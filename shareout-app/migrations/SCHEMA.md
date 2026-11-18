@@ -520,6 +520,7 @@ erDiagram
 | `file_import_sources` | *(0021)* A remote folder mirrored into the workspace: where it lives (`remote_drive_id`, `remote_folder_id`), the ShareOut `target_folder_id`, `convert_enabled`, and the optional daily sync (`daily_sync_enabled`, `next_sync_at`). `connection_id` goes NULL on disconnect, which stops syncing. |
 | `file_import_runs` | *(0021)* One pass over a source: `status`, the progress counts (found, imported, converted, skipped, unchanged, failed) and why it stopped (`stop_code`). |
 | `file_import_items` | *(0021)* The idempotency ledger: each remote folder/file (`remote_id`) and what it became here (`folder_id`, `deliverable_id`, `artifact_id`). A re-run imports a file only when `remote_version` differs from `synced_version`. |
+| `file_import_service_accounts` | *(0042)* The Google service account a workspace shares Drive folders with (`email`, Google's `unique_id`, `status` creating → ready). One per workspace; isolation is Google's ACLs. No secrets (accounts are keyless, impersonated by the instance key). No FK to `workspaces`: the row outlives a deleted workspace until the hourly sweep deletes the account at Google. `file_import_sources.auth` (0042) says whether a source reads through `connection_id` (`oauth`) or this account (`service_account`). |
 
 ## 14 Moderation, support & tests
 

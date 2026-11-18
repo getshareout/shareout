@@ -32,6 +32,28 @@ create folders (*Settings → members can create folders*). External members can
 6. **Start import** and watch the progress: found, imported, pages, unchanged,
    skipped and failed, plus the files that need a look and why.
 
+## Google Drive: share a folder with ShareOut
+
+On instances set up for it, Google Drive works by **sharing** instead of connecting an
+account — no Google permission screen.
+
+1. In the import window, choose **Google Drive → Share a folder**. You get this
+   workspace's own email (`so-…@….iam.gserviceaccount.com`) with a **Copy** button.
+2. In Google Drive, right-click the folder → **Share**, paste the email, set it to
+   **Viewer**, **Send**.
+3. Back in ShareOut, **Check access** lists what is shared with this workspace — or paste
+   the folder's link. Pick it and continue as above.
+
+- The email belongs to **this workspace only**: no other workspace can see what you share
+  with it. Unshare the folder in Drive and ShareOut loses access; the next sync stops and
+  says so, and daily sync resumes once you share it again.
+- **Files added to the folder later** come over on the next sync.
+- **"You can't share outside your organization"** in Drive means your Google Workspace
+  admin blocks external sharing. They have to allow it for your team (a service account
+  can't be added as a trusted domain). Until then, upload the files.
+- A folder imported with an older Google connection shows **Switch to sharing**: share it
+  with the email first, then switch. Nothing is imported again.
+
 ## What happens to each file
 
 | In the drive | In ShareOut |
@@ -78,8 +100,9 @@ Every folder syncing through it stops, including a run in progress and daily syn
 Files already imported stay. To keep syncing, connect again and import the folder again.
 
 <Aside type="note">
-**Self-hosting:** the feature appears once the instance sets `GOOGLE_DRIVE_CLIENT_ID` /
-`GOOGLE_DRIVE_CLIENT_SECRET` and/or `MICROSOFT_FILES_CLIENT_ID` /
+**Self-hosting:** the feature appears once the instance sets `GOOGLE_DRIVE_SA_KEY` (Google
+Drive by sharing — see [Secrets](/self-host/secrets/#google-drive-by-sharing)),
+`GOOGLE_DRIVE_CLIENT_ID` / `GOOGLE_DRIVE_CLIENT_SECRET` (the older consent) and/or `MICROSOFT_FILES_CLIENT_ID` /
 `MICROSOFT_FILES_CLIENT_SECRET` (plus `CREDENTIALS_KEY`). Redirect URIs:
 `$SHAREOUT_BASE_URL/v1/file-imports/oauth/google_drive/callback` and
 `…/microsoft/callback`. Bind the `FILE_IMPORT` Workflow for large folders.

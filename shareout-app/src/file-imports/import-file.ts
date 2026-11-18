@@ -205,12 +205,12 @@ export async function importBatch(a: Active): Promise<{ done: boolean }> {
   `).bind(source.id, run.id, run.id, FILES_PER_STEP).all<FileItem>()).results || [];
   if (!items.length) return { done: true };
 
-  const bucket = await getOrCreateAssetBucket(env, a.conn.user_id, source.workspace_id);
-  const owner = await env.DB.prepare('SELECT id, email FROM users WHERE id = ?').bind(a.conn.user_id).first<{ id: string; email: string | null }>();
+  const bucket = await getOrCreateAssetBucket(env, a.actorId, source.workspace_id);
+  const owner = await env.DB.prepare('SELECT id, email FROM users WHERE id = ?').bind(a.actorId).first<{ id: string; email: string | null }>();
   const ctx: BatchCtx = {
     a, bucketId: bucket.id,
     audience: await targetAudience(env, source.workspace_id, source.target_folder_id),
-    owner: owner ?? { id: a.conn.user_id, email: null },
+    owner: owner ?? { id: a.actorId, email: null },
     conversionsLeft: MAX_CONVERSIONS_PER_RUN - run.converted_count,
   };
 

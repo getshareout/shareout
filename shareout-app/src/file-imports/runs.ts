@@ -4,13 +4,15 @@
  */
 import type { Env } from '../types';
 import { generateId } from '../crypto-utils';
-import { ACTIVE_STATUSES, STALE_RUN_MS, type FileImportProvider, type RunStatus, type RunTrigger } from './types';
+import { ACTIVE_STATUSES, STALE_RUN_MS, type FileImportProvider, type RunStatus, type RunTrigger, type SourceAuth } from './types';
 
 export interface SourceRow {
   id: string;
   workspace_id: string;
   connection_id: string | null;
   provider: FileImportProvider;
+  /** 'oauth' reads through connection_id; 'service_account' through the workspace's own account. */
+  auth: SourceAuth;
   remote_drive_id: string | null;
   remote_folder_id: string;
   remote_name: string;

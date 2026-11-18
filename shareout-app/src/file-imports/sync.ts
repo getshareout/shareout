@@ -15,8 +15,10 @@
 import type { Env } from '../types';
 import { DEFAULT_LIMITS, FOLDERS_PER_STEP, type RemoteLocation, type WalkLimits } from './types';
 import { getRun, getSource, stopRun } from './runs';
-import { getConnection } from './connections';
-import { AuthExpiredError, RateLimitedError } from './http';
+import { accessTokenFor, getConnection } from './connections';
+import { AuthExpiredError, ProviderError, RateLimitedError } from './http';
+import { serviceAccountFor, workspaceDriveToken } from './service-account';
+import { sharedItem } from './providers/google-shared';
 import { withToken, type Active } from './context';
 import { providerApi } from './providers';
 import { canImport, ensureMirrorFolder } from './mirror';
@@ -27,12 +29,28 @@ export type StepRunner = <T>(name: string, fn: () => Promise<T>) => Promise<T>;
 /**
  * The run, if it should keep going. Stops it — and returns null — when its source is
  * gone, its connection was revoked, or the person who connected may no longer import.
+ * A shared-folder source reads only through its own workspace's service account.
  */
 export async function loadActive(env: Env, runId: string, limits: WalkLimits): Promise<Active | null> {
   const run = await getRun(env, runId);
   if (!run || !['queued', 'walking', 'importing'].includes(run.status)) return null;
   const source = await getSource(env, run.workspace_id, run.source_id);
   if (!source) { await stopRun(env, runId, 'stopped', 'SOURCE_DELETED', 'This import was removed.'); return null; }
+  if (source.auth === 'service_account') {
+    const sa = await serviceAccountFor(env, source.workspace_id);
+    if (!sa || sa.workspace_id !== source.workspace_id) {
+      await stopRun(env, runId, 'stopped', 'NOT_SHARED', 'This workspace has no Google share email any more. Share the folder again from Import.');
+      return null;
+    }
+    if (!source.created_by || !(await canImport(env, source.workspace_id, source.created_by))) {
+      await stopRun(env, runId, 'stopped', 'NOT_ALLOWED', 'The person who set up this import can no longer import into this workspace.');
+      return null;
+    }
+    return {
+      env, run, source, api: providerApi(source.provider), limits,
+      actorId: source.created_by, token: (force) => workspaceDriveToken(env, sa, force), shareEmail: sa.email,
+    };
+  }
   const conn = source.connection_id ? await getConnection(env, source.connection_id) : null;
   if (!conn || conn.workspace_id !== source.workspace_id) {
     await stopRun(env, runId, 'stopped', 'CONNECTION_REVOKED', 'The drive was disconnected. Reconnect it and sync again.');
@@ -42,7 +60,24 @@ export async function loadActive(env: Env, runId: string, limits: WalkLimits): P
     await stopRun(env, runId, 'stopped', 'NOT_ALLOWED', 'The person who connected this drive can no longer import into this workspace.');
     return null;
   }
-  return { env, run, source, conn, api: providerApi(source.provider), limits };
+  return {
+    env, run, source, api: providerApi(source.provider), limits,
+    actorId: conn.user_id, token: (force) => accessTokenFor(env, conn, force),
+  };
+}
+
+/** Shared-folder sources: stop cleanly, saying what to do, when the folder is no longer shared. */
+async function stillShared(a: Active): Promise<boolean> {
+  if (a.source.auth !== 'service_account') return true;
+  try {
+    await withToken(a, (t) => sharedItem(t, a.source.remote_folder_id));
+    return true;
+  } catch (e) {
+    if (!(e instanceof ProviderError) || e.status !== 404) throw e;
+    await stopRun(a.env, a.run.id, 'stopped', 'NOT_SHARED',
+      `ShareOut lost access to this folder. Share it again with ${a.shareEmail} as Viewer, then sync again.`);
+    return false;
+  }
 }
 
 async function touch(env: Env, runId: string, status?: string): Promise<void> {
@@ -69,10 +104,11 @@ async function guard<T extends { done: boolean }>(env: Env, runId: string, fn: (
 export async function startStep(env: Env, runId: string, limits: WalkLimits = DEFAULT_LIMITS): Promise<{ done: boolean }> {
   const a = await loadActive(env, runId, limits);
   if (!a) return { done: true };
+  if (!(await stillShared(a))) return { done: true };
   const { source } = a;
   const root = await env.DB.prepare('SELECT folder_id FROM file_import_items WHERE source_id = ? AND remote_id = ?')
     .bind(source.id, source.remote_folder_id).first<{ folder_id: string | null }>();
-  const folderId = await ensureMirrorFolder(env, source.workspace_id, a.conn.user_id, source.target_folder_id, source.remote_name, root?.folder_id ?? null);
+  const folderId = await ensureMirrorFolder(env, source.workspace_id, a.actorId, source.target_folder_id, source.remote_name, root?.folder_id ?? null);
   await env.DB.prepare(`
     INSERT INTO file_import_items (source_id, remote_id, kind, name, path, depth, seen_run_id, folder_id, status)
     VALUES (?, ?, 'folder', ?, ?, 0, ?, ?, 'imported')
@@ -124,7 +160,7 @@ export async function walkStep(env: Env, runId: string, limits: WalkLimits = DEF
       if (f.depth > 0) {
         const parent = await env.DB.prepare('SELECT folder_id FROM file_import_items WHERE source_id = ? AND remote_id = ?')
           .bind(source.id, f.parent_remote_id).first<{ folder_id: string | null }>();
-        folderId = await ensureMirrorFolder(env, source.workspace_id, a.conn.user_id, parent?.folder_id ?? null, f.name, f.folder_id);
+        folderId = await ensureMirrorFolder(env, source.workspace_id, a.actorId, parent?.folder_id ?? null, f.name, f.folder_id);
       }
       const loc: RemoteLocation = { driveId: source.remote_drive_id, folderId: f.remote_id };
       let page: string | undefined;

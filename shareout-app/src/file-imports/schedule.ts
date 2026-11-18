@@ -2,7 +2,9 @@
  * Daily sync: the hourly cron starts a run for each daily source that is due, at most
  * SCHEDULED_SOURCES_PER_TICK per tick (oldest first), and moves it a day on. A source
  * whose connection was revoked has daily sync off and connection_id NULL, so it is
- * never picked.
+ * never picked. Shared-folder sources have no connection: they read through their
+ * workspace's service account, and keep trying daily after an unshare, so sharing the
+ * folder again resumes them.
  */
 import type { Env } from '../types';
 import { SCHEDULED_SOURCES_PER_TICK } from './types';
@@ -12,7 +14,7 @@ import { launchRun } from './launch';
 export async function runDueFileImports(env: Env, now = new Date()): Promise<{ started: number }> {
   const due = (await env.DB.prepare(`
     SELECT * FROM file_import_sources
-    WHERE daily_sync_enabled = 1 AND connection_id IS NOT NULL AND next_sync_at IS NOT NULL AND next_sync_at <= ?
+    WHERE daily_sync_enabled = 1 AND (connection_id IS NOT NULL OR auth = 'service_account') AND next_sync_at IS NOT NULL AND next_sync_at <= ?
     ORDER BY next_sync_at LIMIT ?
   `).bind(now.toISOString(), SCHEDULED_SOURCES_PER_TICK).all<SourceRow>()).results || [];
   let started = 0;

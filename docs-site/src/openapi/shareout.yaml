@@ -4718,6 +4718,15 @@ paths:
                         id: { type: string, enum: [google_drive, microsoft] }
                         connected: { type: boolean }
                         accountEmail: { type: string, nullable: true }
+                  share:
+                    type: object
+                    nullable: true
+                    description: >-
+                      Google Drive by sharing (`GOOGLE_DRIVE_SA_KEY` set), else null. The folder-import
+                      UI offers it instead of the Google OAuth consent.
+                    properties:
+                      provider: { type: string, enum: [google_drive] }
+                      shareEmail: { type: string, nullable: true, description: "The workspace's own service-account email (null until first `POST …/share/google_drive`)." }
                   sources:
                     type: array
                     items:
@@ -4861,6 +4870,36 @@ paths:
           description: Disconnected
         "404":
           $ref: "#/components/responses/NotFound"
+  /v1/workspaces/{workspaceId}/file-imports/share/google_drive:
+    parameters:
+      - $ref: "#/components/parameters/WorkspaceId"
+    post:
+      tags: [File imports]
+      summary: This workspace's Google Drive share email
+      description: >-
+        Returns the workspace's own Google service account, created on first use. People
+        share a Drive folder with this email as Viewer; ShareOut reads it as this account
+        only, so a folder shared with another workspace is invisible here. When the
+        instance has reached Google's service-account limit the answer is 503
+        `SHARE_EMAIL_LIMIT` — never another workspace's or a shared account.
+      operationId: shareFileImportGoogleDrive
+      responses:
+        "200":
+          description: The share email
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  shareEmail: { type: string }
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          description: "`NOT_CONFIGURED` — the instance has no `GOOGLE_DRIVE_SA_KEY`."
+        "502":
+          description: "`SHARE_EMAIL_FAILED` — Google did not create the account; try again."
+        "503":
+          description: "`SHARE_EMAIL_LIMIT` — the instance reached Google's service-account limit."
   /v1/workspaces/{workspaceId}/file-imports/browse/{provider}:
     parameters:
       - $ref: "#/components/parameters/WorkspaceId"
@@ -4878,9 +4917,21 @@ paths:
         in: query
         description: Search SharePoint sites (Microsoft, at `root`).
         schema: { type: string }
+      - name: access
+        in: query
+        description: "`share` = Google Drive folders shared with this workspace's email (no OAuth connection)."
+        schema: { type: string, enum: [share] }
+      - name: link
+        in: query
+        description: "With `access=share`: a pasted folder link (or id) to resolve."
+        schema: { type: string }
     get:
       tags: [File imports]
       summary: Browse my drive's folders
+      description: >-
+        With `access=share`: `root` lists the folders shared with this workspace's
+        email, newest first; a folder ref lists its subfolders. Anything not shared
+        with this workspace is `404 NOT_SHARED`, whose message names the email to share with.
       operationId: browseFileImport
       responses:
         "200":
@@ -4891,6 +4942,7 @@ paths:
                 type: object
                 properties:
                   searchable: { type: boolean }
+                  shareEmail: { type: string, description: "With `access=share` only." }
                   entries:
                     type: array
                     items:
@@ -4900,6 +4952,8 @@ paths:
                         name: { type: string }
                         kind: { type: string, enum: [folder, drive, site, group] }
                         selectable: { type: boolean }
+        "404":
+          description: "`NOT_SHARED` — with `access=share`: not shared with this workspace's email."
         "409":
           $ref: "#/components/responses/Conflict"
   /v1/workspaces/{workspaceId}/file-imports/sources:
@@ -4913,7 +4967,8 @@ paths:
         ShareOut folder inside `targetFolderId` (or at the top level), mirroring
         subfolders. Files take the target folder's visibility (private → private,
         public → link-shareable, otherwise team); converted pages are never public.
-        At most 10 folders per workspace can sync daily.
+        At most 10 folders per workspace can sync daily. With `access: share` the folder
+        must be shared with this workspace's email right now (else `404 NOT_SHARED`).
       operationId: createFileImportSource
       requestBody:
         required: true
@@ -4927,8 +4982,9 @@ paths:
                 ref: { type: string, description: A selectable ref from browse. }
                 name: { type: string }
                 targetFolderId: { type: string, nullable: true }
-                convert: { type: boolean, default: true, description: Turn Word/Excel/PDF/Markdown/CSV (and slides, when the converter is bound) into pages. }
+                convert: { type: boolean, default: true, description: "Turn Word/Excel/PDF/Markdown/CSV (and slides, when the converter is bound) into pages." }
                 dailySync: { type: boolean, default: false }
+                access: { type: string, enum: [share], description: "Google Drive by sharing: read with this workspace's service account; `ref` comes from an `access=share` browse." }
       responses:
         "201":
           description: Created and started
@@ -4951,7 +5007,7 @@ paths:
       - { name: sourceId, in: path, required: true, schema: { type: string } }
     patch:
       tags: [File imports]
-      summary: Change daily sync or conversion
+      summary: Change daily sync or conversion, or switch to sharing
       operationId: updateFileImportSource
       requestBody:
         content:
@@ -4961,6 +5017,12 @@ paths:
               properties:
                 dailySync: { type: boolean }
                 convert: { type: boolean }
+                access:
+                  type: string
+                  enum: [share]
+                  description: >-
+                    Move a Google Drive source from its OAuth connection to this workspace's
+                    share email. The folder must already be shared with it; nothing re-imports.
       responses:
         "200":
           description: Updated
@@ -8734,6 +8796,8 @@ components:
         nextSyncAt: { type: string, nullable: true }
         connected: { type: boolean, description: false after the connection was revoked. }
         mine: { type: boolean }
+        access: { type: string, enum: [oauth, share], description: "How it reads the drive: a member's connection, or the workspace's share email." }
+        canSwitchToShare: { type: boolean }
         lastRun: { $ref: "#/components/schemas/FileImportRun" }
     Visibility:
       type: string

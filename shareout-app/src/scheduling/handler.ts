@@ -1,5 +1,6 @@
 import type { Env } from '../types';
 import { runDueFileImports } from '../file-imports/schedule';
+import { sweepOrphanedServiceAccounts } from '../file-imports/service-account';
 import { runVersionNoticeSweep } from '../notify/review-notify';
 import { getUserRole } from '../artifacts/roles';
 import { purgeSoftDeleted } from '../artifacts/crud';
@@ -276,6 +277,9 @@ export async function handleScheduledEvent(env: Env, scheduledTime?: number): Pr
   // capped per tick. Cheap no-op SELECT when nothing is due.
   const fileImports = await runDueFileImports(env).catch(() => ({ started: 0 }));
   if (fileImports.started > 0) logger.info('file import syncs started', { started: fileImports.started });
+  // Deleted workspaces: delete their Google Drive service account, so nothing shared with it stays readable.
+  const swept = await sweepOrphanedServiceAccounts(env).catch(() => ({ deleted: 0 }));
+  if (swept.deleted > 0) logger.info('file import service accounts deleted', { deleted: swept.deleted });
 
   // Dispatch due crew cron triggers (Phase 1). Hourly granularity.
   const crewResult = await runDueCrewTriggers(env);
