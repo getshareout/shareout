@@ -37,6 +37,12 @@ Cron schedules run in **UTC**: convert the recipient's local time before sending
 | `materialize` | Re-run a connection query and store the result as a dataset/table/json key (extract refresh) | `MaterializeConfig` |
 | `query_snapshot` | Deterministic multi-query refresh: run fixed SQL/paths against a workspace connection → write each result to json/dataset/table | `QuerySnapshotConfig` |
 | `sheets_append` | Run one connection query → append the result rows to a connected Google Sheet (a new dated row-set each run) | `SheetsAppendConfig` |
+| `public_sheet_sync` | Copy one tab of a spreadsheet shared as "Anyone with the link" into one of the page's datasets — no Google sign-in | `PublicSheetSyncConfig` |
+| `drive_file_sync` | Copy one tab of a private Google Drive spreadsheet the creator picked in Google into one of the page's datasets | `DriveFileSyncConfig` |
+
+Keeping a page in sync with a spreadsheet the person edits? Guide them through
+[integrations/spreadsheet-sync.md](../integrations/spreadsheet-sync.md) (which way, what to
+click, what they will see); the two config sections below are the wire format.
 
 ## Trigger Types
 
@@ -463,6 +469,99 @@ interface SheetsAppendConfig {
 - Pair with a slightly-earlier `query_snapshot`/data refresh if the same numbers also feed a dashboard, or just run the query directly here — it's independent.
 - `null`/`undefined` cells become empty strings; objects/arrays are JSON-encoded.
 
+### PublicSheetSyncConfig
+
+One tab of a spreadsheet shared as **"Anyone with the link can view"** (a Google Sheet, or an
+Excel file in Google Drive) → the page's dataset `dataset`, as JSON rows keyed by the header row.
+No Google sign-in: ShareOut builds Google's export URL from the link's file id and fetches only
+from Google's hosts. Every run downloads the file and skips the write when the rows are unchanged.
+
+> **Anyone who has the link can read the file.** Only for data that can be public — never
+> personal or confidential data. Say so to the person before you save; a private file goes
+> through `drive_file_sync` instead.
+
+```typescript
+interface PublicSheetSyncConfig {
+  link: string;       // the share link as pasted: docs.google.com/spreadsheets/d/… or drive.google.com/file/d/…
+  dataset: string;    // letters, digits, _ . -, up to 64 — the page reads sdk.dataset(dataset)
+  sheet?: string;     // tab name; empty = the first tab with cells. Keep it by name (a tab added in front won't move it)
+  fileName?: string;  // label in the UI; each run reads the live title
+}
+```
+
+Check the link first — it saves nothing and names the tabs:
+
+```http
+POST /v1/workspaces/{workspaceId}/sheet-links/inspect
+{ "link": "https://docs.google.com/spreadsheets/d/1Bxi…/edit?usp=sharing" }
+
+200 { "kind": "sheets", "fileName": "Sales 2026.xlsx", "sheets": ["Summary", "Raw"],
+      "sheet": "Summary", "rowCount": 2, "columns": ["Region", "Sales"] }
+```
+
+| Error | Status | Means → tell the person |
+|---|---|---|
+| `NOT_PUBLIC` | 422 | Not shared with anyone who has the link → **Share → General access → "Anyone with the link" → Viewer** (Spanish Google: Compartir → Acceso general → "Cualquier persona que tenga el vínculo" → Lector), then check again |
+| `NOT_FOUND` | 422 | Deleted, or an incomplete link → copy it again with Share → Copy link |
+| `BAD_LINK` | 400 | Not a Google spreadsheet link (folder, document, "Publish to the web", another site) |
+| `NOT_SPREADSHEET` / `TOO_LARGE` / `SHEET_*` | 422 | Not readable as a spreadsheet, or too big |
+| `RATE_LIMITED` | 429 | 60 checks per person per hour |
+
+Workspace members only; saving the job needs owner or editor access to the page (viewers get
+`403`), and the page must be in a workspace.
+
+```json
+{
+  "artifact_id": "art_abc123",
+  "action": "public_sheet_sync",
+  "schedule": "0 11 * * *",
+  "title": "Sync Sales 2026.xlsx from link",
+  "config": { "link": "https://docs.google.com/spreadsheets/d/1Bxi…/edit?usp=sharing", "dataset": "sales_2026", "sheet": "Summary" }
+}
+```
+
+Then `POST /v1/jobs/{id}/run` once so the page has data now (the Inspector does the same).
+
+### DriveFileSyncConfig
+
+One tab of a **private** Google Drive spreadsheet (Excel, Google Sheets, OpenDocument or CSV) →
+the page's dataset `dataset`. It reads through the job creator's own Google consent, which is
+`drive.file`: Google lets ShareOut read **only the files that person picked** in Google's file
+picker. An unchanged Drive revision is skipped (one metadata call per run).
+
+```typescript
+interface DriveFileSyncConfig {
+  provider?: 'google_drive';
+  fileId: string;     // a file the creator picked — GET …/file-imports/sheet-sync → picked.id
+  dataset: string;    // letters, digits, _ . -, up to 64
+  sheet?: string;     // tab name; empty = the first tab with cells
+  fileName?: string;  // label in the UI; each run reads the live name
+}
+```
+
+**Picking the file is the person's click in Google, once — there is no way around it.** Hand
+them the pick link, then read the pick back:
+
+```http
+GET /v1/workspaces/{workspaceId}/file-imports/sheet-sync/pick?return=assistant   → 302 Google consent + picker (their browser)
+GET /v1/workspaces/{workspaceId}/file-imports/sheet-sync
+200 { "available": true, "connected": true, "accountEmail": "ana@acme.com",
+      "picked": { "id": "1DrIvE…", "name": "Stock.xlsx", "pickedAt": "2026-11-18T13:32:10.000Z" } }
+```
+
+- The pick link is opened by the person in **their own browser**: signed out, ShareOut sends them
+  to sign in and back; `&file=<id>` (from a Drive/Sheets link) narrows the picker to that file.
+  With `return=assistant` the last page (English or Spanish) tells them to go back to the
+  conversation and offers "Pick the spreadsheet again" if nothing was picked.
+- `picked` is the last file that person picked in that workspace, visible only to them.
+- A job saved with a `fileId` nobody picked is accepted, but its first run fails with *"The job
+  owner has not chosen this spreadsheet in Google Drive…"*. Run it once after saving.
+- Only the creator can point the sync at another file (the page owner can change the rest).
+- Needs a role that may import files (workspace admins and editors) for the pick, and owner or
+  editor access to the page for the job. `available: false` = this instance has no Google client.
+
+Step by step for an assistant: [integrations/spreadsheet-sync.md](../integrations/spreadsheet-sync.md#private-file).
+
 
 ### Weekly Report Email
 
@@ -542,6 +641,7 @@ interface SheetsAppendConfig {
 
 ## Related
 
+- [Keep a page in sync with a spreadsheet](../integrations/spreadsheet-sync.md) - Guided flow for `public_sheet_sync` / `drive_file_sync`
 - [SDK: Email](../sdk/email.md) - SDK email methods
 - [REST API: Templates](templates.md) - Email templates CRUD
 - [Overview](overview.md) - API intro

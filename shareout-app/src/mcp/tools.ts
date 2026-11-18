@@ -27,6 +27,7 @@ import { KNOWLEDGE_TOOLS } from './knowledge-tools';
 import { KNOWLEDGE_CURATION_TOOLS } from './knowledge-curation-tools';
 import { CONNECTOR_TOOLS } from './connector-tools';
 import { PAGE_TOOLS } from './page-tools';
+import { SHEET_SYNC_TOOLS } from './sheet-sync-tools';
 import { SHARING_TOOLS } from './sharing-tools';
 import { EDIT_TOOLS } from './edit-tools';
 import { lossyWrite, mainText, readSource } from './page-source';
@@ -60,6 +61,12 @@ export const SERVER_INSTRUCTIONS = [
   'For live numbers from the team’s databases, files or apps (warehouses, Supabase, Amazon S3, Humand), call list_connections, then',
   'query_connection (one read-only SELECT), browse_storage (S3 files) or read_connector (app APIs such as Humand: employees,',
   'departments, time off, attendance), and say which connector the answer came from.',
+  'To keep a page\'s numbers up to date from a spreadsheet, guide the person one question at a time and keep the technical words to yourself',
+  '(no schedule codes, ids, dataset names or job talk): ask whether the file may be seen by anyone with its link or is private.',
+  'Shared link: check it with inspect_sheet_link, say plainly that anyone with the link can open the file (never for personal or confidential data),',
+  'and when it is not shared yet, give them the three clicks the result names. Private file: give them the link from pick_drive_spreadsheet ready to click,',
+  'say in one line what they will see (Google asks for their account, then they choose the spreadsheet), and when they say they are done call it again to see the pick.',
+  'Then set_sheet_sync with the defaults (first tab, every day) unless they asked otherwise, and confirm what it says worked: how many rows the page has now and how often it updates.',
   'If anything fails or behaves unexpectedly, call report_problem with what happened, then tell the person',
   'the ShareOut team was notified. For how-to questions about ShareOut, call get_help.',
   'Confirm with the person before anything that reaches other people or cannot be undone from here: sharing a folder or file outside the team,',
@@ -623,7 +630,7 @@ const fetchTool: ToolDef = {
 // Deterministic order (lets clients cache the list).
 export const TOOLS: ToolDef[] = [
   whoami, listWorkspaces, listArtifacts, getArtifact, publishArtifact, updateArtifact, ...EDIT_TOOLS, ...BUILD_TOOLS,
-  ...PAGE_TOOLS, ...SHARING_TOOLS, ...MEMBER_TOOLS, ...KNOWLEDGE_TOOLS, ...KNOWLEDGE_CURATION_TOOLS, ...CONNECTOR_TOOLS, getHelp, reportProblem, search, fetchTool,
+  ...PAGE_TOOLS, ...SHEET_SYNC_TOOLS, ...SHARING_TOOLS, ...MEMBER_TOOLS, ...KNOWLEDGE_TOOLS, ...KNOWLEDGE_CURATION_TOOLS, ...CONNECTOR_TOOLS, getHelp, reportProblem, search, fetchTool,
 ];
 
 export function listTools() {

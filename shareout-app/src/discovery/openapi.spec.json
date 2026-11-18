@@ -7774,6 +7774,121 @@
         }
       }
     },
+    "/v1/workspaces/{workspaceId}/sheet-links/inspect": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/WorkspaceId"
+        }
+      ],
+      "post": {
+        "tags": [
+          "Jobs"
+        ],
+        "summary": "Check a spreadsheet share link",
+        "description": "Checks a Google Sheets or Google Drive (Excel) share link before a `public_sheet_sync` job is saved: is it shared as \"Anyone with the link can view\", what is the file called, which tabs does it have, and the first tab's row count and columns (up to 50). Saves nothing. Workspace members only, 60 checks per person per hour. Fetches only from Google's hosts, never the pasted URL. A link-shared file is readable by anyone who has the link: not for personal or confidential data.",
+        "operationId": "inspectSheetLink",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "link"
+                ],
+                "properties": {
+                  "link": {
+                    "type": "string",
+                    "maxLength": 2000,
+                    "example": "https://docs.google.com/spreadsheets/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/edit?usp=sharing"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The file, its tabs and the first tab's shape",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "sheets",
+                        "drive"
+                      ],
+                      "description": "sheets = a native Google Sheet; drive = a file uploaded to Drive"
+                    },
+                    "fileName": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "sheets": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "sheet": {
+                      "type": "string",
+                      "description": "The first tab with cells (the default)."
+                    },
+                    "rowCount": {
+                      "type": "integer"
+                    },
+                    "columns": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`BAD_LINK` — not a Google spreadsheet link (a folder, a document, a \"Publish to the web\" link, another site); `VALIDATION_ERROR` — no `link` in the body.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "422": {
+            "description": "`NOT_PUBLIC` — not shared with \"Anyone with the link\" (the message names the three clicks in Google: Share → General access → Anyone with the link → Viewer); `NOT_FOUND` — deleted, or an incomplete link; `NOT_SPREADSHEET`; `TOO_LARGE`; `SHEET_*` — the file could not be read as a spreadsheet.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "`RATE_LIMITED` — too many links checked in the last hour."
+          },
+          "502": {
+            "description": "`UPSTREAM` / `BLOCKED` — Google answered unexpectedly."
+          },
+          "504": {
+            "description": "`TIMEOUT` — Google took too long."
+          }
+        }
+      }
+    },
     "/v1/workspaces/{workspaceId}/file-imports": {
       "parameters": [
         {
@@ -7982,7 +8097,7 @@
           "File imports"
         ],
         "summary": "My Google consent for spreadsheet sync",
-        "description": "The scheduled spreadsheet sync (`drive_file_sync` jobs) has its own Google consent, apart from folder import: `drive.file`, so ShareOut reads only the files picked in the Google Picker. `available` = this instance has a Google client for it.",
+        "description": "The scheduled spreadsheet sync (`drive_file_sync` jobs) has its own Google consent, apart from folder import: `drive.file`, so ShareOut reads only the files picked in the Google Picker. `available` = this instance has a Google client for it. `picked` = the last spreadsheet I picked in this workspace (null before the first pick): an API client that handed me the pick link reads it here to create the `drive_file_sync` job.",
         "operationId": "getSheetSyncConsent",
         "responses": {
           "200": {
@@ -8001,6 +8116,24 @@
                     "accountEmail": {
                       "type": "string",
                       "nullable": true
+                    },
+                    "picked": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "description": "The Drive file id (DriveFileSyncConfig.fileId)."
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "pickedAt": {
+                          "type": "string",
+                          "format": "date-time",
+                          "nullable": true
+                        }
+                      }
                     }
                   }
                 }
@@ -8025,6 +8158,17 @@
           "schema": {
             "type": "string"
           }
+        },
+        {
+          "name": "return",
+          "in": "query",
+          "description": "`assistant` when an assistant hands this link to the person: the last page tells them to go back to the conversation, and offers the link again if nothing was picked.",
+          "schema": {
+            "type": "string",
+            "enum": [
+              "assistant"
+            ]
+          }
         }
       ],
       "get": {
@@ -8032,11 +8176,11 @@
           "File imports"
         ],
         "summary": "Pick a spreadsheet in the Google Picker (browser only)",
-        "description": "Redirects (302) to Google's consent for `drive.file` with the Google Picker inside it (`trigger_onepick`), spreadsheets only, one file. It returns to `GET /v1/file-imports/oauth/google_drive/callback`, which stores the consent and posts `shareout:drive-sheet:picked` `{ ok, file: { id, name }, error }` to the opener window, on the ShareOut origin that opened it only.",
+        "description": "Redirects (302) to Google's consent for `drive.file` with the Google Picker inside it (`trigger_onepick`), spreadsheets only, one file. It returns to `GET /v1/file-imports/oauth/google_drive/callback`, which stores the consent, remembers the pick (`picked` in `GET …/file-imports/sheet-sync`) and posts `shareout:drive-sheet:picked` `{ ok, file: { id, name }, error }` to the opener window, on the ShareOut origin that opened it only. Meant for the person's own browser: opened signed out (no session, no Authorization header) it redirects to sign-in and back; a browser refused here gets a page saying why (in English or Spanish), API clients get JSON.",
         "operationId": "pickSheetSyncFile",
         "responses": {
           "302": {
-            "description": "Redirect to Google's consent + Picker"
+            "description": "Redirect to Google's consent + Picker (or to sign-in first)"
           },
           "400": {
             "$ref": "#/components/responses/BadRequest"
@@ -15930,7 +16074,11 @@
               "materialize",
               "telegram",
               "query_snapshot",
-              "sheets_append"
+              "sheets_append",
+              "artifact_test",
+              "asset_delivery",
+              "drive_file_sync",
+              "public_sheet_sync"
             ]
           },
           "trigger_type": {
@@ -16014,7 +16162,11 @@
               "materialize",
               "telegram",
               "query_snapshot",
-              "sheets_append"
+              "sheets_append",
+              "artifact_test",
+              "asset_delivery",
+              "drive_file_sync",
+              "public_sheet_sync"
             ]
           },
           "trigger_type": {
@@ -16041,7 +16193,12 @@
           },
           "config": {
             "type": "object",
-            "description": "Action-specific configuration."
+            "description": "Action-specific configuration. Spreadsheet syncs: `public_sheet_sync` takes `PublicSheetSyncConfig` (a link shared as \"Anyone with the link can view\"; check it first with `POST /v1/workspaces/{workspaceId}/sheet-links/inspect`), `drive_file_sync` takes `DriveFileSyncConfig` (a private Drive file its creator picked in Google's consent + Picker, `GET /v1/workspaces/{workspaceId}/file-imports/sheet-sync/pick`). Both need owner or editor access to a page inside a workspace.",
+            "example": {
+              "link": "https://docs.google.com/spreadsheets/d/1Bxi…/edit",
+              "dataset": "sales",
+              "sheet": "Summary"
+            }
           },
           "retry_config": {
             "type": "object",
@@ -16065,6 +16222,68 @@
                 "maximum": 3600
               }
             }
+          }
+        }
+      },
+      "PublicSheetSyncConfig": {
+        "type": "object",
+        "description": "`public_sheet_sync`: one tab of a spreadsheet shared as \"Anyone with the link can view\" (a Google Sheet, or an Excel file in Google Drive) → the page's dataset `dataset`, as JSON rows keyed by the header row, with no Google sign-in. ShareOut builds Google's export URL from the link's file id and fetches only from Google's hosts. Each run downloads the file and skips the write when the rows are unchanged. Anyone who has the link can read the file: not for personal or confidential data (use `drive_file_sync`).",
+        "required": [
+          "link",
+          "dataset"
+        ],
+        "properties": {
+          "link": {
+            "type": "string",
+            "maxLength": 2000,
+            "description": "The share link as pasted (docs.google.com/spreadsheets/d/… or drive.google.com/file/d/…)."
+          },
+          "dataset": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9_.-]{1,64}$"
+          },
+          "sheet": {
+            "type": "string",
+            "maxLength": 100,
+            "description": "Tab name. Empty = the first tab with cells."
+          },
+          "fileName": {
+            "type": "string",
+            "maxLength": 200,
+            "description": "Shown in the UI only; each run reads the live title from Google."
+          }
+        }
+      },
+      "DriveFileSyncConfig": {
+        "type": "object",
+        "description": "`drive_file_sync`: one tab of a private Google Drive spreadsheet (Excel, Google Sheets, OpenDocument or CSV) → the page's dataset `dataset`, read through the job creator's `drive.file` consent: Google lets ShareOut read only files that person picked in the Google Picker. Choosing the file is the person's click in Google, once; an API client can schedule only a file already picked (`picked` in `GET /v1/workspaces/{workspaceId}/file-imports/sheet-sync`) — any other id is saved but its first run fails. Only the creator may point the sync at another file. Skips the read when the Drive revision is unchanged.",
+        "required": [
+          "fileId",
+          "dataset"
+        ],
+        "properties": {
+          "provider": {
+            "type": "string",
+            "enum": [
+              "google_drive"
+            ],
+            "default": "google_drive"
+          },
+          "fileId": {
+            "type": "string"
+          },
+          "dataset": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9_.-]{1,64}$"
+          },
+          "sheet": {
+            "type": "string",
+            "maxLength": 100,
+            "description": "Tab name. Empty = the first tab with cells."
+          },
+          "fileName": {
+            "type": "string",
+            "description": "Shown in the UI only; each run reads the live name from Drive."
           }
         }
       },

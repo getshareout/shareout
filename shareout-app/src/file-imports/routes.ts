@@ -25,10 +25,15 @@
  *
  * The spreadsheet sync's own consent (drive.file + the Google Picker inside it, never the
  * folder import's drive.readonly). It returns on the Google Drive callback above:
- *   GET    /v1/workspaces/{ws}/file-imports/sheet-sync               { available, connected, accountEmail }
- *   GET    /v1/workspaces/{ws}/file-imports/sheet-sync/pick?file=    → 302 to Google: consent + Picker, one spreadsheet
- *          (file = a pasted link's id: the Picker shows only that file); the callback posts
- *          `shareout:drive-sheet:picked` { ok, file: { id, name } | null, error } to the opening ShareOut origin only
+ *   GET    /v1/workspaces/{ws}/file-imports/sheet-sync               { available, connected, accountEmail, picked }
+ *          (picked = the last spreadsheet this person picked here: { id, name, pickedAt } | null)
+ *   GET    /v1/workspaces/{ws}/file-imports/sheet-sync/pick?file=&return=assistant
+ *          → 302 to Google: consent + Picker, one spreadsheet (file = a pasted link's id: the
+ *          Picker shows only that file); the callback posts `shareout:drive-sheet:picked`
+ *          { ok, file: { id, name } | null, error } to the opening ShareOut origin only and
+ *          records the pick. return=assistant: an assistant handed the person this link, so the
+ *          last page says to go back to the conversation. Opened signed out in a browser, it
+ *          sends the person to sign in first and back here.
  *   DELETE /v1/workspaces/{ws}/file-imports/sheet-sync/connection    forget it (scheduled syncs through it stop)
  */
 import type { FetchContext } from '../router/context';
@@ -37,10 +42,11 @@ import { isAuthUser, requireTokenOrSession } from '../router/helpers/auth-guard'
 import { getInternalWorkspaceRole } from '../workspaces/roles';
 import { jsonWithApiErrors } from '../http/api-error';
 import { escapeHtml } from '../html/utils';
+import { localeForViewer, type Locale } from '../i18n/locale';
 import { standalonePageStyles } from '../design-system/standalone-page';
 import { DRIVE_FILE_CONSENT, isFileImportProvider, MAX_DAILY_SOURCES_PER_WORKSPACE, type FileImportProvider, type RemoteEntry } from './types';
 import { accountEmail, authorizationUrl, configuredProviders, exchangeCode, OAuthGrantError, providerConfig, verifyState, type OAuthState } from './oauth';
-import { accessTokenFor, deleteConnection, findConnection, listConnections, saveConnection, type ConnectionRow } from './connections';
+import { accessTokenFor, deleteConnection, findConnection, listConnections, recordSheetPick, saveConnection, type ConnectionRow } from './connections';
 import { providerApi } from './providers';
 import { DRIVE_FILE_ID, getDriveFile, isSpreadsheet } from './providers/google';
 import { canImport } from './mirror';
@@ -71,11 +77,18 @@ export async function routeFileImportApi(ctx: FetchContext): Promise<Response | 
 async function handleWorkspace(ctx: FetchContext, workspaceId: string, sub: string): Promise<Response> {
   const { env, request } = ctx;
   const method = request.method;
+  // The pick link is opened in the person's own browser (an assistant may have handed it over):
+  // signed out → sign in and come back; refused → a page that says why, not JSON.
+  const browserPick = sub === 'sheet-sync/pick' && method === 'GET' && !request.headers.has('Authorization');
   const user = await requireTokenOrSession(ctx);
-  if (!isAuthUser(user)) return user;
-  if (!(await getInternalWorkspaceRole(env, workspaceId, user.id))) return err('Forbidden', 'FORBIDDEN', 403);
+  if (!isAuthUser(user)) {
+    return browserPick ? redirect(`${ctx.url.origin}/auth/login?redirect=${encodeURIComponent(ctx.url.pathname + ctx.url.search)}`) : user;
+  }
+  if (!(await getInternalWorkspaceRole(env, workspaceId, user.id))) {
+    return browserPick ? await pickRefusedPage(ctx, user.id, workspaceId, 'notMember') : err('Forbidden', 'FORBIDDEN', 403);
+  }
   if (!(await canImport(env, workspaceId, user.id))) {
-    return err('Only workspace admins and editors can import files', 'IMPORT_NOT_ALLOWED', 403);
+    return browserPick ? await pickRefusedPage(ctx, user.id, workspaceId, 'noImport') : err('Only workspace admins and editors can import files', 'IMPORT_NOT_ALLOWED', 403);
   }
   const providers = configuredProviders(env);
   const share = serviceAccountConfigured(env);
@@ -197,13 +210,16 @@ async function sheetSync(ctx: FetchContext, workspaceId: string, userId: string,
   const { env, request } = ctx;
   if (rest === '' && request.method === 'GET') {
     const conn = await findConnection(env, workspaceId, userId, DRIVE_FILE_CONSENT);
-    return json({ available: !!providerConfig(env, DRIVE_FILE_CONSENT), connected: !!conn, accountEmail: conn?.account_email ?? null });
+    const picked = conn?.picked_file_id ? { id: conn.picked_file_id, name: conn.picked_file_name ?? '', pickedAt: conn.picked_at ?? null } : null;
+    return json({ available: !!providerConfig(env, DRIVE_FILE_CONSENT), connected: !!conn, accountEmail: conn?.account_email ?? null, picked });
   }
   if (rest === '/pick' && request.method === 'GET') {
     const file = ctx.url.searchParams.get('file') || '';
     if (file && !DRIVE_FILE_ID.test(file)) return err('Not a Google Drive file id', 'VALIDATION_ERROR', 400);
     // The popup opens on the page's own origin; the pick is posted back to that origin only.
-    const url = await authorizationUrl(env, DRIVE_FILE_CONSENT, workspaceId, userId, { origin: ctx.url.origin, fileIds: file ? [file] : [] });
+    const url = await authorizationUrl(env, DRIVE_FILE_CONSENT, workspaceId, userId, {
+      origin: ctx.url.origin, fileIds: file ? [file] : [], assistant: ctx.url.searchParams.get('return') === 'assistant',
+    });
     return url ? redirect(url) : err('Google Drive is not set up on this instance', 'PROVIDER_NOT_CONFIGURED', 404);
   }
   if (rest === '/connection' && request.method === 'DELETE') {
@@ -422,45 +438,111 @@ async function handleCallback(ctx: FetchContext, provider: string): Promise<Resp
   return callbackPage(true, provider, 'Your drive is connected. Go back to ShareOut to pick a folder.');
 }
 
+/** What the person reads on the sheet sync's last page, in their language. Every refusal says
+ *  what happened and what to do; the page puts the fix (pick again) one click away. */
+const PICK_COPY = {
+  en: {
+    picked: 'Spreadsheet picked', nothing: 'Nothing picked', close: 'You can close this window.', again: 'Pick the spreadsheet again',
+    refusedTitle: 'Google Drive can’t be connected here',
+    backToShareout: 'Go back to ShareOut to finish setting up the sync.',
+    backToAssistant: (name: string) => `You picked “${name}”. Go back to the conversation and tell your assistant you are done: it finishes setting up the sync.`,
+    notSetUp: 'Google Drive is not set up on this instance.',
+    cancelled: 'No spreadsheet was picked.',
+    expired: 'This link expired. Start again.',
+    wrongPerson: 'Sign in to ShareOut as the person who started this.',
+    noImport: 'You can no longer import into this workspace.',
+    noFile: 'No spreadsheet was picked. Try again.',
+    refused: 'Google refused the connection. Try again.',
+    unreadable: 'Google Drive could not read that file. Pick it again.',
+    broken: 'Something went wrong while connecting.',
+    notSheet: (name: string) => `"${name}" is not a spreadsheet (Excel, Google Sheets, OpenDocument or CSV).`,
+    notMember: 'This ShareOut account can’t connect Google Drive in this workspace. If you have another account for work, sign out, sign in with it and open the link again. If not, ask a workspace admin.',
+    noImportYet: 'Your role in this workspace cannot connect Google Drive. Ask a workspace admin to set up the sync, or to make you an editor.',
+  },
+  es: {
+    picked: 'Planilla elegida', nothing: 'No se eligió nada', close: 'Ya podés cerrar esta ventana.', again: 'Elegir la planilla de nuevo',
+    refusedTitle: 'No se puede conectar Google Drive acá',
+    backToShareout: 'Volvé a ShareOut para terminar de configurar la sincronización.',
+    backToAssistant: (name: string) => `Elegiste “${name}”. Volvé a la conversación y decile a tu asistente que ya está: él termina de configurar la sincronización.`,
+    notSetUp: 'Google Drive no está configurado en esta instancia.',
+    cancelled: 'No se eligió ninguna planilla.',
+    expired: 'Este enlace venció. Empezá de nuevo.',
+    wrongPerson: 'Entrá a ShareOut con la cuenta de la persona que empezó esto.',
+    noImport: 'Ya no podés importar en este espacio de trabajo.',
+    noFile: 'No se eligió ninguna planilla. Probá de nuevo.',
+    refused: 'Google rechazó la conexión. Probá de nuevo.',
+    unreadable: 'Google Drive no pudo leer ese archivo. Elegilo de nuevo.',
+    broken: 'Algo salió mal al conectar.',
+    notSheet: (name: string) => `"${name}" no es una planilla (Excel, Google Sheets, OpenDocument o CSV).`,
+    notMember: 'Esta cuenta de ShareOut no puede conectar Google Drive en este espacio de trabajo. Si tenés otra cuenta de trabajo, cerrá sesión, entrá con esa y abrí el enlace de nuevo. Si no, pedíselo a un administrador del espacio.',
+    noImportYet: 'Tu rol en este espacio de trabajo no puede conectar Google Drive. Pedile a un administrador que configure la sincronización, o que te haga editor.',
+  },
+} satisfies Record<Locale, Record<string, string | ((name: string) => string)>>;
+type PickCopy = (typeof PICK_COPY)['en'];
+type PickMsg = { [K in keyof PickCopy]: PickCopy[K] extends string ? K : never }[keyof PickCopy];
+
+async function pickLocale(ctx: FetchContext, userId: string, workspaceId: string): Promise<Locale> {
+  const row = await ctx.env.DB.prepare('SELECT locale FROM users WHERE id = ?').bind(userId).first<{ locale: string | null }>().catch(() => null);
+  return localeForViewer(ctx.env, { workspaceId, user: row?.locale, request: ctx.request });
+}
+
+interface PickPage { ok: boolean; message: string; lang: Locale; origin?: string; file?: { id: string; name: string }; again?: string; title?: string }
+
 /** The sheet sync's consent page: tells the opening ShareOut window (that origin only) what was picked. */
-function sheetPickPage(ok: boolean, message: string, origin: string | undefined, file?: { id: string; name: string }): Response {
+function sheetPickPage({ ok, message, lang, origin, file, again, title }: PickPage): Response {
+  const c = PICK_COPY[lang];
+  const heading = title ?? (ok ? c.picked : c.nothing);
   let target = '';
   try { if (origin && new URL(origin).origin === origin) target = origin; } catch { /* no opener to tell */ }
   // A Drive file name is the user's text: keep it from closing the script tag.
   const msg = JSON.stringify({ type: 'shareout:drive-sheet:picked', ok, file: file ?? null, error: ok ? null : message }).replace(/</g, '\\u003c');
-  const html = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${ok ? 'Spreadsheet picked' : 'Nothing picked'} - ShareOut</title><style>${standalonePageStyles}</style></head>
+  const html = `<!DOCTYPE html><html lang="${lang}"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${heading} - ShareOut</title><style>${standalonePageStyles}</style></head>
 <body><div class="card"><div class="icon ${ok ? 'success' : 'error'}">${ok ? '✓' : '✕'}</div>
-<h1>${ok ? 'Spreadsheet picked' : 'Nothing picked'}</h1><p>${escapeHtml(message)}</p>
-<p class="close-hint">You can close this window.</p></div>
+<h1>${heading}</h1><p>${escapeHtml(message)}</p>
+${!ok && again ? `<p><a href="${escapeHtml(again)}">${c.again}</a></p>` : ''}<p class="close-hint">${c.close}</p></div>
 ${target ? `<script>if (window.opener) { window.opener.postMessage(${msg}, ${JSON.stringify(target)}); window.close(); }</script>` : ''}
 </body></html>`;
   return new Response(html, { status: ok ? 200 : 400, headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer' } });
 }
 
-/** Consent + Picker came back: store the drive.file consent, check the picked file is a spreadsheet. */
+/** The pick link opened in a browser by someone who may not use it here: why, in their language. */
+async function pickRefusedPage(ctx: FetchContext, userId: string, workspaceId: string, why: 'notMember' | 'noImport'): Promise<Response> {
+  const lang = await pickLocale(ctx, userId, workspaceId);
+  const res = sheetPickPage({ ok: false, message: PICK_COPY[lang][why === 'notMember' ? 'notMember' : 'noImportYet'], lang, title: PICK_COPY[lang].refusedTitle });
+  return new Response(res.body, { status: 403, headers: res.headers });
+}
+
+/** Consent + Picker came back: store the drive.file consent, check the picked file is a spreadsheet, remember the pick. */
 async function handleSheetPick(ctx: FetchContext, state: OAuthState, rawState: string): Promise<Response> {
   const { env, url } = ctx;
-  const done = (ok: boolean, message: string, file?: { id: string; name: string }) => sheetPickPage(ok, message, state.o, file);
-  if (!providerConfig(env, DRIVE_FILE_CONSENT)) return done(false, 'Google Drive is not set up on this instance.');
-  if (url.searchParams.get('error')) return done(false, 'No spreadsheet was picked.');
+  const lang = await pickLocale(ctx, state.u, state.ws);
+  const c = PICK_COPY[lang];
+  // Opened from an assistant's link there is no window to post back to: offer the same link again.
+  const again = state.a ? `/v1/workspaces/${encodeURIComponent(state.ws)}/file-imports/sheet-sync/pick?return=assistant` : undefined;
+  const fail = (m: PickMsg | string, known = true) => sheetPickPage({ ok: false, message: known ? c[m as PickMsg] : m, lang, origin: state.o, again });
+  if (!providerConfig(env, DRIVE_FILE_CONSENT)) return fail('notSetUp');
+  if (url.searchParams.get('error')) return fail('cancelled');
   const code = url.searchParams.get('code');
-  if (!code) return done(false, 'This link expired. Start again.');
+  if (!code) return fail('expired');
   const user = await requireTokenOrSession(ctx);
-  if (!isAuthUser(user) || user.id !== state.u) return done(false, 'Sign in to ShareOut as the person who started this.');
-  if (!(await canImport(env, state.ws, user.id))) return done(false, 'You can no longer import into this workspace.');
+  if (!isAuthUser(user) || user.id !== state.u) return fail('wrongPerson');
+  if (!(await canImport(env, state.ws, user.id))) return fail('noImport');
   const fileId = (url.searchParams.get('picked_file_ids') || '').split(',')[0].trim();
-  if (!DRIVE_FILE_ID.test(fileId)) return done(false, 'No spreadsheet was picked. Try again.');
+  if (!DRIVE_FILE_ID.test(fileId)) return fail('noFile');
   let entry: RemoteEntry;
+  let connectionId: string;
   try {
     const tokens = await exchangeCode(env, DRIVE_FILE_CONSENT, code, rawState);
-    await saveConnection(env, state.ws, user.id, DRIVE_FILE_CONSENT, tokens, await accountEmail(DRIVE_FILE_CONSENT, tokens.accessToken));
+    connectionId = await saveConnection(env, state.ws, user.id, DRIVE_FILE_CONSENT, tokens, await accountEmail(DRIVE_FILE_CONSENT, tokens.accessToken));
     entry = await getDriveFile(tokens.accessToken, fileId);
   } catch (e) {
-    if (e instanceof OAuthGrantError) return done(false, 'Google refused the connection. Try again.');
-    if (e instanceof ProviderError || e instanceof AuthExpiredError) return done(false, 'Google Drive could not read that file. Pick it again.');
-    return done(false, 'Something went wrong while connecting.');
+    if (e instanceof OAuthGrantError) return fail('refused');
+    if (e instanceof ProviderError || e instanceof AuthExpiredError) return fail('unreadable');
+    return fail('broken');
   }
-  if (!isSpreadsheet(entry)) return done(false, `"${entry.name}" is not a spreadsheet (Excel, Google Sheets, OpenDocument or CSV).`);
-  return done(true, 'Go back to ShareOut to finish setting up the sync.', { id: entry.id, name: entry.name });
+  if (!isSpreadsheet(entry)) return fail(c.notSheet(entry.name), false);
+  const file = { id: entry.id, name: entry.name };
+  await recordSheetPick(env, connectionId, file);
+  return sheetPickPage({ ok: true, message: state.a ? c.backToAssistant(entry.name) : c.backToShareout, lang, origin: state.o, file });
 }

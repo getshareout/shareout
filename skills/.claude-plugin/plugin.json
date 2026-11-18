@@ -1,7 +1,7 @@
 {
   "name": "shareout",
   "displayName": "ShareOut",
-  "version": "2.67.0",
+  "version": "2.68.0",
   "description": "Publish what Claude builds as a live page with a link: HTML apps, dashboards, forms and documents, with versions, comments, sharing and workspace knowledge.",
   "author": {
     "name": "ShareOut",

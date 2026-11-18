@@ -200,7 +200,14 @@ describe('sheet sync consent: drive.file + the Google Picker', () => {
     // The folder-import overview does not show it as a Drive connection.
     const ov = await (await call(`/v1/workspaces/${WS}/file-imports`))!.json() as { providers: Array<{ id: string; connected: boolean }> };
     expect(ov.providers).toEqual([{ id: 'google_drive', connected: false, accountEmail: null }]);
-    expect(await (await call(`/v1/workspaces/${WS}/file-imports/sheet-sync`))!.json()).toEqual({ available: true, connected: true, accountEmail: 'member@drive.test' });
+    expect(await (await call(`/v1/workspaces/${WS}/file-imports/sheet-sync`))!.json()).toEqual({
+      available: true, connected: true, accountEmail: 'member@drive.test',
+      // Remembered for whoever finishes the setup (the Inspector, or an assistant over MCP).
+      picked: { id: 'XL1', name: 'Sales </script><script>alert(1)</script>.xlsx', pickedAt: expect.stringMatching(/^\d{4}-\d\d-\d\dT/) },
+    });
+    // Only to the person who picked it, only in this workspace.
+    as(ADMIN);
+    expect(await (await call(`/v1/workspaces/${WS}/file-imports/sheet-sync`))!.json()).toMatchObject({ connected: false, picked: null });
   });
 
   it('refuses a non-spreadsheet, a cancelled picker, and a state minted for someone else', async () => {
