@@ -23,6 +23,8 @@ vi.mock('../../../src/chat-agent/access', () => ({ listWorkspacesForUser }));
 import { callTool, listTools } from '../../../src/mcp/tools';
 import { queueKnowledgeSource } from '../../../src/knowledge/corpus/ingest';
 import { setKnowledgeEnabled, upsertKnowledgeFile } from '../../../src/knowledge';
+import { routeKnowledgeApi } from '../../../src/router/api/knowledge';
+import { createFetchContext } from '../../../src/router/context';
 
 const base = env as unknown as Env;
 const run = Date.now();
@@ -193,6 +195,17 @@ describe('knowledge_facts', () => {
     expect(text(forAna)).not.toContain('90k');
     const forBo = await callTool(ctxFor('so_bo'), 'knowledge_facts', { about: 'Northwind', workspace_id: WS_A });
     expect(text(forBo)).toContain('budget: 90k');
+  });
+  it('lists a fact the team added as confirmed by the team, with no source to cite', async () => {
+    const acme = (await callTool(ana, 'knowledge_entity', { name: 'Acme', workspace_id: WS_A }))!.structuredContent!.entity as { id: string };
+    const req = new Request(`https://shareout.test/v1/workspaces/${WS_A}/knowledge/entities/${acme.id}/facts`, {
+      method: 'POST', headers: { Authorization: 'Bearer so_ana', 'Content-Type': 'application/json' }, body: JSON.stringify({ predicate: 'account owner', value: 'Ana' }),
+    });
+    expect((await routeKnowledgeApi(createFetchContext(req, e)))!.status).toBe(201);
+    const r = await callTool(ana, 'knowledge_facts', { about: 'Acme', workspace_id: WS_A });
+    expect(r!.isError).toBeUndefined();
+    expect(text(r)).toContain('- Acme · account_owner: Ana — confirmed by the workspace team');
+    expect(text(r)).toContain(`"Acme's budget is 50k." [dlv_a1.md]`);
   });
 });
 
