@@ -249,8 +249,8 @@ export async function graphStep(env: Env, p: IngestParams, offset: number): Prom
   const store = corpusFor(env, p.workspaceId)!;
   const chunks = await store.chunkTexts(p.refId, offset, EXTRACT_BATCH);
   if (!chunks.length) return 0;
-  const known = await store.knownEntities(KNOWN_ENTITIES);
-  const x = await extractBatch(env, p.workspaceId, p.refId, chunks, known);
+  const ctx = await store.learnerContext(KNOWN_ENTITIES);
+  const x = await extractBatch(env, p.workspaceId, p.refId, chunks, ctx);
   const r = await store.applyExtraction(p.refId, x);
   return r.entities + r.relations + r.facts;
 }

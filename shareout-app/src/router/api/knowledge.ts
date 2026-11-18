@@ -19,6 +19,7 @@ import { corpusStatus, reindexWorkspace, REINDEX_MAX } from '../../knowledge/cor
 import { isPlatformAdmin } from '../../superadmin/auth';
 import { entityMarkdown, listVisibleEntities, visibleEntity, visibleGraph } from '../../knowledge/corpus/graph';
 import { startVectorBackfill, v2Problem, vectorStatus } from '../../knowledge/vectors/backfill';
+import { routeKnowledgeCuration } from './knowledge-curation';
 
 const PREFIX_RE = /^\/v1\/workspaces\/([^/]+)\/knowledge(?:\/(.*))?$/;
 const BACKFILL_LIMIT = 200;
@@ -343,6 +344,22 @@ export async function routeKnowledgeApi(ctx: FetchContext): Promise<Response | n
     );
   }
 
+  // The team's edits to the graph and its rules (knowledge-curation.ts).
+  if (['entities', 'relations', 'facts', 'schema', 'rules', 'discarded', 'history'].includes(sub.split('/')[0]) && !(method === 'GET' && (sub === 'entities' || sub.startsWith('entities/')))) {
+    if (!(await isKnowledgeEnabled(ctx.env, workspaceId))) {
+      return cors(apiErrorResponse({
+        message: 'Knowledge is off for this workspace',
+        code: 'KNOWLEDGE_DISABLED',
+        status: 409,
+        hint: `An owner or admin turns it on with POST /v1/workspaces/${workspaceId}/knowledge/enable`,
+      }));
+    }
+    const store = corpusFor(ctx.env, workspaceId);
+    if (!store) return cors(jsonError('Knowledge search is not configured on this instance', 'NOT_CONFIGURED', 501));
+    const res = await routeKnowledgeCuration(ctx, { workspaceId, sub, canManage, userId: auth.id, store });
+    if (res) return cors(res);
+  }
+
   // GET /search?q=&limit=&full=1&format=md — (full=1: whole passages, not 700-char snippets) cited passages from the workspace's Files and pages.
   const corpusRoute = ['search', 'sources', 'usage', 'graph', 'entities'].includes(sub) || sub.startsWith('entities/');
   if (corpusRoute) {
@@ -366,11 +383,14 @@ export async function routeKnowledgeApi(ctx: FetchContext): Promise<Response | n
       return cors(jsonResponse(await knowledgeUsage(ctx.env, workspaceId, store, days)));
     }
 
-    // GET /entities?type=&q=&limit= — the things the workspace is about, most-mentioned first.
+    // GET /entities?type=&q=&status=confirmed|draft&limit= — the things the workspace is about:
+    // what the team confirmed first, then most-mentioned.
     if (sub === 'entities') {
+      const status = url.searchParams.get('status');
       return cors(jsonResponse(await listVisibleEntities(ctx.env, store, workspaceId, auth.id, {
         type: url.searchParams.get('type') || undefined,
         q: url.searchParams.get('q') || undefined,
+        status: status === 'confirmed' || status === 'draft' ? status : undefined,
         limit: num('limit', 50, 100),
       })));
     }
