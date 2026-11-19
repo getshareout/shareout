@@ -91,12 +91,13 @@ describe('duplicate pages', () => {
   let scanA = '';
   let scanB = '';
   let sameName = '';
+  let elsewhere = '';
 
   it('groups pages by the content of their source file, not by name, within one workspace', async () => {
     first = await page('Acme report.md', '# Q3\n\nSame bytes.');
     copy = await page('Acme report.md', '# Q3\n\nSame bytes.');
     sameName = await page('Acme report.csv', 'a,b\n1,2');           // same name, different file
-    await page('Acme other.md', '# Q3\n\nSame bytes.', WS2);         // same file, other workspace
+    elsewhere = await page('Acme other.md', '# Q3\n\nSame bytes.', WS2); // same file, other workspace
     // Two transcriptions of one scan differ; the kept original is what matches.
     scanA = await imported('Acme scan', '# Scan\n\nfirst reading', 'PDF-BYTES');
     scanB = await imported('Acme scan', '# Scan\n\nsecond reading', 'PDF-BYTES');
@@ -131,6 +132,9 @@ describe('duplicate pages', () => {
     expect(((await mixed.json()) as { code: string }).code).toBe('NOT_A_DUPLICATE');
     expect(await deletedAt(copy)).toBeNull();
     expect(await deletedAt(sameName)).toBeNull();
+    // The same bytes in another workspace are not this workspace's copy to remove.
+    expect((await remove(OWNER, { keep: first, remove: [elsewhere], confirm: true })).status).toBe(409);
+    expect(await deletedAt(elsewhere)).toBeNull();
 
     // A file that became the removed page now points at the kept one.
     await e.DB.prepare(`INSERT INTO asset_deliverables (id, bucket_artifact_id, workspace_id, owner_id, name, deleted_at, type_metadata)
