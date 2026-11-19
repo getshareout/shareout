@@ -1,7 +1,7 @@
 import type { Env } from '../types';
 
 /** Supported account-level messaging platforms. */
-export type PlatformId = 'telegram' | 'slack' | 'web';
+export type PlatformId = 'telegram' | 'whatsapp' | 'slack' | 'web';
 
 /** Workspace scope for artifact list/search in a chat session. */
 export const PERSONAL_SCOPE = '__personal';
@@ -33,7 +33,7 @@ export type ChatUiAction =
 
 /**
  * Stable session identity for routing, linking, and the ChatSession DO.
- * key format: "{platform}:{nativeId}" e.g. telegram:12345, slack:T1:U9
+ * key format: "{platform}:{nativeId}" e.g. telegram:12345, whatsapp:AR.1349…, slack:T1:U9
  */
 export interface ChatSession {
   platform: PlatformId;

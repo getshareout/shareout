@@ -172,6 +172,7 @@ export default defineConfig({
 						{ label: 'AI chat agent', slug: 'guides/ai-agent', translations: { es: 'Agente de chat IA' } },
 						{ label: 'Fast rendering', slug: 'guides/performance', translations: { es: 'Renderizado rápido' } },
 						{ label: 'Telegram bot', slug: 'guides/telegram-bot', translations: { es: 'Bot de Telegram' } },
+						{ label: 'WhatsApp assistant', slug: 'guides/whatsapp', translations: { es: 'Asistente en WhatsApp' } },
 						{ label: 'Slack bot', slug: 'guides/slack-bot', translations: { es: 'Bot de Slack' } },
 						{ label: 'Your data is portable', slug: 'guides/data-portability', translations: { es: 'Tus datos son portables' } },
 					],

@@ -384,7 +384,8 @@ ${!(args.workspaceId || args.workspace) || canManage ? `        <a class="wsx-ac
         <a class="wsx-accbtn" href="/home?view=analytics" data-acc-lens="analytics">${svg(ICON.chart)}<span data-i18n="nav.analytics">Analytics</span></a>
         <div class="wsx__accsec-title" data-i18n="account.grpAccounts">Accounts</div>
         <a class="wsx-accbtn" href="/settings/telegram?go=1" target="_blank" rel="noopener">${svg('<path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/>')}<span data-i18n="account.telegram">Connect Telegram</span></a>
-        <a class="wsx-accbtn" href="/v1/auth/link-google?redirect=%2Fhome%3Fnext%3D1">${svg('<path d="M10 13a5 5 0 0 0 7 0l2-2a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-2 2a5 5 0 0 0 7 7l1-1"/>')}<span data-i18n="account.linkGoogle">Link Google account</span></a>
+${args.whatsapp ? `        <a class="wsx-accbtn" href="/settings/whatsapp?go=1" target="_blank" rel="noopener">${svg('<path d="M21 11.5a8.4 8.4 0 0 1-12.4 7.4L3 20.5l1.6-5.4A8.4 8.4 0 1 1 21 11.5z"/>')}<span data-i18n="account.whatsapp">Connect WhatsApp</span></a>
+` : ''}        <a class="wsx-accbtn" href="/v1/auth/link-google?redirect=%2Fhome%3Fnext%3D1">${svg('<path d="M10 13a5 5 0 0 0 7 0l2-2a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-2 2a5 5 0 0 0 7 7l1-1"/>')}<span data-i18n="account.linkGoogle">Link Google account</span></a>
         <div class="wsx__accsec-title" data-i18n="account.linkedAccounts">Linked accounts</div>
         <p class="wsx__accsub" data-i18n="account.linkedDesc">Link your other emails to see all their workspaces from one login.</p>
         <div class="wsx__linked" id="wsxLinked"><div class="wsx-empty" data-i18n="common.loading">Loading…</div></div>

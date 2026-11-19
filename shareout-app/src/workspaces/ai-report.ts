@@ -4,14 +4,14 @@ import { priceCall } from '../data/agent/model-costs';
 
 // Admin → Billing → AI report: where one month of AI went, at the workspace's price — by what it was
 // for (questions, pages, automations, knowledge…), by kind, by model with input/output tokens, by
-// automation, by page, by person and by day. It reads ai_usage_events, the one AI meter
+// automation, by page, by person, by channel (web, Telegram, WhatsApp, Slack) and by day. It reads ai_usage_events, the one AI meter
 // (data/ai-pending.ts), so its total is the AI budget's, the Summary's and the invoice's. Cost and
 // margin are added only for the instance operator (`withCost`).
 
 export type AiCategory = 'questions' | 'pages' | 'automations' | 'knowledge' | 'summaries' | 'other';
 
 const CATEGORY: Record<string, AiCategory> = {
-  assistant_chat: 'questions', ask_workspace: 'questions', artifact_visitor_chat: 'questions', artifact_admin_chat: 'questions',
+  assistant_chat: 'questions', whatsapp_message: 'questions', ask_workspace: 'questions', artifact_visitor_chat: 'questions', artifact_admin_chat: 'questions',
   page_build: 'pages', page_pilot: 'pages', artifact_ai_edit: 'pages', present_this: 'pages',
   crew_run: 'automations',
   file_enrichment: 'knowledge',
@@ -50,8 +50,13 @@ export interface AiReport {
   by_page: AiReportRow[];
   /** key '' = no person (automations, background work) or someone no longer here. */
   by_member: AiReportRow[];
+  /** Where the assistant was asked: web, telegram, whatsapp, slack. Only chat usage has a channel. */
+  by_channel: AiReportRow[];
   by_day: AiReportRow[];
 }
+
+/** The `source` values that name the app a chat came from (ai_usage_events.source). */
+const CHANNELS = new Set(['web', 'telegram', 'whatsapp', 'slack']);
 
 interface Acc { key: string; calls: number; input_tokens: number; output_tokens: number; tokens: number; cost: number; runs: Set<string> }
 
@@ -84,7 +89,7 @@ export async function aiReport(env: Env, workspaceId: string, month: string, mar
   }>()).results ?? [];
 
   const dims = { category: new Map<string, Acc>(), kind: new Map<string, Acc>(), model: new Map<string, Acc>(), automation: new Map<string, Acc>(),
-    page: new Map<string, Acc>(), member: new Map<string, Acc>(), day: new Map<string, Acc>() };
+    page: new Map<string, Acc>(), member: new Map<string, Acc>(), channel: new Map<string, Acc>(), day: new Map<string, Acc>() };
   const total: Acc = { key: 'total', calls: 0, input_tokens: 0, output_tokens: 0, tokens: 0, cost: 0, runs: new Set() };
   const runIds = new Set<string>(), pageIds = new Set<string>(), userIds = new Set<string>();
 
@@ -107,6 +112,7 @@ export async function aiReport(env: Env, workspaceId: string, month: string, mar
     if (r.user_id) userIds.add(r.user_id);
     if (r.kind === 'crew_run' && r.source) { add(dims.automation, r.source, r.source); runIds.add(r.source); }
     if (r.source?.startsWith('art_')) { add(dims.page, r.source); pageIds.add(r.source); }
+    if (r.source && CHANNELS.has(r.source)) add(dims.channel, r.source);
   }
 
   // Runs roll up to the automation (crew) they belong to.
@@ -154,6 +160,7 @@ export async function aiReport(env: Env, workspaceId: string, month: string, mar
     by_automation: sorted([...byCrew.values()].map((a) => view(a, a.label, true))),
     by_page: sorted([...dims.page.values()].map((a) => view(a, pageNames.get(a.key) ?? null))),
     by_member: sorted([...dims.member.values()].map((a) => view(a, a.key ? people.get(a.key) ?? null : null))),
+    by_channel: sorted([...dims.channel.values()].map((a) => view(a))),
     by_day: [...dims.day.values()].map((a) => view(a)).sort((p, q) => p.key.localeCompare(q.key)),
   };
 }
@@ -174,6 +181,6 @@ export function aiReportCsv(r: AiReport): string {
   };
   dump('total', [r.totals]);
   dump('category', r.by_category); dump('kind', r.by_kind); dump('model', r.by_model); dump('automation', r.by_automation);
-  dump('page', r.by_page); dump('member', r.by_member); dump('day', r.by_day);
+  dump('page', r.by_page); dump('member', r.by_member); dump('channel', r.by_channel ?? []); dump('day', r.by_day);
   return lines.join('\n') + '\n';
 }

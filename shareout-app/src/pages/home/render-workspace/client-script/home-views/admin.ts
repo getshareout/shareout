@@ -617,10 +617,11 @@ export const workspace_client_home_views_admin_JS = `  var AD_COPY = ${JSON.stri
       fetch(wsUrl('/publish-policy'), { credentials: 'same-origin' }).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; }),
       fetch(wsUrl('/branding'), { credentials: 'same-origin' }).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; }),
       fetch(wsUrl('/features'), { credentials: 'same-origin' }).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; }),
-      fetch(wsUrl(''), { credentials: 'same-origin' }).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; })
+      fetch(wsUrl(''), { credentials: 'same-origin' }).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; }),
+      fetch(wsUrl('/whatsapp'), { credentials: 'same-origin' }).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; })
     ]); };
     swr('settings', function (res) {
-      var pol = res[0]; var brd = res[1] || {}; var feat = res[2]; var wsInfo = res[3] || {};
+      var pol = res[0]; var brd = res[1] || {}; var feat = res[2]; var wsInfo = res[3] || {}; var wa = res[4];
       var cur = (pol && pol.policy) || 'allow'; var n = (pol && (pol.approvals_required || pol.approvalsRequired)) || 1;
       var pubSection = '<div class="wsx-admin__settings-section">'
         + '<div class="wsx-admin__settings-title">' + esc(t('admin.publishingPolicy')) + '</div>'
@@ -634,6 +635,14 @@ export const workspace_client_home_views_admin_JS = `  var AD_COPY = ${JSON.stri
       var folderSection = '<div class="wsx-admin__settings-section"><div class="wsx-admin__settings-title">' + esc(t('admin.teamFolders')) + '</div>'
         + '<p class="wsx-lens__intro">' + esc(t('admin.teamFoldersIntro')) + '</p>'
         + '<label class="wsx-admin__check"><input type="checkbox" id="wsxMemberFolders"' + (memberFolders ? ' checked' : '') + '> ' + esc(t('admin.membersCreateFolders')) + '</label></div>';
+      // WhatsApp: only when this instance has a number set up. Each reply is billed to the workspace.
+      var waSection = wa && wa.available
+        ? '<div class="wsx-admin__settings-section"><div class="wsx-admin__settings-title">' + esc(t('admin.whatsapp')) + '</div>'
+          + '<p class="wsx-lens__intro">' + esc(t('admin.whatsappIntro')) + '</p>'
+          + '<label class="wsx-admin__check"><input type="checkbox" id="wsxWhatsApp"' + (wa.enabled ? ' checked' : '') + '> ' + esc(t('admin.whatsappAllow')) + '</label>'
+          + (wa.enabled && !wa.linked ? '<div class="wsx-admin__row"><a class="wsx-abtn" href="' + esc(wa.connect_url) + '" target="_blank" rel="noopener">' + esc(t('admin.whatsappConnect')) + '</a></div>' : '')
+          + '</div>'
+        : '';
       var accent = brd.accent_color || '${colors.primary}';
       var brdSection = '<div class="wsx-admin__settings-section"><div class="wsx-admin__settings-title">' + esc(t('admin.branding')) + '</div>'
         + '<div class="wsx-admin__brand"><div class="wsx-admin__logocol">'
@@ -678,8 +687,8 @@ export const workspace_client_home_views_admin_JS = `  var AD_COPY = ${JSON.stri
         + '<button class="home-lang-btn" type="button" data-scope="workspace" data-lang="en" aria-selected="true" title="English" data-i18n-title="settings.languageEn">\\uD83C\\uDDFA\\uD83C\\uDDF8 EN</button>'
         + '<button class="home-lang-btn" type="button" data-scope="workspace" data-lang="es" aria-selected="false" title="Espa\\u00f1ol" data-i18n-title="settings.languageEs">\\uD83C\\uDDE6\\uD83C\\uDDF7 ES</button>'
         + '</div></div>';
-      var parts = { general: instanceSection + langSection + folderSection + inboxSection + featSection, publishing: pubSection, branding: brdSection }[adminTab];
-      m.innerHTML = parts != null ? parts : instanceSection + inboxSection + langSection + pubSection + folderSection + brdSection + featSection;
+      var parts = { general: instanceSection + langSection + folderSection + waSection + inboxSection + featSection, publishing: pubSection, branding: brdSection }[adminTab];
+      m.innerHTML = parts != null ? parts : instanceSection + inboxSection + langSection + pubSection + folderSection + waSection + brdSection + featSection;
       if (typeof window.__SO_APPLY_HOME_I18N === 'function') window.__SO_APPLY_HOME_I18N();
       if (typeof window.__SO_WIRE_HOME_LANG === 'function') window.__SO_WIRE_HOME_LANG(m);
       var copyBtn = document.getElementById('wsxInboxCopy');
@@ -722,6 +731,19 @@ export const workspace_client_home_views_admin_JS = `  var AD_COPY = ${JSON.stri
           apply: function () { mfEl.checked = next; },
           rollback: function () { mfEl.checked = !next; },
           request: function () { return adReq(wsUrl(''), { method: 'PATCH', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ members_can_create_folders: next }) }); },
+          success: t('common.saved'),
+          error: adErr(t('admin.saveFailed')),
+          done: function () { delete adDataCache['settings']; },
+        });
+      });
+      var waEl = document.getElementById('wsxWhatsApp');
+      if (waEl) waEl.addEventListener('change', function () {
+        var next = waEl.checked;
+        optimistic({
+          key: 'whatsapp',
+          apply: function () { waEl.checked = next; },
+          rollback: function () { waEl.checked = !next; },
+          request: function () { return adReq(wsUrl('/whatsapp'), { method: 'PUT', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled: next }) }); },
           success: t('common.saved'),
           error: adErr(t('admin.saveFailed')),
           done: function () { delete adDataCache['settings']; },

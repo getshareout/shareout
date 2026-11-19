@@ -27,6 +27,8 @@ export async function enqueueAgentTurn(
     selectedWorkspaceId?: WorkspaceSelection;
     /** Slack DM channel id for replies (optional; resolved on send if missing). */
     slackChannelId?: string;
+    /** WhatsApp message being answered (marks it read and shows "typing…"). */
+    inboundMessageId?: string;
     onUnavailable: (message: string) => Promise<void>;
   }
 ): Promise<void> {
@@ -46,6 +48,7 @@ export async function enqueueAgentTurn(
     selectedWorkspaceId: opts.selectedWorkspaceId,
     updateId: opts.updateId,
     slackChannelId: opts.slackChannelId,
+    inboundMessageId: opts.inboundMessageId,
   };
   await stub.fetch('https://chat/turn', {
     method: 'POST',
@@ -65,6 +68,7 @@ export async function enqueueCallback(
     messageId: number | string;
     updateId: number;
     slackChannelId?: string;
+    selectedWorkspaceId?: WorkspaceSelection;
     onUnavailable: (message: string) => Promise<void>;
   }
 ): Promise<void> {
@@ -86,6 +90,7 @@ export async function enqueueCallback(
     messageId: opts.messageId,
     updateId: opts.updateId,
     slackChannelId: opts.slackChannelId,
+    selectedWorkspaceId: opts.selectedWorkspaceId,
   };
   await stub.fetch('https://chat/callback', {
     method: 'POST',

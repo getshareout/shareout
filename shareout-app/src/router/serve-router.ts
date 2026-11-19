@@ -25,6 +25,7 @@ import { handleSpaceGuestPortal, renderSpaceGuestSignIn } from '../sharees/space
 import { handleSpaceGuestAccept, handleSpaceGuestCode, handleSpaceGuestSignOut, handleSpaceGuestVerify } from '../sharees/space-guest';
 import { handleInviteAcceptPage, handleInviteJoinPage } from '../workspaces/invite-accept-page';
 import { renderTelegramConnectPage, telegramDeepLinkRedirect } from '../pages/telegram-connect';
+import { renderWhatsAppConnectPage, whatsappDeepLinkRedirect } from '../pages/whatsapp-connect';
 import { handleSlackConnectPost, renderSlackConnectPage } from '../pages/slack-connect';
 import { renderRunsPage } from '../pages/runs';
 import { renderSlidesAnalyticsPage } from '../pages/slides-analytics';
@@ -354,6 +355,18 @@ export async function routeServe(ctx: FetchContext): Promise<Response | null> {
       if (redirect) return redirect;
     }
     return renderTelegramConnectPage(env, sessionUser);
+  }
+
+  if (path === '/settings/whatsapp') {
+    const sessionUser = await getSessionUser(request, env);
+    if (!sessionUser) {
+      return Response.redirect(new URL(`/auth/login?redirect=/settings/whatsapp${url.search}`, url.origin).toString(), 302);
+    }
+    if (url.searchParams.get('go')) {
+      const redirect = await whatsappDeepLinkRedirect(env, sessionUser);
+      if (redirect) return redirect;
+    }
+    return renderWhatsAppConnectPage(env, sessionUser);
   }
 
   if (path === '/settings/slack') {

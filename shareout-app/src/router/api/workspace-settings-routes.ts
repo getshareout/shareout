@@ -24,6 +24,7 @@ import { handleListWorkspaceLibraries } from '../../workspace-library';
 import { handleGetWorkspaceAudit } from './workspace-audit';
 import { handleGetWorkspaceSpend } from './workspace-spend';
 import { handleGetWorkspaceAiReport } from './workspace-ai-report';
+import { handleGetWorkspaceWhatsApp, handleSetWorkspaceWhatsApp } from './workspace-whatsapp';
 import { handleGetWorkspaceSessionPolicy, handleSetWorkspaceSessionPolicy } from './workspace-session-policy';
 import { handleGetWorkspaceLocale, handleSetWorkspaceLocale, handleSetMyLocale } from './workspace-locale';
 import type { FetchContext } from '../context';
@@ -93,6 +94,17 @@ export async function routeWorkspaceSettings(ctx: FetchContext): Promise<Respons
     const role = await getInternalWorkspaceRole(env, workspaceId, user.id);
     if (!role) return addCORS(Response.json({ error: 'Not a member of this workspace', code: 'FORBIDDEN' }, { status: 403 }));
     return addCORS(Response.json({ ...(await buildFeaturesPayload(env, workspaceId)), readonly: true }));
+  }
+
+  const workspaceWhatsAppMatch = path.match(/^\/v1\/workspaces\/([^/]+)\/whatsapp$/);
+  if (workspaceWhatsAppMatch && (request.method === 'GET' || request.method === 'PUT')) {
+    const [, workspaceId] = workspaceWhatsAppMatch;
+    const user = await requireTokenOrSession(ctx);
+    if (!isAuthUser(user)) return user;
+    const role = await getInternalWorkspaceRole(env, workspaceId, user.id);
+    return addCORS(request.method === 'GET'
+      ? await handleGetWorkspaceWhatsApp(env, user.id, workspaceId, role)
+      : await handleSetWorkspaceWhatsApp(request, env, user.id, workspaceId, role));
   }
 
   const workspaceAuditMatch = path.match(/^\/v1\/workspaces\/([^/]+)\/audit$/);

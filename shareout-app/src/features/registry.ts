@@ -38,6 +38,7 @@ export const FEATURES: FeatureDef[] = [
   { key: 'ai.editor_chat', label: 'Editor AI assistant', description: 'AI help inside the visual editor (generate/edit/publish).', category: 'ai', defaultEnabled: true },
   { key: 'ai.telegram_bot', label: 'Telegram bot', description: 'Account-level Telegram chat agent.', category: 'ai', defaultEnabled: true },
   { key: 'ai.slack_bot', label: 'Slack bot', description: 'Account-level Slack DM chat agent.', category: 'ai', defaultEnabled: false },
+  { key: 'ai.whatsapp_bot', label: 'WhatsApp assistant', description: 'Members chat with the workspace assistant on WhatsApp. Each reply is a WhatsApp message billed to the workspace. Off until a workspace admin turns it on under Admin → Settings.', category: 'ai', defaultEnabled: false },
   { key: 'ai.create', label: 'AI Creator (/create)', description: 'Chat-first artifact builder at /create (plan, preview, publish).', category: 'ai', defaultEnabled: false },
   { key: 'ai.web_agent', label: 'Workspace home assistant', description: 'Workspace-scoped AI assistant on the home page (concierge + read-only data). On by default; turn it off per workspace under Admin → Features.', category: 'ai', defaultEnabled: true },
   { key: 'ai.build_agent', label: 'Page build agent', description: 'AI page builds run as a tool-using agent that writes files, checks them, fixes what it finds, publishes and tests the page. Off: the one-shot builder. BUILD_AGENT=on forces it for the whole instance; BUILD_AGENT=off turns it off everywhere.', category: 'ai', defaultEnabled: false },

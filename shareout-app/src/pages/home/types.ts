@@ -91,6 +91,8 @@ export interface RenderArgs {
   inboxDomain: string;
   /** Viewer administers the instance itself → Settings links to the admin portal. */
   isInstanceAdmin: boolean;
+  /** The instance has a WhatsApp number set up → the account menu offers "Connect WhatsApp". */
+  whatsapp?: boolean;
   /** Instance has the slides converter (SLIDES_CONVERTER) → .pptx/.ppt/.odp import as PDF, not Assets. */
   slidesImport?: boolean;
   /** Whether "Anyone with the link" can take effect for this viewer; false hides it from the create flow. */

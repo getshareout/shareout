@@ -1,82 +1,35 @@
 import type { Env } from '../types';
-import { TELEGRAM_PERSONAL_WORKSPACE, type TelegramWorkspaceSelection } from '../chat-agent/access';
+import type { TelegramWorkspaceSelection } from '../chat-agent/access';
+import {
+  consumeBotLinkCode,
+  countBotLinks,
+  getBotLinkedUserId,
+  getBotSelectedWorkspace,
+  linkBotSession,
+  mintBotLinkCode,
+  setBotSelectedWorkspace,
+  unlinkBotSession,
+} from '../chat-platforms/bot/links';
 
-const LINK_CODE_PREFIX = 'tg:link:';
-const LINK_CODE_TTL_SECONDS = 900; // 15 minutes
 const BOT_USERNAME_KEY = 'tg:bot_username';
 
-function randomCode(): string {
-  const bytes = new Uint8Array(16);
-  crypto.getRandomValues(bytes);
-  return Array.from(bytes).map((b) => b.toString(16).padStart(2, '0')).join('');
-}
-
-// Mint a one-time linking code bound to a user. Null if KV is unbound.
-export async function mintLinkCode(env: Env, userId: string): Promise<string | null> {
-  if (!env.RATE_LIMIT_KV) return null;
-  const code = randomCode();
-  await env.RATE_LIMIT_KV.put(LINK_CODE_PREFIX + code, userId, { expirationTtl: LINK_CODE_TTL_SECONDS });
-  return code;
-}
-
-// Consume a code: return the bound userId and delete it (one-time use).
-export async function consumeLinkCode(env: Env, code: string): Promise<string | null> {
-  if (!env.RATE_LIMIT_KV) return null;
-  const key = LINK_CODE_PREFIX + code;
-  const userId = await env.RATE_LIMIT_KV.get(key);
-  if (!userId) return null;
-  await env.RATE_LIMIT_KV.delete(key);
-  return userId;
-}
-
-// Telegram links live in `messaging_links` alongside Slack: session_key and
+// Telegram's side of the shared bot links (chat-platforms/bot/links.ts): the session key and
 // platform_user_id are both the chat id, which for a Telegram DM is the user.
-export async function linkChat(env: Env, chatId: number, userId: string): Promise<void> {
-  await env.DB.prepare(
-    `INSERT OR REPLACE INTO messaging_links (platform, session_key, user_id, platform_user_id, linked_at)
-     VALUES ('telegram', ?, ?, ?, ?)`
-  ).bind(String(chatId), userId, String(chatId), new Date().toISOString()).run();
-}
 
-export async function getLinkedUserId(env: Env, chatId: number): Promise<string | null> {
-  const row = await env.DB.prepare(
-    `SELECT ml.user_id FROM messaging_links ml
-       JOIN users u ON u.id = ml.user_id AND COALESCE(u.disabled, 0) = 0
-      WHERE ml.platform = 'telegram' AND ml.session_key = ?`
-  ).bind(String(chatId)).first<{ user_id: string }>();
-  return row?.user_id ?? null;
-}
+export const mintLinkCode = (env: Env, userId: string): Promise<string | null> => mintBotLinkCode(env, 'telegram', userId);
 
-export async function getSelectedTelegramWorkspace(
-  env: Env,
-  chatId: number
-): Promise<TelegramWorkspaceSelection> {
-  try {
-    const row = await env.DB.prepare(
-      `SELECT selected_workspace_id FROM messaging_links WHERE platform = 'telegram' AND session_key = ?`
-    ).bind(String(chatId)).first<{ selected_workspace_id: string | null }>();
-    return row?.selected_workspace_id ?? null;
-  } catch {
-    // The deploy can briefly run before the D1 migration is applied. Defaulting
-    // to "all" keeps the bot usable instead of breaking every chat turn.
-    return null;
-  }
-}
+export const consumeLinkCode = (env: Env, code: string): Promise<string | null> => consumeBotLinkCode(env, 'telegram', code);
 
-export async function setSelectedTelegramWorkspace(
-  env: Env,
-  chatId: number,
-  workspaceId: TelegramWorkspaceSelection
-): Promise<void> {
-  const selected = workspaceId === TELEGRAM_PERSONAL_WORKSPACE ? TELEGRAM_PERSONAL_WORKSPACE : workspaceId;
-  try {
-    await env.DB.prepare(
-      `UPDATE messaging_links SET selected_workspace_id = ? WHERE platform = 'telegram' AND session_key = ?`
-    ).bind(selected, String(chatId)).run();
-  } catch {
-    // See getSelectedTelegramWorkspace.
-  }
-}
+export const linkChat = (env: Env, chatId: number, userId: string): Promise<void> =>
+  linkBotSession(env, 'telegram', String(chatId), userId, String(chatId));
+
+export const getLinkedUserId = (env: Env, chatId: number): Promise<string | null> => getBotLinkedUserId(env, 'telegram', String(chatId));
+
+export const getSelectedTelegramWorkspace = (env: Env, chatId: number): Promise<TelegramWorkspaceSelection> =>
+  getBotSelectedWorkspace(env, 'telegram', String(chatId));
+
+export const setSelectedTelegramWorkspace = (env: Env, chatId: number, workspaceId: TelegramWorkspaceSelection): Promise<void> =>
+  setBotSelectedWorkspace(env, 'telegram', String(chatId), workspaceId);
 
 /** Resolve a user's linked Telegram chat (the most recently linked), or null. */
 export async function getLinkedChatId(env: Env, userId: string): Promise<number | null> {
@@ -87,18 +40,9 @@ export async function getLinkedChatId(env: Env, userId: string): Promise<number 
   return Number.isFinite(n) ? n : null;
 }
 
-export async function unlinkChat(env: Env, chatId: number): Promise<void> {
-  await env.DB.prepare(
-    `DELETE FROM messaging_links WHERE platform = 'telegram' AND session_key = ?`
-  ).bind(String(chatId)).run();
-}
+export const unlinkChat = (env: Env, chatId: number): Promise<void> => unlinkBotSession(env, 'telegram', String(chatId));
 
-export async function countLinkedChats(env: Env, userId: string): Promise<number> {
-  const row = await env.DB.prepare(
-    `SELECT COUNT(*) AS n FROM messaging_links WHERE platform = 'telegram' AND user_id = ?`
-  ).bind(userId).first<{ n: number }>();
-  return row?.n ?? 0;
-}
+export const countLinkedChats = (env: Env, userId: string): Promise<number> => countBotLinks(env, 'telegram', userId);
 
 // Resolve the bot's @username via getMe, cached in KV (it doesn't change).
 export async function getBotUsername(env: Env): Promise<string | null> {

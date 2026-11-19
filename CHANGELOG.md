@@ -12,6 +12,11 @@ adds to both (AGENTS.md → Gate contract).
 
 ### 2026-11-19
 
+- **The assistant answers on WhatsApp, turned on per workspace.** A workspace owner or admin turns it on under Admin → Settings → WhatsApp; members connect from their account menu (Connect WhatsApp) and chat with the same assistant and commands as on Telegram. Each reply is a WhatsApp message billed to the workspace and shown in the AI report. The Telegram and WhatsApp assistants now always work inside one workspace you belong to, so what they cost lands in that workspace, and the AI report has a new By channel breakdown (ShareOut, Telegram, WhatsApp).
+  - es: **El asistente responde por WhatsApp, activado por espacio.** Un dueño o admin del espacio lo activa en Admin → Configuración → WhatsApp; los miembros se conectan desde el menú de su cuenta (Conectar WhatsApp) y hablan con el mismo asistente y los mismos comandos que en Telegram. Cada respuesta es un mensaje de WhatsApp que se cobra al espacio y aparece en el reporte de IA. Los asistentes de Telegram y WhatsApp ahora trabajan siempre dentro de un espacio del que sos parte, así lo que cuestan cae en ese espacio, y el reporte de IA tiene un nuevo desglose Por canal (ShareOut, Telegram, WhatsApp).
+  - Guide: /guides/whatsapp/
+  - Guía: /es/guides/whatsapp/
+  - Integrators: `GET`/`PUT /v1/workspaces/{id}/whatsapp` `{ enabled }` (owners/admins write; feature `ai.whatsapp_bot`, off by default); webhook `GET`/`POST /whatsapp/webhook` (Meta signature); the AI report adds `by_channel` and the `whatsapp_message` kind. Telegram `/personal` and "All pages" are gone: a chat always has one workspace.
 - **Turning Files into pages never makes the same page twice, and owners can find and clear copies.** If the conversion of Files into pages is run again while a batch is still going (a slow scan, a timeout and a retry), each file still becomes one page. Workspace owners can list pages made from the exact same file — matched by its content, so two different documents with the same name are never mixed up — and move the copies they pick to the trash, where they stay recoverable for 30 days.
   - es: **Convertir Archivos en páginas nunca crea la misma página dos veces, y el dueño puede encontrar y quitar copias.** Si la conversión de Archivos a páginas se vuelve a lanzar mientras una tanda sigue en curso (un escaneo lento, un corte y un reintento), cada archivo sigue dando una sola página. El dueño del espacio puede ver las páginas hechas del mismo archivo — comparando el contenido, así dos documentos distintos con el mismo nombre nunca se confunden — y mandar a la papelera las copias que elija, recuperables durante 30 días.
   - Integrators: `POST /v1/workspaces/{id}/assets/to-artifacts` is safe to repeat mid-run and returns `inProgress`; `GET /v1/workspaces/{id}/assets/duplicates` (owner/admin, read-only) and `POST /v1/workspaces/{id}/assets/duplicates/remove` `{ keep, remove, confirm: true }` (owner only).
@@ -298,6 +303,15 @@ adds to both (AGENTS.md → Gate contract).
   - Integrators: MCP `publish_artifact` / `update_artifact` `files`; `400 INVALID_PATH`; `access_policy.queries`; `POST …/knowledge/reindex`; self-host `D1_READ_REPLICAS`. (#124, #125, #127, #129, #132, #136, #138, #140, #146)
 
 ## [Unreleased]
+
+### Added
+
+- **WhatsApp assistant on the shared Telegram/WhatsApp bot core.** `src/chat-platforms/bot/` holds what both apps share — one-time link codes and `messaging_links` (`links.ts`), the one workspace a chat works in (`workspace.ts`: internal member + the app's feature on; a single eligible workspace is picked, several are asked once and the pending question runs after the pick), and commands, linking and agent hand-off (`router.ts`, es/en copy in `copy.ts`). `router/telegram-router.ts` and the new `router/whatsapp-router.ts` only translate their webhooks into a `BotChannel`. WhatsApp uses the Cloud API directly (`src/whatsapp/client.ts`, Graph v27.0): `X-Hub-Signature-256` HMAC on every webhook, the subscribe challenge, business-scoped user ids (`from_user_id`) as the session key, reply buttons / list messages for choices, typing indicator, Whisper for voice notes, one message per answer (no streaming, no edits). Every message Meta accepts is metered into `ai_usage_events` (`kind = 'whatsapp_message'`, `unit_kind = 'messages'`, `source = 'whatsapp'`) at Meta's USD list rate for the recipient's market (`chat-platforms/whatsapp/rates.ts`, rate card effective 2026-10-01), so it counts toward the workspace's AI budget and is invoiced at its AI markup. Feature `ai.whatsapp_bot` (off by default) is set by workspace owners/admins through `PUT /v1/workspaces/{id}/whatsapp`; `/settings/whatsapp` opens a `wa.me` link with the code pre-filled. The messaging-app system prompt keeps the assistant on ShareOut (WhatsApp Business terms §4.7, AI providers). Support tickets opened on WhatsApp are answered by email and in-app (`TicketChannel` adds `whatsapp`).
+- **AI report `by_channel`:** chat usage by `source` (`web`, `telegram`, `whatsapp`, `slack`), in Admin → Billing → AI report and its CSV.
+
+### Changed
+
+- **Telegram chats always work in one workspace.** "All pages" and `/personal` are gone: the bot picks or asks for a workspace the person is an internal member of with `ai.telegram_bot` on, so `assistant_chat` rows from Telegram carry a `workspace_id` (they had none: unbilled and invisible to workspace admins).
 
 ### Deprecated
 

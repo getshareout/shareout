@@ -49,21 +49,23 @@ Cada transcripción se registra para visibilidad de costos, pero no se cobra al 
 de un workspace.
 </Aside>
 
-## Alcance del workspace
+## Un workspace a la vez
 
-El bot recuerda qué artefactos buscar entre sesiones:
+El bot trabaja dentro de **un workspace** — uno del que sos miembro interno — y solo ve
+los artefactos de ese workspace. Su uso de IA aparece en el reporte de IA de ese
+workspace, en **Por canal → Telegram**. El bot recuerda el workspace entre sesiones:
 
 | Comando | Acción |
 | --- | --- |
 | `/workspaces` | Muestra un selector de workspaces (botones inline) |
 | `/workspace {nombre}` | Cambia a un workspace por nombre o slug |
-| `/personal` | Solo artefactos personales |
-| `/status` | Muestra el email de la cuenta vinculada y el alcance actual |
+| `/status` | Muestra el email de la cuenta vinculada y el workspace actual |
 
-El alcance por defecto cubre **todos los artefactos** a los que tenés acceso — artefactos
-personales y de workspaces combinados. Los grupos de identidades vinculadas se respetan,
-así que un login personal que pertenece a una cuenta de workspace también ve esos
-artefactos.
+Si estás en un solo workspace, queda elegido solo; si estás en varios, el bot pregunta una
+vez (y contesta la pregunta que mandaste apenas elegís). Los grupos de identidades
+vinculadas se respetan, así que un login personal que pertenece a una cuenta de workspace
+ve ese workspace. El mismo bot funciona en [WhatsApp](/es/guides/whatsapp/), con los mismos
+comandos.
 
 ## Tarjetas de artefacto
 

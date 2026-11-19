@@ -46,20 +46,22 @@ Each transcription is logged for cost visibility but is not billed to a workspac
 balance.
 </Aside>
 
-## Workspace scope
+## One workspace at a time
 
-The bot remembers which pages to search across sessions:
+The bot works inside **one workspace** — one you are an internal member of — and only
+sees that workspace's pages. Its AI use shows in that workspace's AI report, under
+**By channel → Telegram**. The bot remembers the workspace across sessions:
 
 | Command | Action |
 | --- | --- |
 | `/workspaces` | Show a workspace picker (inline buttons) |
 | `/workspace {name}` | Switch to a workspace by name or slug |
-| `/personal` | Personal pages only |
-| `/status` | Show the linked account email and current scope |
+| `/status` | Show the linked account email and current workspace |
 
-The default scope covers **all pages** you can access — personal and workspace
-artifacts combined. Linked identity groups are honoured, so a personal login that
-belongs to a workspace account sees those artifacts too.
+If you belong to one workspace it is picked for you; with several, the bot asks once
+(and answers the question you sent as soon as you pick). Linked identity groups are
+honoured, so a personal login that belongs to a workspace account sees that workspace.
+The same bot runs on [WhatsApp](/guides/whatsapp/), with the same commands.
 
 ## Artifact cards
 
