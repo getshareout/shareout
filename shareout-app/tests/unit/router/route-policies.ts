@@ -100,6 +100,7 @@ export const OPEN_ROUTES: Record<string, string> = {
   '/slack/commands': SIGNED,
   '/slack/interactions': SIGNED,
   '/telegram/webhook': SIGNED,
+  '/whatsapp/webhook': SIGNED,
   '/v1/webhooks/email-events': SIGNED,
 
   // Connector OAuth callbacks
@@ -138,6 +139,7 @@ export const OPEN_ROUTES: Record<string, string> = {
   '/v1/support/': PREFIX,
   '/slack/': PREFIX,
   '/telegram/': PREFIX,
+  '/whatsapp/': PREFIX,
   '/oauth/': PREFIX,
 };
 

@@ -79,9 +79,13 @@ export async function whatsappEventId(messageId: string): Promise<number> {
 }
 
 export async function routeWhatsApp(ctx: FetchContext): Promise<Response | null> {
-  const { request, path, env } = ctx;
-  if (path !== '/whatsapp/webhook') return null;
+  const { path } = ctx;
+  if (path === '/whatsapp/webhook') return handleWebhook(ctx);
+  return null;
+}
 
+async function handleWebhook(ctx: FetchContext): Promise<Response> {
+  const { request, env } = ctx;
   if (request.method === 'GET') {
     const challenge = whatsAppSubscribeChallenge(env, new URL(request.url));
     return challenge != null
