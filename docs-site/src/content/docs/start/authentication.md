@@ -42,7 +42,9 @@ authenticates as a headless **service principal** scoped to one workspace, with 
 scopes (`artifacts:read`, `artifacts:publish`, `data:read`, `data:write`), and is
 revocable independently of any employee.
 
-Mint one as a workspace owner/admin, then use it exactly like a personal token:
+Mint one as a workspace owner/admin. It works on the artifact, publish, data and support routes
+(publish, update, read and write a page's data, open a support ticket) within its workspace and
+scopes; every other route answers `403 INSUFFICIENT_SCOPE`:
 
 ```bash
 curl -X POST "$ORIGIN/v1/workspaces/{workspace_id}/agent-tokens" \

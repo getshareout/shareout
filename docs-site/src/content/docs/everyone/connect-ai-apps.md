@@ -50,6 +50,9 @@ The plugin connects to `https://shareout.site`. If your company runs its own Sha
 - "Turn this table into a page my team can open."
 - "Update the launch checklist page: mark the first three done."
 - "Invite ana@company.com and leo@company.com to my workspace." (owners and admins)
+- "Make a small site for the event: a home page, the schedule and how to get there."
+- "Keep this table up to date: Ana emails me the Excel every Monday." (it gives you the address to send it to)
+- "Show my stock spreadsheet from Google Drive on a page that updates every morning."
 
 The AI tells you the link and who can see the page. Pages go to your workspace by default, so your team can open them. Ask for **private** or **public** if you want something else.
 

@@ -16,6 +16,11 @@ Authorization: Bearer {token}
 
 Some workspace reads also accept a logged-in browser session.
 
+Use a personal (`so_`) token for the routes on this page. Workspace Agent tokens and
+external `sot_` tokens are accepted only by the artifact, publish, data and support
+routes (which enforce their workspace boundary and scopes); every other route answers
+them `403 INSUFFICIENT_SCOPE`.
+
 ## Features
 
 ```http
@@ -103,7 +108,7 @@ Content-Type: application/json
   [Team Space folders](folders.md) and rename/delete the ones they created; folders made
   by someone else stay admin/owner-only. When off, only admins/owners create, rename or
   delete folders and members get `403 ADMIN_REQUIRED`. A non-boolean value is
-  `400 VALIDATION_ERROR`. In the app: **Admin → Settings → Team Space folders**.
+  `400 VALIDATION_ERROR`. In the app: **Admin → General → Team Space folders**.
 
 ## Workspace Membership Policy
 
@@ -321,7 +326,7 @@ Workspace admins can manage jobs/crew triggers across artifacts:
 | `GET` | `/v1/workspaces/{id}/automations` | List crew triggers. |
 | `GET` | `/v1/workspaces/{id}/automations/{triggerId}/runs` | Run history. |
 | `POST` | `/v1/workspaces/{id}/automations/{triggerId}/run` | Dispatch now. |
-| `PATCH` | `/v1/workspaces/{id}/automations/{triggerId}` | Enable/disable. |
+| `PATCH` | `/v1/workspaces/{id}/automations/{triggerId}` | Any of `enabled`, `cron` (the trigger) and `name` (1–120 chars), `instructions` (1–20000), `model` (a crew model id), `maxIterations`, `runBudgetMicroUsd` (the task; caps bounded as on `PATCH /crew`). Only sent fields change; a bad `cron` saves nothing. `400 INVALID_REQUEST` on a bad field. Admin+. |
 | `DELETE` | `/v1/workspaces/{id}/automations/{triggerId}` | Delete trigger. |
 
 Job payloads are documented in [../api/jobs.md](../api/jobs.md).
@@ -411,6 +416,12 @@ Per-workspace catalog of `artifact_type: "skill"` markdown playbooks. Full guide
 | `POST` | `/v1/workspaces/{ws}/invoices/{id}/send` | Platform admin | Email an unpaid invoice again. 409 when nobody can receive it (no billing email or owner/admin, or all suppressed), 503 without an `EMAIL` binding. |
 | `PUT` | `/v1/workspaces/{ws}/invoices/{id}/receipt` · `/proof` | Platform admin · owner/admin | Raw PDF/PNG/JPG/WEBP body (≤10 MB, bytes checked), `?name=` for the file name. Proof only while the invoice is `open`; a proof from an owner/admin marks it paid (`paid_source: "proof"`) and emails the platform admins with it. `GET` the same path downloads it. |
 | `GET` · `PUT` | `/v1/workspaces/{ws}/ai-markup` | Platform admin | The workspace's AI resale markup: `{ markup, workspace_markup, instance_default }`. PUT `{ "markup": 1.5 }` (1–10) or `{ "markup": null }` for the instance default (`PUT /v1/admin/ai-settings {"defaultMarkup": 1.5}`). Every AI amount the workspace sees — budget, Usage, invoices, crew and Knowledge costs — is cost × this; it never sees cost or the markup. |
+| `GET` | `/v1/workspaces/{ws}/spend?month=YYYY-MM[&format=csv]` | Owner/admin | Admin → Billing spend: per day and per metric (storage, serving, automations, AI, email, browser), month-end pace and last month's total; `format=csv` downloads it. AI metrics at the workspace's price, live from the AI meter; infra metrics from the nightly ledger. `400 INVALID_MONTH`. |
+| `GET` | `/v1/workspaces/{ws}/ai-report?month=YYYY-MM[&format=csv]` | Owner/admin | Admin → Billing → AI report: one month of AI at the workspace's price, by category, kind, model (input/output tokens), automation, page, person and day. Same total as the budget and the invoice. `400 INVALID_MONTH`. Agent tokens refused. |
+| `GET` | `/v1/workspaces/{ws}/summary?month=YYYY-MM` | Owner, listed admins | Admin → Summary: one month's usage (visits, pages, knowledge, AI, per member, readers outside the team) plus `can_manage`. Default: this month. `400 INVALID_MONTH`; `403` for admins the owner did not list. Agent tokens refused. |
+| `GET` | `/v1/workspaces/{ws}/summary/access` | Member | `{ can_view, can_manage }` — drives whether the Summary entry shows. |
+| `GET` · `PUT` | `/v1/workspaces/{ws}/summary/viewers` | Owner | GET: owner + admins, each with `can_view`, and `max` (50). PUT `{ "user_ids": ["usr_…"] }` replaces who besides the owner may view; only admins of the workspace; written to the audit log (`summary.viewers_update`). |
+| `GET` · `PUT` | `/v1/workspaces/{ws}/billing-profile` | Owner/admin | Who invoices are made out to: `{ profile \| null, can_edit, tax_conditions }`. PUT the whole profile — `country`, `legal_name`, `tax_id` (CUIT checked for `AR`), `tax_condition` (`responsable_inscripto`/`monotributo`/`exento`/`consumidor_final`), `address`, `city`, `province`, `postal_code`, `phone`, `billing_email`; `400 VALIDATION_ERROR` with `fields` per refused field. Audited (`billing_profile.update`). Agent tokens refused. |
 | `GET` | `/v1/workspaces/{ws}/default-skills` | Member | Skills attached to every member's assistant in this workspace. |
 | `POST` | `/v1/workspaces/{ws}/default-skills` | Admin | `{ "skill_artifact_id" }`: attach a workspace-visible Library skill to every member's assistant (max 5; injected only for turns scoped to this workspace; re-POST re-pins to the latest version). |
 | `DELETE` | `/v1/workspaces/{ws}/default-skills/{skillId}` | Admin | Remove it. |
@@ -541,7 +552,7 @@ Opt-in learned library. Full guide: [knowledge.md](knowledge.md). On self-host, 
 | `POST` | `/v1/workspaces/{id}/knowledge/enable` | Admin+ | `{ "enabled": true }`. |
 | `POST` | `/v1/workspaces/{id}/knowledge/reindex` | Admin+ | Re-learn every page/File (or `{ "artifactIds": [...] }`) even at an unchanged version → `202 { queued, remaining, skipped }`. Once per workspace per 10 min (`429` + `Retry-After`). Instance admins too. |
 | `POST` | `/v1/workspaces/{id}/knowledge/backfill` | Admin+ | Queue up to 200 pages for notes + every page and File for search → `{ queued, kicked, corpus, corpusRemaining }`. |
-| `GET` | `/v1/workspaces/{id}/knowledge/search?q=&limit=&format=md` | Member+ | Cited passages from Files and pages. |
+| `GET` | `/v1/workspaces/{id}/knowledge/search?q=&limit=&full=1&format=md` | Member+ | Cited passages from Files and pages. `full=1` returns whole passages instead of 700-char snippets. |
 | `GET` | `/v1/workspaces/{id}/knowledge/sources?limit=` | Member+ | Learned sources: counts by status + recent list. |
 | `GET` | `/v1/workspaces/{id}/knowledge/entities?type=&q=&status=&limit=` | Member+ | Entities (clients, people, products…) by mentions; `status=confirmed\|draft`. |
 | `GET` | `/v1/workspaces/{id}/knowledge/entities/{entityId}?format=md` | Member+ | One entity: facts, relations, quoted mentions. |
@@ -565,7 +576,7 @@ Opt-in learned library. Full guide: [knowledge.md](knowledge.md). On self-host, 
 
 ## Artifact delivery (one-shot)
 
-One-shot send from the Home Inspector **Deliver** section or API — email, Slack, or Telegram. Uses the same `config` shapes as [jobs](../api/jobs.md). Full UI flow: [../core/workspace-home.md](../core/workspace-home.md#inspector-right-rail).
+One-shot send from the Home Inspector's **Automate** tab → **Send now** (editors) or the API — email, Slack, or Telegram. Uses the same `config` shapes as [jobs](../api/jobs.md). Full UI flow: [../core/workspace-home.md](../core/workspace-home.md#inspector-right-rail).
 
 | Method | Endpoint | Who | Notes |
 | --- | --- | --- | --- |

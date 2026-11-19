@@ -108,11 +108,31 @@ flowchart LR
 | `maxTokensPerCall` | Tope de tokens de salida por llamada al modelo: 4096 por defecto, máximo 16384 |
 | `runBudgetMicroUsd` | Tope de gasto por run |
 | `maxRuntimeMs` | Tope de duración de runs programados (cron/condition): 25000 por defecto, máximo 300000 (5 min). Runs manuales, por evento y de chat quedan en 25 s |
+| Presupuesto mensual de IA del workspace | Tope opcional para toda la IA medida del workspace, lo define un admin en **Admin → Facturación → Presupuesto mensual de IA**. Cuando se alcanza, el run del crew termina con `workspace_budget` hasta que se suba el presupuesto o empiece el próximo mes (UTC) |
+| Runs simultáneos | Tope **por owner**, sumando todos sus crews: 1 a la vez salvo que la instancia defina límites por plan (`plan_crew_limits`) |
 
 Un valor fuera de rango se rechaza con `400 INVALID_REQUEST` (no se recorta) en `POST /crew/define` y `PATCH /crew`.
-| Balance AI del workspace | Detiene runs si se agota |
+
+Cuando el owner ya tiene un run en curso:
+
+- **Run manual** (`POST /crew/run`) → `429 CONCURRENCY_LIMIT`; probá de nuevo cuando termine.
+- **Trigger por evento** → el run queda en cola, no se pierde (hasta 20 por owner, se guardan
+  24 h), y arranca, el más viejo primero, en el próximo tick horario.
+- **Trigger cron o de condición** → sigue pendiente y se reintenta cada hora hasta 6 h; después
+  se saltea hasta su próxima ocurrencia.
 
 Uso: `sdk.crew.usage(workspaceId)`.
+
+## Emails que manda un crew
+
+Los emails de `email_send` y `notify_send` salen como un mensaje por destinatario, cada uno con un
+pie que dice *Enviado automáticamente por el agente de IA* (con el nombre del crew) y un link al
+artefacto, más un link de baja de un clic para ese artefacto. Además:
+
+- **Freno a repetidos** — el mismo asunto a la misma persona desde el mismo artefacto se manda
+  como mucho una vez cada 12 horas. Los repetidos se saltean (`email_send` los lista en
+  `skipped_already_sent`); si todos los destinatarios eran repetidos, la tool devuelve un error.
+- Los destinatarios **dados de baja** se saltean (`email_send` los lista en `skipped_opted_out`).
 
 ## Siguiente
 

@@ -45,13 +45,13 @@ await sdk.collaborators.transferOwnership('alice@example.com');
 
 ## Access requests (private & workspace artifacts)
 
-When a signed-in user opens a **private** or **workspace** artifact they cannot access, the gate screen offers **Request access** (Google Drive style). The owner is notified via Telegram (if linked) and sees pending requests in the **Home** Activity feed (**Needs You**) and inbox banner.
+When a signed-in user opens a **private** or **workspace** artifact they cannot access, the gate screen offers **Request access** (Google Drive style). Someone who can already view an artifact but not edit it gets **Request edit access** on the artifact's tab in ShareOut Home (`role: "editor"`). Every request emails the owner (`access_request` lifecycle email, unless they opted out of product emails), shows in **Home** (**Needs You** / Access requests), and pings Telegram with **Approve** / **Deny** buttons if linked. The requester is emailed when it is approved or declined.
 
 | Endpoint | Method | Who | Action |
 |----------|--------|-----|--------|
-| `/v1/access-requests` | POST | Signed-in user with verified email | Request viewer access to a page by `slug` |
-| `/v1/access-requests/incoming` | GET | Artifact owners | List pending requests across owned pages |
-| `/v1/access-requests/{id}` | POST | Owner of the requested page | `{ "action": "approve" \| "deny" }` |
+| `/v1/access-requests` | POST | Signed-in user with verified email | Request access to a page by `slug`; `role`: `"viewer"` (default) or `"editor"` |
+| `/v1/access-requests/incoming` | GET | Artifact owners, and owners/admins of the artifact's workspace | List pending requests (each with its `role`); optional `?workspace_id=` |
+| `/v1/access-requests/{id}` | POST | Owner of the requested page, or a workspace owner/admin | `{ "action": "approve" \| "deny" }` |
 
 **Create request:**
 
@@ -60,12 +60,12 @@ POST /v1/access-requests
 Authorization: Bearer so_xxx
 Content-Type: application/json
 
-{ "slug": "my-dashboard" }
+{ "slug": "my-dashboard", "role": "editor" }
 ```
 
-**Approve** grants `viewer` collaborator access automatically (`addCollaboratorEmails`). Owners can also tap **Approve** / **Deny** on the Telegram notification.
+**Approve** adds the requester as a collaborator with the role they asked for — `viewer`, or `editor` for an edit request (`addCollaboratorEmails`). A pending view request upgrades in place to an edit request (one pending row per requester). After a denial, new requests from the same person for 7 days answer `{ "status": "pending" }` without notifying anyone.
 
-Errors: `EMAIL_REQUIRED` (must sign in with email), `HAS_ACCESS`, `IS_OWNER`, `NOT_PRIVATE` (page already open), duplicate pending returns `{ "status": "pending" }`.
+Errors: `EMAIL_REQUIRED` (must sign in with email), `HAS_ACCESS` (already a collaborator — a `viewer` collaborator may still ask for `editor`), `IS_OWNER`, `NOT_PRIVATE` (a view request on a page that is already open), duplicate pending returns `{ "status": "pending" }`.
 
 ## Checking Permissions
 

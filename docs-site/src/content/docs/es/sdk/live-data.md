@@ -133,6 +133,13 @@ const rows = (bqResp.rows || []).map(row => {
 });
 ```
 
+**Artefactos con política de filas.** Con un `access_policy`, quien mira con alcance limitado no
+puede mandar su propio SQL. El artefacto corre por nombre una query que el autor declaró en
+`access_policy.queries`, y el servidor completa los valores de esa persona:
+`sdk.platform.execute('bigquery', 'jobs.query', { query: 'mis_ventas' })` — ahí `connectionId` es
+opcional (la declaración nombra la conexión) y `params` se ignora. Mirá
+[Política de acceso](/es/spec/access-policy/).
+
 Patrón de endpoint del proveedor: `/platform/{providerId}/{endpointId}/execute`.
 
 ### Paginación de BigQuery

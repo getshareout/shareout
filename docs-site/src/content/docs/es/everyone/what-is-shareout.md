@@ -21,8 +21,8 @@ entero o solo a unas pocas personas.
 
 ## Por qué le encanta a la gente
 
-- **Vos hablás, ella construye.** Describí tu artefacto con tus palabras (Crear con
-  AI necesita una clave de AI en la instancia — preguntale al admin si ese botón
+- **Vos hablás, ella construye.** Describí tu artefacto con tus palabras (**Nuevo →
+  Describilo a la IA** necesita una clave de IA en la instancia — preguntale al admin si esa opción
   no hace nada).
 - **Está en vivo en tu link.** Cada artefacto tiene una dirección real en *tu*
   dominio o URL workers.dev.

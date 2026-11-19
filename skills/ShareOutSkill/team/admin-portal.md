@@ -1,7 +1,7 @@
 # Workspace Admin Portal
 
 Workspace **owners and admins** manage the workspace from Home → **Admin** lens —
-governance, members, automations, support, AI.
+governance, members, automations, support, AI, billing.
 
 Load [SKILL.md](SKILL.md) first.
 
@@ -9,8 +9,8 @@ Load [SKILL.md](SKILL.md) first.
 
 | Role | Admin lens |
 | --- | --- |
-| `owner` | Full access to every tab |
-| `admin` | Full access to every tab |
+| `owner` | Every page |
+| `admin` | Every page except **Summary**, unless the owner lists them under **Who can see this** |
 | `member` | Admin lens hidden |
 
 ## Instance owner (`/admin`) — different thing
@@ -59,21 +59,37 @@ Prefer `provision` for any new customer account. Minimal body:
   echoes them. Operators can use `scripts/provision-workspace.mjs` with a YAML spec and
   `${ENV_VAR}` placeholders for secrets.
 
-## Tabs
+## Pages
 
-| Tab | What you do there |
-| --- | --- |
-| **Overview** | Artifact/storage totals, views, public exposure, automation health, seat usage if shown — plus **Needs attention** rows (pending invites, inactive members, public artifacts, failing automations) |
-| **Artifacts** | Sortable governance table: owner, visibility, views, visitors, size, performance (LCP), paused state — row actions to pause/unpause, change visibility, **transfer ownership** to another workspace member |
-| **Members** | Member analytics table (join date, last active, role, agent tokens) — invite, change roles, remove members, manage **pending invites** (resend/revoke), approve/deny **access requests** and **publish approvals** |
-| **Sharing** | External sharing — guided **Add client or partner** flow, invite external members, share folders/artifacts at a capability, see read receipts, mint scoped API tokens. See [external-sharing.md](external-sharing.md) |
-| **Automation** | Workspace-wide schedules and crew automations as tables — enable/disable, run now, open **Run Inspector** drawer for any run |
-| **AI** | Workspace assistant toggles and connector **AI query** settings — which connectors the home agent may query |
-| **Security** | Session policy, audit log, workspace Agent tokens (`sot_`) — see [agent-tokens.md](agent-tokens.md) |
-| **Settings** | Publish governance policy, whether members can create Team Space folders (`members_can_create_folders`), workspace branding (logo, accent, footer), **file inbox** address (`{slug}@inbox.example.com`), read-only feature flags |
-| **Support** | Customer ticket workbench for this workspace — list, open thread, edit AI draft, **Approve & send** reply on the origin channel, assign, resolve. Super-admins also use the global `/admin?view=support` view for cross-workspace tickets |
+Admin is a sidebar of pages grouped by topic; it opens on **Members**. Keys are what
+`#l/admin/<key>` takes.
 
-Deep-link a tab with hash routing inside Admin: `#l/admin` then pick a tab in the UI.
+| Group | Page (key) | What you do there |
+| --- | --- | --- |
+| Reports | **Summary** (`summary`) | Month-by-month usage report: active people, page views, publishes, AI questions, reading, pages & knowledge, AI & automations, per member, readers outside the team. Owner, the admins the owner lists (max 50) and platform admins only — hidden for everyone else |
+| People | **Members** (`members`) | Member analytics table (join date, last active, role, agent tokens) — **Invite people**, change roles, remove members, manage **pending invites** (resend / copy link / revoke) |
+| People | **Sharing** (`clients`) | External sharing — guided **Add client or partner** flow, invite external members, share folders/artifacts at a capability, see read receipts, mint scoped API tokens. See [external-sharing.md](external-sharing.md) |
+| People | **Support** (`support`) | Customer ticket workbench for this workspace — list, open thread, edit AI draft, **Approve & send** reply on the origin channel, assign, resolve. Super-admins also use the global `/admin?view=support` view for cross-workspace tickets |
+| Content | **Artifacts** (`artifacts`) | Sortable governance table: owner, visibility, views, visitors, size, performance (LCP), paused state — row actions to pause/unpause, change visibility, **transfer ownership** to another workspace member |
+| Content | **Automations** (`automation`) | Scheduled jobs, AI task (crew) automations and the connectors they use, as tables — enable/disable, run now, open **Run Inspector** drawer for any run |
+| AI & billing | **Billing** (`billing`) | Spend this/last month by category and day (+ CSV), the **monthly AI budget**, AI by kind, today's per-member caps, the **AI report** (+ CSV), **invoices** (download, attach transfer proof → paid) and **billing details**. All amounts at the workspace's price |
+| AI & billing | **AI & models** (`ai`) | The workspace's Vercel AI Gateway model, BYO provider key (OpenAI / Vercel Gateway), spend / requests / tokens per model |
+| Security | **Access** (`access`) | **Access requests** (approve/deny), membership domain allowlist, session policy |
+| Security | **Publishing** (`publishing`) | **Publish approvals** waiting for you, publish governance policy (`allow` / `require_approval` / `prohibit`, `approvals_required`) |
+| Security | **Agent tokens** (`tokens`) | Workspace Agent tokens (`sot_`) — see [agent-tokens.md](agent-tokens.md) |
+| Security | **Activity log** (`audit`) | Workspace audit log |
+| Workspace | **General** (`general`) | Language, whether members can create Team Space folders (`members_can_create_folders`), **file inbox** address (`{slug}@inbox.example.com`), read-only feature flags; instance admins also get a link to `/admin?view=instance` |
+| Workspace | **Branding** (`branding`) | Logo, accent color, hide the "Made with ShareOut" footer |
+| Workspace | **Custom domain** (`domains`) | Serve the workspace from its own hostname — see [custom-domain.md](custom-domain.md) |
+
+Sidebar badges count what waits: pending invites (Members), access requests (Access),
+publish approvals (Publishing), failing automations (Automations), unpaid invoices and a
+monthly AI budget near/at its limit (Billing). Billing and Summary routes are in
+[api.md](api.md).
+
+Deep-link a page: `#l/admin/<page>` (e.g. `#l/admin/billing`) or `/home?view=admin&tab=<page>`.
+Old tab keys still resolve: `overview`/`people` → `members`, `usage` → `billing`,
+`security` → `access`, `settings` → `general`. Anything else opens Members.
 
 ## Artifact governance API
 
@@ -100,7 +116,7 @@ Beyond `POST /v1/workspaces/{id}/members/invite`:
 
 ## Run Inspector
 
-One normalized run detail shape across **crew**, **scheduled job**, and **metric alert** surfaces — steps, tokens, cost, delivery status, errors. Admins open runs from the Automation tab, Brief **Runs** widget, or Needs You failed-run rows.
+One normalized run detail shape across **crew**, **scheduled job**, and **metric alert** surfaces — steps, tokens, cost, delivery status, errors. Admins open runs from the Automations page, Brief **Runs** widget, or Needs You failed-run rows.
 
 | Method | Endpoint | Purpose |
 | --- | --- | --- |
@@ -109,12 +125,12 @@ One normalized run detail shape across **crew**, **scheduled job**, and **metric
 
 Job and alert runs may include a `rerunPath` for **Run again** from the drawer. Crew runs are read-only in the inspector.
 
-## Queues on Members tab
+## Approval queues
 
-The Members tab surfaces two approval queues without leaving Admin:
+Two approval queues live in Admin, each with a sidebar badge while something waits:
 
-- **Access requests** — `GET /v1/access-requests/incoming` (owners) and `POST /v1/access-requests/{id}` with `{ "action": "approve" \| "deny" }`
-- **Publish approvals** — `GET /v1/workspaces/{id}/publish-approvals?status=pending` and `POST /v1/artifacts/{id}/publish-approval/{requestId}/decision`
+- **Access requests** (Admin → **Access**) — `GET /v1/access-requests/incoming` (owners) and `POST /v1/access-requests/{id}` with `{ "action": "approve" \| "deny" }`
+- **Publish approvals** (Admin → **Publishing**) — `GET /v1/workspaces/{id}/publish-approvals?status=pending` and `POST /v1/artifacts/{id}/publish-approval/{requestId}/decision`
 
 See [publish-governance.md](publish-governance.md) and [../modules/_shared/permissions.md](../modules/_shared/permissions.md#access-requests-private--workspace-artifacts).
 
@@ -142,7 +158,7 @@ linked Telegram/Slack bots.
 
 - [../core/workspace-home.md](../core/workspace-home.md#workspace-lenses) — Admin lens entry from Home rail
 - [api.md](api.md) — workspace endpoint tables
-- [workspace-context.md](workspace-context.md) — Intelligence tab + REST context files
-- [workspace-assistant.md](workspace-assistant.md) — AI tab + home agent
+- [workspace-context.md](workspace-context.md) — REST context files (Knowledge → Guidance)
+- [workspace-assistant.md](workspace-assistant.md) — home agent
 - [activity-feed.md](activity-feed.md) — Needs You rows that link to admin queues
 - [../api/jobs.md](../api/jobs.md) — schedule payloads behind job runs

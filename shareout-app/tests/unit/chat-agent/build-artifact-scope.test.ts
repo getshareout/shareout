@@ -94,12 +94,12 @@ describe('executeBuildArtifact — same daily publish cap and storage quota as P
     generateArtifactHtml.mockRejectedValue(new BuildTruncatedError());
     const steps: string[] = [];
     const r = await executeBuildArtifact(env, 'u1', build, (s) => steps.push(s), 'es');
-    expect(steps).toEqual(['Diseñando tu página…']);
-    expect(r).toMatchObject({ ok: false, text: expect.stringMatching(/demasiado larga/) });
+    expect(steps).toEqual(['Diseñando tu artefacto…']);
+    expect(r).toMatchObject({ ok: false, text: expect.stringMatching(/demasiado largo/) });
   });
 
   it('marks a published build ok', async () => {
     const r = await executeBuildArtifact(env, 'u1', build, undefined, 'es');
-    expect(r).toMatchObject({ ok: true, slug: 'p', text: 'Lista y publicada ✅ https://x/a/p/' });
+    expect(r).toMatchObject({ ok: true, slug: 'p', text: 'Listo y publicado ✅ https://x/a/p/' });
   });
 });

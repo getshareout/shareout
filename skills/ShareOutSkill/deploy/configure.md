@@ -164,7 +164,7 @@ curl -sS -X POST "$ORIGIN/v1/admin/workspaces/$WORKSPACE_ID/members" \
 ```
 
 Inviting people *into* a workspace you administer is a workspace-level operation and
-lives in the workspace Admin → Members tab, not here.
+lives in the workspace Admin → Members page, not here.
 
 ---
 

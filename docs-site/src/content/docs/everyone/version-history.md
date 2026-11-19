@@ -4,13 +4,17 @@ description: See who changed your artifact, how and what changed, compare any tw
 ---
 
 Every publish makes a new **version** of your artifact: v1, v2, v3… Nothing is ever
-overwritten. The **History** tab shows them all, and you can put any old version back
+overwritten. The **Versions** list shows them all, and you can put any old version back
 live in one click.
 
-## Open History
+## Open Versions
 
-Open the artifact on [Home](/everyone/your-workspace/) and pick **History** in the
-Inspector. Each version shows:
+1. Open the artifact on [Home](/everyone/your-workspace/).
+2. In the side panel (the Inspector), stay on **Details**. On a phone or tablet, tap
+   **Options** first to open that panel.
+3. Open **More** at the bottom and pick **Versions**. **← Details** takes you back.
+
+Each version shows:
 
 - **Who** published it (or "Someone" when it is not known).
 - **How** it was made: **Published** (API), **Agent**, **Editor** or **Restore**.
@@ -19,7 +23,7 @@ Inspector. Each version shows:
 - How many **comments** and **approvals** that version got
   (see [Review & approvals](/everyone/review/)).
 
-History lists the 50 most recent versions. It is visible to the people the artifact
+The list shows the 50 most recent versions. It is visible to the people the artifact
 is shared with.
 
 ## See what changed
@@ -42,7 +46,7 @@ don't run in a preview, so what you see is the page itself, not today's numbers.
 ## Restore a version
 
 **Restore vN** publishes a **new** version with the content of vN. Nothing is deleted:
-every version, including the ones after vN, stays in History, and the new one is marked
+every version, including the ones after vN, stays in the list, and the new one is marked
 "Restored from vN". If you change your mind, restore the version you came from.
 
 You need **Can edit** on the artifact (or be its owner, or a workspace owner/admin) to
@@ -57,11 +61,11 @@ history intact. See the [API reference](/api/).
 ## Change notes
 
 When you publish from the API or from an AI app connected to ShareOut, you can send an
-optional `message` saying what you changed. It shows next to that version in History.
+optional `message` saying what you changed. It shows next to that version in Versions.
 
 When a version is published without a note, ShareOut writes a one-line "what changed"
 note for you from the differences with the previous version. These notes carry an
-**AI** badge in History so you can tell them apart from notes people wrote. First
+**AI** badge in Versions so you can tell them apart from notes people wrote. First
 versions, restores and publishes that didn't change the page get no AI note.
 
 The note for the live version also shows in **Details** as "Updated &lt;time&gt;: &lt;note&gt;".

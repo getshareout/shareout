@@ -244,8 +244,9 @@ Regenerá la miniatura del preview cuando quieras con
 
 ## Auto-resumen y tags
 
-Tras cada publish HTML exitoso, ShareOut corre un paso de IA en **background** sobre
-el entrypoint de producción. Escribe una **descripción** de 1–2 oraciones (solo si
+Tras cada publish exitoso de un artefacto HTML, un documento Markdown, un CSV o un PDF
+(incluidos los documentos convertidos al importar, como PDF → Markdown o una planilla →
+CSV), ShareOut corre un paso de IA en **background** sobre el entrypoint de producción. Escribe una **descripción** de 1–2 oraciones (solo si
 dejaste el campo vacío) y **3–6 tags** en la tabla `artifact_tags` existente. El
 publish nunca espera este job — si la IA no está disponible, el artefacto igual queda
 en vivo.
@@ -280,6 +281,70 @@ la [referencia de la API](/api/).
 
 Para publicar varios archivos HTML como un solo artefacto, mirá
 [Artefactos de varias secciones](/es/guides/multi-page/).
+
+## Editar por partes
+
+Para cambiar una palabra, un color o un archivo, no hace falta volver a publicar todos los
+archivos:
+
+1. **Leé lo que vas a cambiar.** `GET /v1/artifacts/{id}/files?manifest=1` lista cada
+   archivo (path, mime, tamaño, sha256 — sin contenido) y `newest_version`, la versión
+   desde la que tiene que partir la edición. `GET /v1/artifacts/{id}/files?paths=index.html,styles.css`
+   lee solo los archivos que nombrás.
+2. **Mandá el cambio.** `POST /v1/artifacts/{id}/edits` con `base_version` y una lista de
+   `ops`: `replace` (`old` → `new`, sumá `all` para todas las coincidencias), `write`,
+   `delete` o `rename` — hasta 100, en orden. `dry_run: true` muestra el resultado sin
+   guardar.
+
+```json
+{
+  "base_version": 3,
+  "message": "Títulos en azul",
+  "ops": [{ "op": "replace", "path": "styles.css", "old": "h1 { color: red; }", "new": "h1 { color: blue; }" }]
+}
+```
+
+Si falla cualquier op, no se escribe nada: `EDIT_NO_MATCH` da la línea más parecida,
+`EDIT_AMBIGUOUS` las líneas que coinciden. Si alguien guardó una versión más nueva que
+`base_version`, la respuesta es `409 VERSION_CONFLICT` con `current_version`: leé de nuevo
+y reintentá. El resultado se publica como la versión siguiente por el mismo camino que un
+publish (moderación, tests, readiness), y los archivos que no tocaste se mantienen.
+Funciona en artefactos html, markdown, csv, txt y json; requiere rol de editor.
+
+Desde un agente de IA por MCP, el mismo flujo es **`read_artifact`** (la lista de archivos
+y la versión, o un archivo por partes — nunca se corta nada sin avisar) y después
+**`edit_artifact`**. Para reescribir un artefacto entero, **`get_artifact`** con
+`include_files` lee todos los archivos y **`update_artifact`** lo guarda con
+`base_version`. `update_artifact` rechaza una escritura que perdería trabajo:
+`VERSION_CONFLICT` cuando alguien guardó una versión más nueva, y `WOULD_REMOVE_FILES`
+cuando los archivos enviados dejan afuera archivos de la versión actual (salvo
+`replace_all_files: true`).
+
+## Revisá lo que ven los demás (Verify)
+
+Después de publicar o editar, revisá el artefacto como lo ve la gente con la que está
+compartido:
+
+```bash
+curl -X POST https://shareout.site/v1/artifacts/art_abc123/verify \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{}'
+```
+
+Verify abre el artefacto en un navegador limpio, sin sesión de ShareOut, en una
+computadora (1280×800) y en un celular (390×844), y reporta errores de script con archivo
+y línea, archivos que no cargan, librerías bloqueadas, problemas de accesibilidad,
+contenido más ancho que la pantalla del celular, botones demasiado chicos para tocar,
+carga lenta y errores comunes del código — con una captura de cada vista. `status` es
+`pass`, `warn`, `fail` o `partial` (solo chequeos del código, cuando la instancia no
+tiene renderizado de navegador).
+
+- Body (todo opcional): `version` (por defecto, la que está en vivo), `viewports`
+  (`["desktop"]`, `["mobile"]` o los dos), `full_page`.
+- `GET /v1/artifacts/{id}/verify/latest` devuelve el último resultado.
+- MCP: **`verify_artifact`**.
+- Solo dueños y editores. Cada persona puede correrlo 30 veces por hora salvo que la
+  instancia configure `VERIFY_RUNS_PER_HOUR`; pasado eso, `429` con `Retry-After`.
 
 ## Eliminar y restaurar
 

@@ -57,9 +57,9 @@ describe('executeBuildArtifact with BUILD_AGENT=on', () => {
     const steps: string[] = [];
     const r = await executeBuildArtifact(env(), 'u1', build, (l) => steps.push(l), 'es');
     expect(r).toMatchObject({ ok: true, url: 'https://p.x/', slug: 'p', artifactId: 'art_1', name: 'Mi página' });
-    expect(r.text).toBe('Lista y publicada ✅ https://x/a/p/');
+    expect(r.text).toBe('Listo y publicado ✅ https://x/a/p/');
     expect(steps).toContain('Escribiendo estilos…');
-    expect(steps).toContain('Publicándola…');
+    expect(steps).toContain('Publicándolo…');
     expect(publishGeneratedFiles).toHaveBeenCalledTimes(1);
     expect(publishGeneratedFiles.mock.calls[0][2]).toMatchObject({ workspaceId: 'wsp_1', visibility: 'private', name: 'Mi página' });
     expect(publishGeneratedFiles.mock.calls[0][2].files).toHaveLength(3);
@@ -72,7 +72,7 @@ describe('executeBuildArtifact with BUILD_AGENT=on', () => {
     const r = await executeBuildArtifact(env(), 'u1', build, undefined, 'es');
     expect(r.ok).toBe(false);
     expect(r.url).toBeUndefined();
-    expect(r.text).toMatch(/no la publiqué/);
+    expect(r.text).toMatch(/no lo publiqué/);
     expect(publishGeneratedFiles).not.toHaveBeenCalled();
     expect(incrementRateLimit).not.toHaveBeenCalled();
     expect(alertOps).toHaveBeenCalledTimes(1);

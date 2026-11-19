@@ -91,6 +91,7 @@ export default defineConfig({
 						{ label: 'Your workspace (Home)', slug: 'everyone/your-workspace', translations: { es: 'Tu workspace (Home)' } },
 						{ label: 'Folder guides', slug: 'everyone/folder-guides', translations: { es: 'Guías de carpeta' } },
 						{ label: 'Files & deliverables', slug: 'everyone/assets', translations: { es: 'Archivos y entregas' } },
+						{ label: "What's new", slug: 'whats-new', translations: { es: 'Novedades' } },
 					],
 				},
 				{
@@ -196,6 +197,7 @@ export default defineConfig({
 						{ label: 'Datasets', slug: 'sdk/datasets', translations: { es: 'Datasets' } },
 						{ label: 'Live data', slug: 'sdk/live-data', translations: { es: 'Datos en vivo' } },
 						{ label: 'MCP connections', slug: 'sdk/mcp', translations: { es: 'Conexiones MCP' } },
+						{ label: 'Knowledge search', slug: 'sdk/knowledge', translations: { es: 'Búsqueda en Knowledge' } },
 						{ label: 'Secrets', slug: 'sdk/secrets', translations: { es: 'Secrets' } },
 						{ label: 'AI agent', slug: 'sdk/agent', translations: { es: 'Agente IA' } },
 						{ label: 'Page Pilot', slug: 'sdk/pilot', translations: { es: 'Page Pilot' } },

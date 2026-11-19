@@ -83,7 +83,7 @@ repo as primary — it is a publish mirror. After deploy, agents load
    `SHAREOUT_BASE_URL` before serving. **`npm run deploy` sets `SHAREOUT_BASE_URL` for you** —
    if you skipped that, `GET $ORIGIN/health` returns a `warnings` entry until you set it.
 
-6. **Day 1 extras** — set an AI key if you want Create with AI / Crew
+6. **Day 1 extras** — set an AI key if you want **New → Describe it to AI** / Crew
    (`OPENAI_API_KEY` or Vercel AI Gateway); invite a teammate under Admin; confirm
    `curl …/v1/admin/instance` → `gaps` is empty (or you accept each gap). Details in the
    [repo README Day 1](https://github.com/getshareout/shareout#day-1-after-health-is-green).
@@ -99,6 +99,7 @@ repo as primary — it is a publish mirror. After deploy, agents load
 | Microsoft sign-in | `MICROSOFT_CLIENT_ID` + `MICROSOFT_CLIENT_SECRET` (optional `MICROSOFT_TENANT`); callback `{origin}/auth/microsoft/callback` — [setup](/self-host/secrets/#sign-in-with-microsoft) |
 | Email one-time codes | Configure the `EMAIL` binding + from-address vars |
 | Workspace subdomains | Wildcard DNS → worker; see [Domain and DNS](/self-host/domain/) |
+| Workspace custom domains | `CUSTOM_DOMAINS_CNAME_TARGET`, plus `CF_CUSTOM_HOSTNAMES_TOKEN` + `CF_CUSTOM_HOSTNAMES_ZONE_ID` to let Cloudflare for SaaS issue the certificates — [setup](/teams/custom-domain/#for-instance-operators) |
 | Split content CDN | Set `ARTIFACT_ORIGIN` to a second zone (optional hardening) |
 
 Same-zone serving (no CDN) is the default and is fine for most self-hosts.

@@ -50,6 +50,9 @@ El plugin se conecta a `https://shareout.site`. Si tu empresa tiene su propio Sh
 - "Convertí esta tabla en una página que pueda abrir mi equipo."
 - "Actualizá la página del checklist de lanzamiento: marcá los tres primeros como hechos."
 - "Invitá a ana@empresa.com y leo@empresa.com a mi espacio de trabajo." (dueños y administradores)
+- "Armá un sitio chico para el evento: inicio, el cronograma y cómo llegar."
+- "Mantené esta tabla al día: Ana me manda el Excel todos los lunes." (te da la dirección a la que mandarlo)
+- "Mostrá mi planilla de stock de Google Drive en un artefacto que se actualice todas las mañanas."
 
 La IA te dice el link y quién puede ver el artefacto. Los artefactos van a tu espacio de trabajo por defecto, así tu equipo los puede abrir. Si querés otra cosa, pedilo **privado** o **público**.
 

@@ -24,6 +24,7 @@ Add a new product, change a price, remove a sold-out item — your page updates 
 ## Where the list can come from
 
 - **You type it in** — perfect for a small, hand-kept list.
+- **An Excel or CSV file you already have** — **New → Table from an Excel file** turns it into a table page in one step. (See [Start from an Excel file](/everyone/inbox/#start-from-an-excel-file).)
 - **A spreadsheet you connect** — keep your info in Google Sheets and the page follows along. (See [Connect your tools](/everyone/connect/).)
 - **Form replies** — the things people submit can become a list too (a sign-up sheet, an order log).
 
@@ -36,7 +37,7 @@ Add a new product, change a price, remove a sold-out item — your page updates 
 - An FAQ
 
 :::tip[Keep it fresh on its own]
-Connect a spreadsheet and your list updates itself whenever you edit the sheet — great for a menu or a "what's in stock" page. More in [Connect your tools](/everyone/connect/).
+Connect a spreadsheet and your list updates itself whenever you edit the sheet — great for a menu or a "what's in stock" page. More in [Keep a page up to date from a spreadsheet](/everyone/google-sheets/#keep-a-page-up-to-date-from-a-spreadsheet) — from Google Drive, a shared link, or by emailing the Excel.
 :::
 
 ## Share a list between pages

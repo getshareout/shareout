@@ -14,14 +14,40 @@ Copy a whole remote folder (with subfolders) into workspace files, keep it in sy
 |---|---|
 | Overview: providers, my connections, imported folders + last run | `GET /v1/workspaces/{ws}/file-imports` |
 | Browse folders (needs my connection) | `GET /v1/workspaces/{ws}/file-imports/browse/{google_drive\|microsoft}?ref=root[&q=site search]` |
-| Import a folder (starts a run) | `POST /v1/workspaces/{ws}/file-imports/sources` `{ provider, ref, name, targetFolderId?, convert?, dailySync? }` |
+| Import a folder (starts a run) | `POST /v1/workspaces/{ws}/file-imports/sources` `{ provider, ref, name, targetFolderId?, dailySync? }` |
 | Sync again (only changed files) | `POST /v1/workspaces/{ws}/file-imports/sources/{id}/sync` → `202 { run }`, `409 RUN_IN_PROGRESS` |
-| Daily sync on/off, conversion on/off | `PATCH /v1/workspaces/{ws}/file-imports/sources/{id}` `{ dailySync?, convert? }` (max 10 daily per workspace) |
+| Daily sync on/off | `PATCH /v1/workspaces/{ws}/file-imports/sources/{id}` `{ dailySync? }` (max 10 daily per workspace) |
 | Progress + per-file problems | `GET /v1/workspaces/{ws}/file-imports/runs/{runId}` |
 | Stop syncing (files stay) | `DELETE /v1/workspaces/{ws}/file-imports/sources/{id}` |
 | Disconnect my drive (stops every sync through it) | `DELETE /v1/workspaces/{ws}/file-imports/connections/{provider}` |
 
-`ref` is opaque: take it from a browse entry with `selectable: true`.
+`ref` is opaque: take it from a browse entry with `selectable: true`. A `convert` field is still
+accepted but ignored: every file that can become a page does (Word, Excel, PDF, Markdown, CSV,
+text, images, video, `.pptx`; `.ppt`/`.odp` only with the slides converter), up to 300 per run.
+
+## Google Drive by sharing (when the instance sets `GOOGLE_DRIVE_SA_KEY`)
+
+Instead of the OAuth consent, the workspace gets its **own** Google service-account email and the
+person shares a Drive folder with it (Viewer). `GET …/file-imports` → `share` is
+`{ provider: "google_drive", shareEmail }` when this is on (`shareEmail: null` until first use),
+`null` when the instance has no key — then only the OAuth path above exists.
+
+| Do | Call |
+|---|---|
+| The workspace's share email (created on first use) | `POST /v1/workspaces/{ws}/file-imports/share/google_drive` → `{ shareEmail }` |
+| Folders shared with it | `GET /v1/workspaces/{ws}/file-imports/browse/google_drive?access=share&ref=root` → `{ entries, shareEmail }` |
+| A folder from its pasted link | `GET …/browse/google_drive?access=share&link=<folder link>` (a file link → `400 NOT_A_FOLDER`) |
+| Import it | `POST …/file-imports/sources` `{ provider: "google_drive", ref, name, access: "share", … }` |
+| Move an OAuth-imported folder onto sharing (nothing re-imports) | `PATCH …/file-imports/sources/{id}` `{ access: "share" }` |
+
+What to tell the person, in order: share the folder in Drive with the email (Viewer); come back and
+pick it. Files added to the folder later come over on the next sync; unsharing it stops the sync.
+A company Google Workspace may block sharing outside the organization — their Google admin has to
+allow it. Errors: `SHARE_EMAIL_NOT_READY` (`409`, a just-made account Google hasn't finished — try
+again in a minute), `SHARE_EMAIL_LIMIT` (`503`, the instance reached Google's account limit; never
+a shared account), `SHARE_EMAIL_FAILED` (`502`), `NOT_CONFIGURED` / `PROVIDER_NOT_CONFIGURED` (`404`, no key).
+An agent can create the email and start the import, but the sharing itself is the person's step
+in Drive.
 
 ## Run results
 

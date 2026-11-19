@@ -180,14 +180,16 @@ las rutas requieren membresía del workspace.
 | Method | Endpoint | Quién | Propósito |
 | --- | --- | --- | --- |
 | `GET` | `/v1/workspaces/{id}/knowledge` | Member+ | Settings + counts |
-| `GET` | `/v1/workspaces/{id}/knowledge/status` | Member+ | Progreso de entrenamiento (ventana 24h) |
+| `GET` | `/v1/workspaces/{id}/knowledge/status` | Member+ | Progreso de entrenamiento (ventana 24h), más `corpus`: estado por fuente (`chunker_version`, `last_reindex_at`, `counts`, `sources[]` con `status`, `outdated`, `chunks`, `error`); un miembro ve solo las fuentes que puede abrir |
 | `GET` | `/v1/workspaces/{id}/knowledge/tree` | Member+ | Resúmenes agrupados por kind |
 | `GET` | `/v1/workspaces/{id}/knowledge/files/{path}` | Member+ | Una nota — cuerpo markdown + sources, con título, slug y enlace de cada artefacto fuente cuando lo podés abrir |
 | `GET` | `/v1/workspaces/{id}/knowledge/from/{artifactId}` | Member+ | Notas aprendidas de un artefacto; vacío si Conocimiento está apagado o no podés abrir el artefacto |
 | `PUT` | `/v1/workspaces/{id}/knowledge/files/{path}` | Member+ (`index.md`: Admin+) | Reemplazar markdown; marca como editada a mano |
 | `DELETE` | `/v1/workspaces/{id}/knowledge/files/{path}?forget=1` | Admin+ | Eliminar nota; `forget=1` evita re-aprendizaje |
 | `POST` | `/v1/workspaces/{id}/knowledge/enable` | Admin+ | Activar/desactivar (**plan pago** para activar) |
-| `POST` | `/v1/workspaces/{id}/knowledge/backfill` | Admin+ | Encolar hasta 200 artefactos; `{ queued, kicked }` (**plan pago**) |
+| `POST` | `/v1/workspaces/{id}/knowledge/backfill` | Admin+ | Encolar hasta 200 artefactos recientes para notas, y cada artefacto y Archivo que falte aprender para búsqueda (hasta 300 por llamada); `{ queued, kicked, corpus, corpusRemaining }` |
+| `POST` | `/v1/workspaces/{id}/knowledge/reindex` | Admin+ | Re-aprender todos los artefactos live y Archivos (o solo `{ "artifactIds": [...] }`, 1–300) aunque no hayan cambiado; `202 { queued, remaining, skipped }`. Una vez por workspace cada 10 minutos (`429 RATE_LIMITED` con `Retry-After`) |
+| `GET` | `/v1/workspaces/{id}/knowledge/search?q=&limit=&full=1&format=md` | Member+ | Pasajes citados de Archivos y artefactos; se cortan en 700 caracteres salvo con `full=1`; `limit` 1–30 (10 por defecto); `format=md` para markdown compacto |
 | `POST` | `/v1/workspaces/{id}/knowledge/entities` | Admin+ | Crear una entidad, confirmada por el equipo |
 | `PATCH` / `DELETE` | `/v1/workspaces/{id}/knowledge/entities/{entityId}` | Admin+ | Renombrar, cambiar tipo, describir o confirmar; descartar |
 | `POST` | `/v1/workspaces/{id}/knowledge/entities/{entityId}/merge` · `/facts` | Admin+ | Fusionar en otra (`{ into }`); agregar un dato |
@@ -198,12 +200,18 @@ las rutas requieren membresía del workspace.
 | `GET` / `POST` | `/v1/workspaces/{id}/knowledge/discarded[/restore]` | Admin+ | Lo descartado; restaurar |
 | `GET` | `/v1/workspaces/{id}/knowledge/history` | Admin+ | Los cambios del equipo al grafo |
 
+**Re-aprendizaje.** Cada fuente recuerda la versión del lector que la partió en pasajes.
+Cada noche, Knowledge re-aprende las fuentes leídas por una versión anterior y reintenta las
+que fallaron (unas pocas por workspace por noche). Para re-aprender todo ya — por ejemplo,
+después de cambiar tus reglas — un owner o admin llama a `reindex`; consume uso de IA, y
+`status` muestra el progreso.
+
 ## Privacidad y alcance
 
 - **Solo miembros.** La biblioteca Knowledge es visible para miembros del workspace. Los sharees externos no ven Knowledge.
 - **Solo tus artefactos.** Las notas se derivan de los artefactos publicados de tu workspace.
 - **Opt-in.** Knowledge está apagado hasta que un owner o admin lo active.
-- **Desaprender.** Cuando una página pasa a privada o a la papelera, las notas aprendidas de ella (temas, entidades, la línea de tiempo y el overview) dejan de mostrarse al resto de los miembros y a sus asistentes en el momento, y la corrida nocturna siguiente las reconstruye con las páginas que siguen abiertas para todos.
+- **Desaprender.** Cuando un artefacto pasa a privado o a la papelera, las notas aprendidas de él (temas, entidades, la línea de tiempo y el overview) dejan de mostrarse al resto de los miembros y a sus asistentes en el momento, y la corrida nocturna siguiente las reconstruye con los artefactos que siguen abiertos para todos.
 
 ## Relacionado
 

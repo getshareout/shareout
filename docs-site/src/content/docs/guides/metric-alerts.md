@@ -93,8 +93,8 @@ see [Crew](/crew/patterns/#metric-alert-investigation).
 ## Metric watches
 
 **Metric watches** are a lighter sibling of metric alerts — zero destination
-config, bell-only. From an open page's Inspector → **Watches**, pick a table and
-a metric kind:
+config, bell-only. From an open page's Inspector → **Automate** → **Monitoring**
+(shown to people who can edit the page), pick a table and a metric kind:
 
 | Kind | Watches |
 | --- | --- |

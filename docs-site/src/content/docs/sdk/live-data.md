@@ -133,6 +133,12 @@ const rows = (bqResp.rows || []).map(row => {
 });
 ```
 
+**Pages with a row policy.** Under an `access_policy`, a scoped viewer can't send their own SQL.
+The page runs a query the author declared in `access_policy.queries` by name, and the server binds
+the viewer's values: `sdk.platform.execute('bigquery', 'jobs.query', { query: 'my_sales' })` —
+`connectionId` is optional then (the declaration names the connection) and `params` is ignored.
+See [Access policy](/spec/access-policy/).
+
 Equivalent forms:
 
 ```javascript

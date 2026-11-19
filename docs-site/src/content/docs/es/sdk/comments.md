@@ -246,7 +246,7 @@ Con comentarios habilitados en un artefacto, los viewers logueados ven una toolb
 | Presencia | "N otros acá" en el encabezado (canal de comments, no analytics de página) |
 | Resolver / Reabrir | Marcá hilos como hechos sin borrarlos |
 
-Owners y colaboradores también gestionan hilos desde la pestaña **Comments** del
+Owners y colaboradores también gestionan hilos desde la pestaña **Comentarios** del
 [Inspector del workspace](/es/everyone/your-workspace/#inspector-rail-derecho).
 
 <Aside type="note" title="Transporte en tiempo real">

@@ -1391,6 +1391,34 @@
               "null"
             ]
           },
+          "workspace_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The workspace's display name — only for its members, else null (detail endpoint only)."
+          },
+          "owner": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "description": "Who owns the artifact; null when there is no owner name or email to show. `email` is set only for workspace members and the owner (detail endpoint only).",
+            "properties": {
+              "name": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "email": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          },
           "artifact_type": {
             "type": "string"
           },
@@ -1435,6 +1463,10 @@
           "can_manage_comments": {
             "type": "boolean",
             "description": "Caller may change the artifact's comment settings, such as guest comments (owner; detail endpoint only)."
+          },
+          "can_open_public": {
+            "type": "boolean",
+            "description": "Editors only: whether \"Anyone with the link\" can take effect for this artifact (the workspace or instance may forbid public links). Absent for callers who can't edit."
           },
           "pages": {
             "type": "array",

@@ -97,6 +97,8 @@ with `sdk.clearMockData()`.
 | [`sdk.workspace.table(name)`](/sdk/tables/#share-a-table-across-artifacts-teams) | Share a table across artifacts in a workspace (Teams) |
 | [`sdk.blobs`](/sdk/blobs/) | File storage, served direct from R2 |
 | [`sdk.files`](/sdk/files/) | Embed workspace Assets (`dlv_*`) across artifacts |
+| [`sdk.mcp`](/sdk/mcp/) | Call the viewer's own account on a remote MCP server (members-only pages) |
+| [`sdk.knowledge.search(q, { limit, full })`](/sdk/knowledge/) | Search the workspace's Knowledge — cited passages from its Files and pages (signed-in members only) |
 
 ## Everything else
 

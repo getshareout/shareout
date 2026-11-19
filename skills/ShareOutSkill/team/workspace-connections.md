@@ -276,6 +276,15 @@ Per-user credential storage for **generic** `rest_api` connectors uses `api_key`
 
 ---
 
+## Remote MCP Servers
+
+An admin adds a remote MCP server: `POST /v1/workspaces/{wsId}/mcp-connections` (UI: catalog →
+**MCP server** → URL → **Add MCP server**). Each member connects their own account in a browser
+(`GET /v1/workspaces/{wsId}/connections/{connId}/mcp/connect` → the server's sign-in; `400
+NO_AUTH_REQUIRED` when it needs none) and `POST …/connections/{connId}/mcp/tools` lists its tools
+(`403 CREDENTIALS_REQUIRED` until connected). A members-only page declares the tools it uses and
+calls them as the viewer: [../sdk/mcp.md](../sdk/mcp.md).
+
 ## Agent Checklist
 
 When building a Teams dashboard that hits an API **per logged-in user**:

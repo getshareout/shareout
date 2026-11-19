@@ -46,7 +46,7 @@ describe('viewer error bar', () => {
     expect(bar.hidden).toBe(true);
     raise();
     expect(bar.hidden).toBe(false);
-    expect(q('.so-err-title').textContent).toContain('Algo falló en esta página');
+    expect(q('.so-err-title').textContent).toContain('Algo falló en este artefacto');
     expect(q('.so-err-detail').hidden).toBe(true);
     q('[data-so-err="detail"]').click();
     expect(q('.so-err-detail').hidden).toBe(false);
@@ -74,7 +74,7 @@ describe('viewer error bar', () => {
       category: 'bug', severity: 'normal', client: 'ui', artifactId: 'art_1', workspaceId: 'wsp_1', locale: 'es',
       pageUrl: location.href,
     });
-    expect(body.subject).toMatch(/^Error en la página: /);
+    expect(body.subject).toMatch(/^Error en el artefacto: /);
     expect(body.body).toContain('art_1 · version ver_2');
     expect(body.body).toContain('SyntaxError: Invalid or unexpected token');
     expect(body.idempotencyKey).toMatch(/^page-error:art_1:ver_2:[0-9a-z]+$/);

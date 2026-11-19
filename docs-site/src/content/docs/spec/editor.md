@@ -105,8 +105,27 @@ What that means in practice:
 | Collaborator reloads | They load **their** draft — not yours |
 | You publish | The HTML on **your** canvas goes live; **your** draft row is cleared; other editors keep their own drafts |
 | Two of your tabs save | Optimistic concurrency: `POST /editor/draft` with `baseUpdatedAt` returns **409 `DRAFT_CONFLICT`** if another of your sessions saved first |
+| Someone publishes while you edit | `POST /editor/publish` with `baseLiveAt` returns **409 `STALE_BASE`** when the live page changed after your edit started — publishing would silently revert their change |
 
 Draft concurrency is per-user (your tabs / devices / agent acting as you), not a single shared draft row.
+
+`baseLiveAt` is the publish time of the live page your edit started from (`GET /editor`
+returns it). If a teammate, an agent or a crew published after that point, publish
+refuses with **409 `STALE_BASE`**:
+
+```json
+{
+  "success": false,
+  "code": "STALE_BASE",
+  "error": "The live page changed since this edit started.",
+  "live": { "versionNo": 7, "updatedAt": "…", "by": "Ana", "byYou": false, "source": "agent" },
+  "baseVersionNo": 5
+}
+```
+
+Send the publish again **without** `baseLiveAt` to publish anyway. Quick Edit in Home
+shows this as **Changed since you started**, with **See what changed** and
+**Publish anyway**; a `DRAFT_CONFLICT` there offers **Keep mine** or **Load newer**.
 
 ## Collaboration
 
@@ -128,11 +147,11 @@ Agents normally create or update artifacts via `POST /v1/publish`. The studio al
 
 | Route | Purpose |
 |-------|---------|
-| `GET /editor` | Load editor state (`html`, `draftUpdatedAt`, collaborators, assets, …) |
+| `GET /editor` | Load editor state (`html`, `draftUpdatedAt`, `baseLiveAt`, collaborators, assets, …) |
 | `GET /editor/draft` | Fetch current draft |
 | `POST /editor/draft` | Save draft (accepts `baseUpdatedAt` for optimistic concurrency) |
 | `DELETE /editor/draft` | Discard draft |
-| `POST /editor/publish` | Publish from studio |
+| `POST /editor/publish` | Publish from studio (accepts `baseUpdatedAt` and `baseLiveAt`; 409 `DRAFT_CONFLICT` or `STALE_BASE`) |
 | `GET /editor/history` | Version history list |
 | `POST /editor/rollback` | Roll back to a previous version |
 | `POST /editor/upload` | Asset upload |

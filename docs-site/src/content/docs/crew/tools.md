@@ -29,6 +29,12 @@ await sdk.crew.define({
 | `table_schema` | Inspect table column names and types |
 | `connection_query` | Query a [workspace connection](/teams/connections/) — REST or warehouse SQL |
 | `web_search` | Web lookup (when enabled for the workspace) |
+| `file_list` | List the workspace file library (name, type, size, AI summary and tags) |
+| `file_read` | Read one library file by id (from `file_list`): summary, tags and extracted text |
+| `workspace_artifacts` | List artifacts in the crew's workspace that its owner can open (`name_contains`, `updated_since`; up to 200 per call) |
+| `workspace_data_read` | Read a JSON key (`json_key`) or query a table (`table`) of **another** artifact in the same workspace that the owner can open — pass its `artifact_id` |
+| `knowledge_search` | Search the workspace's [Knowledge](/teams/knowledge/) and return cited passages (source + link), only from what the owner can see |
+| `action_item_list` | List action items (assigned comments) on the artifact |
 
 ### `connection_query`
 
@@ -62,6 +68,8 @@ can query BigQuery the same way the interactive data API does.
 | `email_send` | Send email from the artifact |
 | `notify_send` | One-shot delivery to Slack, email, Discord, or webhook |
 | `scheduled_job_create` | Create a recurring [scheduled job](/guides/jobs/) |
+| `action_item_create` | Create an action item — a comment assigned to a workspace member or collaborator, who is notified |
+| `pilot_verify` | Open the published artifact in a headless browser and run [Page Pilot](/sdk/pilot/) to check a UI behaviour (1–8 steps, default 6) |
 
 ### `json_set`
 

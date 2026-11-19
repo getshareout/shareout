@@ -50,8 +50,11 @@ registro con ids de artefacto y conteos de uso en vivo.
 Un skill es un `.md` publicado con `artifact_type: "skill"`. Se almacena como
 markdown pero se sirve con un visor dedicado cuando está en el marketplace.
 
-Los skills son siempre visibles para el `workspace` para que todos los miembros
-exploren el catálogo.
+Los skills son visibles para el `workspace` por defecto, así todos los miembros exploran
+el catálogo. Un autor puede dejar uno como `private` (un borrador): queda oculto del
+catálogo para todos los demás, y los agentes de otros miembros nunca lo cargan — ni
+siquiera si lo habían adjuntado antes de que pasara a privado. Solo lo abren el autor y
+los colaboradores del skill.
 
 ### Frontmatter
 
@@ -103,7 +106,9 @@ POST /v1/publish
 }
 ```
 
-`workspace_id` es obligatorio. La visibilidad se fuerza a `workspace`.
+`workspace_id` es obligatorio. La visibilidad es `workspace` salvo que mandes
+`"visibility": "private"` para dejar el skill como borrador; cualquier otro valor queda en
+`workspace`.
 
 Más simple, cuando solo tenés un nombre y un cuerpo:
 
@@ -114,6 +119,8 @@ POST /v1/workspaces/{workspaceId}/skills
 ```json
 { "name": "Checklist de deploy", "markdown": "# Checklist de deploy\n\n…", "category": "Ingeniería" }
 ```
+
+Acá también podés sumar `"visibility": "private"` para dejarlo como borrador.
 
 Es lo que llaman el botón **Nueva skill** de la Library y la tool `save_skill` del
 asistente.
@@ -238,6 +245,24 @@ DELETE /v1/workspaces/{scope}/agent-skills/{skillId}
 
 `GET /v1/skills/{skillId}/markdown` devuelve el `SKILL.md` crudo para el visor (logueado;
 el skill debe ser oficial o visible para vos).
+
+### Skills por defecto del workspace
+
+Un owner o admin del workspace puede adjuntar hasta **5** skills al asistente de **todos
+los miembros** de ese workspace. Los skills por defecto se cargan primero, antes de los que
+adjuntó cada miembro (si un skill está en los dos, se carga una vez), y nunca en el chat
+`__personal`.
+
+```http
+GET    /v1/workspaces/{workspaceId}/default-skills              ← cualquier miembro
+POST   /v1/workspaces/{workspaceId}/default-skills              ← admin+ · { "skill_artifact_id": "art_skill" }
+DELETE /v1/workspaces/{workspaceId}/default-skills/{skillId}    ← admin+
+```
+
+Cada uno queda fijado a la última versión del skill al agregarlo; volvé a hacer `POST` para
+pasarlo a una más nueva. Tiene que ser un skill oficial o de este workspace
+(`CROSS_WORKSPACE` si no) y no puede ser privado (`SKILL_PRIVATE`). El sexto responde
+`LIMIT_REACHED`.
 
 ## Moderación admin
 

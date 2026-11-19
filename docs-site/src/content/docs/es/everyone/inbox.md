@@ -59,8 +59,9 @@ una planilla) te dice en una frase qué hacer.
 ## Actualizá los números de tu artefacto mandando el Excel por email
 
 ¿Alguien te manda la misma planilla todas las semanas? Tu artefacto puede actualizarse solo con
-ella. Abrí el artefacto desde Inicio y elegí **Actualizar por email**. Decí quién manda el archivo
-(solo su email), tocá **Activar** y vas a tener la dirección del artefacto. Después, cada vez:
+ella. Abrí el artefacto desde Inicio, andá a **Automatizar → Actualizar los datos** (en el celular:
+**Opciones → Automatizar**) y elegí **Mandando el Excel por email**. Decí quién manda el archivo (solo su email), tocá **Activar** y
+vas a tener la dirección del artefacto. Después, cada vez:
 
 1. Abrí tu correo.
 2. Escribí un email nuevo a la dirección del artefacto.

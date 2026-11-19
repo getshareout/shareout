@@ -231,7 +231,7 @@ describe('routeCreateApi', () => {
     });
     const events = await sseEvents(await post({ phase: 'build', prompt: 'hi page' }, { 'Accept-Language': 'es-AR,es;q=0.9' }));
     expect(events.at(-1)).toMatchObject({ type: 'error', code: 'BUILD_TRUNCATED' });
-    expect(events.at(-1).error).toMatch(/demasiado larga/);
+    expect(events.at(-1).error).toMatch(/demasiado largo/);
   });
 
   describe('who can see it', () => {

@@ -18,13 +18,35 @@ Anyone you send it to can open it in their browser. Nothing to download.
 
 ## Decide who can see it
 
-You're always in control of who can open your page:
+You're always in control of who can open your page. Tap **Share** on it, and under
+**Who else can open it** pick one:
 
-- **Anyone with the link** — great for a shop, an invite, or a portfolio you want out in the world.
-- **Just the people you choose** — invite specific people by email when it's only for them.
-- **Only you** — keep it private while you're still working on it.
+- **Only the people above** — just you and the people you invited. Nobody else can open
+  it, even with the link. Good while you're still working on it.
+- **Everyone in** *your workspace* — anyone on your team who signs in can open it. (Shown
+  when the page belongs to a workspace.)
+- **Anyone with the link** — no sign-in needed. Great for a shop, an invite, or a
+  portfolio you want out in the world. (Shown only where your workspace allows public
+  pages.)
 
 You can change your mind any time — make a private page public when it's ready, or lock one back down.
+
+### Invite people by email
+
+1. Tap **Share** and type their email in **Add people by name or email**.
+2. Want to say why? Tap **+ Add a message** and write a short note — it goes in their email.
+3. Tap **Invite**.
+
+They get an email with the link and sign in with a code we send them — no password, no
+account to set up. Until they open it, they show as **Invited · hasn't signed in yet**.
+If the email didn't go out (for example, you hit today's email limit), they still have
+access: ShareOut tells you, and you can tap **Copy link** and send it to them yourself.
+
+### If you can only view
+
+You can still pass the link along: in **Share**, tap **Copy link**, or type an email under
+**Email the link** and tap **Send**. Sending the link doesn't give access, though: only
+people who can already open the page get in. To add someone, ask the page's owner.
 
 ## Show it once
 
@@ -57,14 +79,20 @@ The name on the page is what makes that risky for them.
 
 ## Ask for access
 
-If someone sends you a link to a **private page** you're not on yet, ShareOut shows a
-**Request access** button after you sign in. Tap it and the owner gets notified — in
-ShareOut Home and, if they use it, on Telegram. They can approve with one click; you
-then get **viewer** access without needing a new link.
+If someone sends you a link to a **private page** you're not on yet:
 
-You need to sign in with an **email address** (Google or email code) so the owner knows
-who is asking. If you already requested access, the button shows that your request is
-pending.
+1. Sign in with an **email address** (Google or email code), so the owner knows who is asking.
+2. Tap **Request access**.
+3. The owner gets an email, and a notification in ShareOut Home (and on Telegram, if they
+   use it). They can approve with one click.
+4. You get an email when they answer. Once approved, the same link opens the page — no
+   new link needed.
+
+Can see a page but need to change it? Open it in ShareOut and tap **Request edit access**.
+When the owner approves, you can edit it.
+
+If you already asked, ShareOut shows that your request was sent — there's no need to ask
+again. If nothing happens, message the owner directly.
 
 ## It looks good when you share it
 

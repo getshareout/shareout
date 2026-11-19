@@ -27,9 +27,13 @@ miembros externos no.
    sitio de SharePoint → biblioteca → carpeta.
 4. **Elegí dónde va**: el nivel principal de Archivos o dentro de una carpeta del Team
    Space. La carpeta elegida se crea ahí, con las mismas subcarpetas.
-5. Cada Word, Excel, PDF, Markdown, CSV, imagen y video se convierte en un artefacto (y las
-   presentaciones, si la instancia tiene el conversor). El original queda adentro para
-   descargarlo.
+5. Cada Word, Excel, PDF, PowerPoint (`.pptx`), Markdown, CSV, imagen y video se
+   convierte en un artefacto. El original queda adentro para descargarlo. Un `.pptx`
+   pasa a PDF si la instancia tiene el conversor de presentaciones; si no, queda su
+   texto, una sección por diapositiva. Las presentaciones viejas (`.ppt`, `.odp`) solo se
+   convierten con el conversor. Un PDF convertido abre con las pestañas **Texto** |
+   **Original**: **Original** muestra el PDF mismo, dentro del artefacto
+   (`?show=original`).
 6. **Empezá la importación** y seguí el progreso: encontrados, importados, artefactos, sin
    cambios, omitidos y con error, más los archivos para revisar y por qué.
 

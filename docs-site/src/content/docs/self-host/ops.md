@@ -48,7 +48,6 @@ The spec (YAML or JSON):
 | `policy` | `allowed_domains`, `allowed_emails`, `external_sharing`, `guest_comments` (on the starter folders), `knowledge`, `features` (any key from `GET /v1/admin/features`). |
 | `folders` | Starter folders, e.g. `[Clientes, Proveedores, Reportes]`. |
 | `connectors` | Same body as `POST /v1/workspaces/{id}/connections`. Write secrets as `${ENV_VAR}`; the CLI fills them in from the environment so they never live in the file. |
-| `templates` | Installs every instance-library template tagged with this name, once (a re-run skips templates the workspace already has). `pending` when no template carries the tag. |
 | `custom_domain` | Attaches the hostname to the workspace and makes it primary once live. `pending` with the DNS records until it verifies, or while custom domains are off on the instance; re-run the spec to check again. |
 | `if_exists` | `match` (default) adopts an existing slug only if its name matches; `update` adopts and renames; `fail` refuses. |
 
@@ -122,11 +121,14 @@ signal that the instance is fully configured.
 ### Answer support requests
 
 Every help request — the in-app **Help & support** panel, the Home assistant, the API,
-Telegram, Slack, `support@` email — lands in one queue at `/admin?view=support`. Nothing
-is pushed to you; you (or your agents) read the queue. Open a ticket to see its context
+Telegram, Slack, `support@` email — lands in one queue at `/admin?view=support`, where you
+(or your agents) work it. Open a ticket to see its context
 (category, severity, page, request id, browser), the thread and an AI-drafted reply, then
 answer and set its status. The reply reaches the requester on the channel they used, by
 email for in-app and API requests, and in their notification bell.
+
+With `SUPPORT_ALERT_TELEGRAM_CHAT_ID` and `TELEGRAM_BOT_TOKEN` set, every new ticket also
+pings your Telegram chat (the same chat gets the [AI and build alerts](/self-host/ai/#alerts)).
 
 An agent can work the same queue with a personal API token created by an instance admin:
 
@@ -225,8 +227,13 @@ Test a restore on a staging worker before you need it.
 ## Observability
 
 - Worker logs: `npx wrangler tail`
-- In-product: Admin → Health (when signed in as admin), if enabled on your build
-- There is no super-admin notification channel — use `/admin?view=health` and Worker logs
+- In-product: `/admin?view=health` (instance admins) — requests, errors and latency over
+  48 hours, recent server errors, and **Page builds**: every AI page build (the latest 25,
+  kept 90 days) with its outcome, workspace, duration, tokens, cost and each step
+- Pushed to you: a Telegram chat, once `SUPPORT_ALERT_TELEGRAM_CHAT_ID` and
+  `TELEGRAM_BOT_TOKEN` are set — new support tickets, failed page builds, an AI provider out
+  of credit, daily AI spend over `AI_SPEND_ALERT_USD_PER_DAY`, gateway credit under
+  `AI_CREDIT_ALERT_USD`. See [AI provider → Alerts](/self-host/ai/#alerts)
 
 ### Server-Timing
 

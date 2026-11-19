@@ -27,6 +27,8 @@ pasa. Mandá un reporte semanal por email, posteá un snapshot a Slack, refresc�
 | `email_sheet_sync` | En `email.received`: un Excel/CSV que un remitente permitido y verificado manda a la dirección del artefacto reemplaza uno de sus datasets |
 | `query_snapshot` | Corre queries fijas de warehouse/REST en schedule y escribe cada resultado en json/tabla/dataset |
 | `sheets_append` | Corre una query de conexión y agrega filas a una Google Sheet (historial diario creciente) |
+| `public_sheet_sync` | Copia una pestaña de una planilla compartida como "Cualquier persona que tenga el vínculo" a uno de los datasets del artefacto, según un horario. Sin iniciar sesión en Google |
+| `drive_file_sync` | Copia una pestaña de una planilla privada de Google Drive que el creador eligió en Google a uno de los datasets del artefacto, según un horario |
 
 ## Crear un job
 
@@ -48,9 +50,35 @@ curl -X POST https://shareout.site/v1/jobs \
   }'
 ```
 
-Siempre definí `title` y `description` al crear un schedule — aparecen en **Mis
-schedules** y en **Admin → Schedules** del workspace. `PATCH /v1/jobs/{id}` también
-acepta `title` / `description` (mandá `null` para borrar).
+Siempre definí `title` y `description` al crear un schedule — aparecen en
+**Automatizaciones** (barra lateral del workspace) y en **Admin → Automatizaciones**.
+`PATCH /v1/jobs/{id}` también acepta `title` / `description` (mandá `null` para borrar).
+
+### Email: adjuntar el artefacto como PDF
+
+En un job `email`, `renderPdf: true` renderiza el artefacto en vivo en el servidor y lo adjunta
+(`pdfFilename` le pone nombre al archivo; por defecto `<slug>.pdf`). Por defecto el PDF es una
+sola página continua con el layout de pantalla. Sumá `pdfFormat` (`"A4"`, `"Letter"` o `"Legal"`)
+para paginarlo con el CSS de impresión del propio artefacto (`@media print`; una regla
+`@page { size }` gana sobre `pdfFormat`), y `pdfLandscape: true` para páginas apaisadas (por
+defecto vertical). Cualquier otro valor de `pdfFormat`, o un `pdfLandscape` que no sea booleano,
+da `400` al crear o actualizar el job.
+
+```json
+"config": {
+  "recipients": ["ana@acme.com"],
+  "subject": "Reporte semanal",
+  "html": "<p>Va el reporte adjunto.</p>",
+  "renderPdf": true,
+  "pdfFormat": "A4",
+  "pdfLandscape": true
+}
+```
+
+Cada email de un artefacto lleva un link de baja de un clic para ese artefacto. Quien se dio de
+baja se saltea en los envíos siguientes; si se dieron de baja todos, la corrida falla con *All
+recipients opted out of this artifact's emails*. El owner los lista con
+`GET /v1/data/{artifactId}/email/optouts`. Ver [Email](/es/sdk/email/).
 
 ### Formato cron
 
@@ -63,8 +91,13 @@ acepta `title` / `description` (mandá `null` para borrar).
 * * * * *
 ```
 
-`0 9 * * 1` → lunes 9am · `*/15 * * * *` → cada 15 min · `0 9-17 * * 1-5` →
-cada hora, horario laboral.
+`0 9 * * 1` → lunes 9am · `0 9-17 * * 1-5` → cada hora, horario laboral · `0 6 1 * *` →
+el 1 de cada mes, 6am. Los horarios son UTC.
+
+Los schedules se revisan **una vez por hora, en punto**, así que la cadencia más fina es cada
+hora. Un minuto distinto de `0` (`30 9 * * *`, `*/15 * * * *`) corre en el próximo `:00` después
+de que vence, no en ese minuto; la respuesta de creación trae entonces un `notice` que lo avisa.
+Usá el minuto `0` para una hora exacta.
 
 ### `query_snapshot` — refresh determinístico de datos
 
@@ -171,6 +204,25 @@ curl -X POST https://shareout.site/v1/jobs \
 - Reenvío automático de Gmail: Gmail primero le manda una confirmación a la dirección del artefacto. Una genuina (DKIM y DMARC pasan para google.com según Cloudflare, el remitente de reenvío de Google, el link en un host propio de Google) no se rebota ni se vuelve datos: aparece en `forwarding` (`requester`, `confirmUrl`, `code` en las viejas, `expiresAt`) para que la abran los editores del artefacto. `POST /v1/artifacts/{id}/email-sync/forwarding/{confirmationId}` `{ "action": "opened" | "dismiss" }`. Outlook / Microsoft 365 no tiene paso de confirmación.
 - Borrar el job apaga la dirección y conserva los datos y la lista de remitentes (`senders_kept`).
 - Límites: 8 MB y 100.000 filas por archivo, 25 MB por email, 200 emails por día por artefacto.
+
+### `public_sheet_sync` y `drive_file_sync` — mantener un dataset al día con una planilla
+
+Los dos copian una pestaña de una planilla a uno de los datasets del artefacto según un horario
+cron. La app (Automatizar → **Actualizar los datos**) usa por defecto la primera pestaña, todos los
+días a las 08:00, y corre la primera sincronización en el momento. Paso a paso para personas:
+[Mantené un artefacto al día desde una planilla](/es/everyone/google-sheets/#mantené-un-artefacto-al-día-desde-una-planilla).
+
+- `public_sheet_sync` — `config: { link, dataset, sheet?, fileName? }`. El archivo tiene que estar
+  compartido como "Cualquier persona que tenga el vínculo" (una planilla de Google o un Excel en Drive).
+  Revisá el enlace antes con `POST /v1/workspaces/{workspaceId}/sheet-links/inspect` `{ "link": "…" }`
+  → sus pestañas, cantidad de filas y columnas. Cualquiera que tenga el enlace puede leer el archivo:
+  usalo solo para datos que pueden ser públicos.
+- `drive_file_sync` — `config: { fileId, dataset, sheet?, fileName? }`. Un archivo privado: la
+  persona lo elige una vez en la ventana de Google (`GET /v1/workspaces/{workspaceId}/file-imports/sheet-sync/pick`,
+  abierto en su navegador), y ShareOut solo puede leer los archivos elegidos así.
+  `GET /v1/workspaces/{workspaceId}/file-imports/sheet-sync` → `picked` es el último que eligió.
+- Una corrida cuyas filas no cambiaron no escribe nada. Límites: 8 MB y 100.000 filas por archivo.
+- Referencia completa de la config: `api/jobs.md` del skill (`PublicSheetSyncConfig`, `DriveFileSyncConfig`).
 
 ## Reintentos
 

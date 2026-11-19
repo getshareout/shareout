@@ -4,7 +4,7 @@ import type { HomeLocaleCopy } from '../types';
 export const DROP_IMPORT_COPY: HomeLocaleCopy = {
   en: {
     'drop.overlay': 'Drop to add',
-    'drop.overlayHint': 'If people will read it, it’s an artifact. If you’ll build with it, it goes to Assets.',
+    'drop.overlayHint': 'Documents, images and video become artifacts you can open and share.',
     'drop.title': 'Importing',
     'drop.close': 'Close',
     'drop.working': 'Publishing…',
@@ -32,7 +32,7 @@ export const DROP_IMPORT_COPY: HomeLocaleCopy = {
   },
   es: {
     'drop.overlay': 'Soltá para agregar',
-    'drop.overlayHint': 'Si se va a leer, es un artefacto. Si vas a construir con eso, va a Recursos.',
+    'drop.overlayHint': 'Documentos, imágenes y videos se vuelven artefactos que podés abrir y compartir.',
     'drop.title': 'Importando',
     'drop.close': 'Cerrar',
     'drop.working': 'Publicando…',

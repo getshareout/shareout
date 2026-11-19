@@ -13,8 +13,9 @@ el job por vos — sin llamadas a la API. Los owners y editores pueden programar
 otras personas; los viewers pueden suscribirse para recibir el artefacto en su propio mail de
 forma recurrente.
 
-La pestaña **Automate** del Inspector en Home lista solo los schedules del artefacto que
-estás mirando. Owners y editores ven los schedules compartidos y sus propios envíos
+La pestaña **Automatizar** del Inspector en Inicio (en el celular: **Opciones → Automatizar**)
+empieza con **Actualizar los datos** — desde Google Drive, un enlace o mandando el Excel por email —
+y lista solo los schedules del artefacto que estás mirando. Owners y editores ven los schedules compartidos y sus propios envíos
 personales; la suscripción personal de otra persona (un email o DM a sí misma) queda
 privada.
 
@@ -39,7 +40,7 @@ privada.
 | **Mandar mails** | Un reporte semanal, un resumen, un aviso |
 | **Postear a Slack** | Un resumen, una captura o un PDF a tu canal |
 | **Postear a Discord** | Avisar a tu servidor de la comunidad |
-| **Actualizar tus datos** | Traer lo último de tu planilla o tu tienda |
+| **Actualizar tus datos** | Traer lo último de tu planilla o tu tienda — mirá [Mantené un artefacto al día desde una planilla](/es/everyone/google-sheets/#mantené-un-artefacto-al-día-desde-una-planilla) |
 | **Avisar a otra app** | Mandar una señal a una herramienta que usás |
 
 ## Ejemplos reales
@@ -53,6 +54,25 @@ privada.
 
 - **Pausalo** cuando quieras, o corrélo **ahora mismo** para probarlo.
 - **Revisá qué pasó** — hay un registro simple de cada corrida, así ves que funcionó (o por qué no).
+
+### Abrí una para ver y cambiar todo
+
+Cada automatización tiene su propia página:
+
+1. En la barra lateral, tocá **Automatizaciones**.
+2. Tocá la automatización que querés. Su página muestra **Qué hace**, **Cuándo corre** y su
+   **Historial de corridas**.
+3. Para cambiarla, tocá **Editar** — podés cambiar el nombre, cuándo corre, a quién le llega y
+   más — y después **Guardar cambios**. **Ejecutar ahora** la prueba en el momento; **Eliminar**
+   la borra.
+
+Si una corrida del **Historial de corridas** dice **Falló**, arreglá lo que indica (muchas veces
+un email o un Slack o una planilla desconectados) y tocá **Ejecutar ahora** para ver que vuelve a
+andar.
+
+Los admins del workspace también ven **Tareas con IA** en la barra lateral. Cada tarea con IA abre
+el mismo tipo de página, donde además podés cambiar sus **Instrucciones**, el **Modelo**, y sus
+**Pasos máximos** y **Presupuesto por corrida (US$)**.
 
 :::tip[Empezá de a poco]
 Elegí una cosa que hacés a mano todas las semanas — mandar un reporte, copiar números, avisarle al equipo — y dejá que tu artefacto lo haga en tu lugar.

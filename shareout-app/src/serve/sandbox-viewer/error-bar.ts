@@ -24,17 +24,17 @@ const en = {
 };
 
 const es: typeof en = {
-  title: 'Algo falló en esta página y puede que no funcione bien.',
+  title: 'Algo falló en este artefacto y puede que no funcione bien.',
   showDetail: 'Ver detalle',
   hideDetail: 'Ocultar detalle',
   report: 'Reportar a soporte',
   sending: 'Enviando…',
   sent: 'Reportado como {id}. Te respondemos por mail.',
   failed: 'No se pudo enviar el reporte. Probá de nuevo.',
-  signIn: 'Iniciá sesión para reportarlo, o avisale a quien te compartió esta página.',
+  signIn: 'Iniciá sesión para reportarlo, o avisale a quien te compartió este artefacto.',
   dismiss: 'Cerrar',
-  subject: 'Error en la página: {name}',
-  intro: 'Reportado desde el visor de la página.',
+  subject: 'Error en el artefacto: {name}',
+  intro: 'Reportado desde el visor del artefacto.',
 };
 
 export const ERROR_BAR_COPY: LocaleCopy<typeof en> = { en, es };

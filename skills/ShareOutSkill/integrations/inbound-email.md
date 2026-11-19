@@ -233,8 +233,8 @@ list (`senders_kept` in the answer).
 
 ## Limits & safety
 
-- **Allowlist:** addresses or `@domain` entries. Unset = any authenticated sender.
-  Senders failing both DMARC and DKIM are bounced unless allowlisted. With a list, the header
+- **Allowlist:** addresses or `@domain` entries. Without a list, any sender is accepted except
+  one failing both DMARC and DKIM. With a list, being on it is not enough: the header
   From must be on it and verified: Cloudflare's own `Authentication-Results` (authserv-id
   `mx.cloudflare.net`) shows DMARC pass, or a DKIM pass signed by that sender's domain.
 - **Gmail forwarding confirmation** (only on an inbox with a list): kept for the page's editors,

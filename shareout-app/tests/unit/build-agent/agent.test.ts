@@ -60,7 +60,7 @@ describe('runBuildAgent', () => {
     const { provider } = scriptedProvider([writeAll, publish]);
     const labels: string[] = [];
     ok(await runBuildAgent(deps(provider, { locale: 'es', onProgress: (l) => labels.push(l) }), input));
-    expect(labels).toEqual(expect.arrayContaining(['Escribiendo estilos…', 'Publicándola…']));
+    expect(labels).toEqual(expect.arrayContaining(['Escribiendo estilos…', 'Publicándolo…']));
   });
 
   it('completes a page bigger than one turn by appending, and the file tools never echo the file back', async () => {
@@ -241,7 +241,7 @@ describe('testing the published page', () => {
       { draft: false, slug: 'my-page' },
     ]);
     expect(lastToolResults(calls, 1)[0]).toMatch(/PRIVATE DRAFT.*2 errors[\s\S]*ReferenceError/);
-    expect(labels).toEqual(expect.arrayContaining(['Probando la página…', 'Corrigiendo 2 problemas que aparecieron al probar…', 'Dejándola en vivo…']));
+    expect(labels).toEqual(expect.arrayContaining(['Probando el artefacto…', 'Corrigiendo 2 problemas que aparecieron al probar…', 'Dejándolo en vivo…']));
   });
 
   it('gives up after 2 failed fix rounds: the draft stays private, the operator is told', async () => {

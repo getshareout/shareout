@@ -37,6 +37,7 @@ button provisions names; replace placeholder IDs after create if needed.
 | `MICROSOFT_FILES_CLIENT_ID` / `MICROSOFT_FILES_CLIENT_SECRET` / `MICROSOFT_FILES_TENANT` | secret / var | Enables folder import from OneDrive / SharePoint (delegated `Files.Read.All`, `Sites.Read.All`, `User.Read`, `offline_access`). Tenant defaults to `common`. Redirect: `{SHAREOUT_BASE_URL}/v1/file-imports/oauth/microsoft/callback`. |
 | Email binding `EMAIL` | binding | Enables emailed one-time codes. Without it those codes only reach the worker log. |
 | `EMAIL_DEFAULT_FROM` | var | From-address when Email is bound. |
+| `EMAIL_WEBHOOK_SECRET` | secret | Turns on the bounce/complaint webhook (`/v1/webhooks/email-events`). Unset = it answers `404` and bounces are never suppressed. See [Email → Deliverability](/self-host/email/#deliverability). |
 
 ## Google Drive by sharing
 
@@ -122,6 +123,13 @@ Tokens are checked against Microsoft's keys (`/discovery/v2.0/keys`): signature,
 | `OPEN_VISIBILITY_DISABLED` | var | `1` keeps every artifact private; no public links. |
 | `ADMIN_BRIDGE_SECRET` | secret | **Leave unset** unless you run a private bridge worker. Unset ⇒ `/internal/admin/*` denies all. |
 | Telegram / Slack bot tokens | secret | Only if you use those integrations. |
+| `TELEGRAM_LOGIN_LINKS` | var | `1` = page links in Telegram bot replies sign the member in with one tap. Needs `TELEGRAM_BOT_TOKEN` and BotFather `/setdomain`. See [Telegram bot](/guides/telegram-bot/). |
+| `SUPPORT_ALERT_TELEGRAM_CHAT_ID` | var | Telegram chat that gets the operator alerts: new support tickets, failed page builds, an AI provider out of credit, daily AI spend and low gateway credit. Needs `TELEGRAM_BOT_TOKEN`. See [AI provider → Alerts](/self-host/ai/#alerts). |
+| `AI_SPEND_ALERT_USD_PER_DAY` / `AI_CREDIT_ALERT_USD` / `BUILD_AGENT` / `BUILD_EFFORT` / `BUILD_MODEL` / `SCAN_MODEL` | var | AI alert lines, the page build agent and model choices. See [AI provider → All AI settings](/self-host/ai/#all-ai-settings). |
+| `VERIFY_RUNS_PER_HOUR` | var | Verify runs per user per UTC hour (`POST /v1/artifacts/{id}/verify`, MCP `verify_artifact`). Unset = 30. |
+| `CUSTOM_DOMAINS_CNAME_TARGET` | var | Turns on workspace custom domains: the hostname customers CNAME their domain to. Set alone = manual mode (ShareOut checks a `_shareout-verify` TXT record; you route each hostname to the Worker). See [Custom domain → For instance operators](/teams/custom-domain/#for-instance-operators). |
+| `CF_CUSTOM_HOSTNAMES_TOKEN` / `CF_CUSTOM_HOSTNAMES_ZONE_ID` | secret / var | Optional, with the CNAME target: Cloudflare for SaaS provisions each custom hostname and its certificate. Token permission: Zone → SSL and Certificates: Edit, on the SaaS zone. |
+| `D1_READ_REPLICAS` | var | `1` = each request's queries go through a D1 Sessions API session, so a nearby read replica can serve reads (`GET`, `HEAD` and `OPTIONS` requests; anything else starts on the primary). Turn on read replication for the database in Cloudflare first. A request that wrote hands back an `x-d1-bookmark` header and `__d1b` cookie so the caller's next read is at least that fresh. Unset = every query goes to the primary. |
 | `ANTHROPIC_API_KEY` / `VERCEL_AI_GATEWAY` / `OPENAI_API_KEY` | secret | **AI is off until one is set** — Crew, assistants, editor AI, knowledge. See [Ops → AI providers](/self-host/ops/#ai-providers). |
 | `CREDENTIALS_KEY` | secret | `openssl rand -hex 32`. Encrypts per-workspace AI keys and connector credentials; those endpoints refuse without it. |
 

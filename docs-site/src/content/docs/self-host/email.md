@@ -78,7 +78,7 @@ per-artifact addresses.
 The inbox subdomain is deliberately separate from your apex so a catch-all never swallows
 real mailboxes like `hello@yourcompany.com`.
 
-Once it is live, **Admin → Settings** shows the workspace's inbox address. If that section
+Once it is live, **Admin → General → File inbox** shows the workspace's inbox address. If that section
 is missing, the instance has no email binding — the address is hidden rather than shown as
 something that cannot receive.
 
@@ -109,8 +109,19 @@ Whatever you send, you own the reputation of the sending domain:
 
 - SPF, DKIM and DMARC on the sending domain — Cloudflare's dashboard walks these
 - a real, monitored `From` address, not `noreply@`
-- ShareOut keeps a suppression list and honours unsubscribes per category; a bounce or a
-  complaint stops future sends to that address on its own
+- ShareOut keeps a suppression list and honours unsubscribes per category
+- bounces and complaints reach that list only through the delivery-events webhook. Set a
+  secret and point your provider's bounce/complaint events at
+  `{SHAREOUT_BASE_URL}/v1/webhooks/email-events`, sending the secret in an
+  `x-webhook-secret` header (or `?secret=`):
+
+  ```bash
+  openssl rand -hex 32 | npx wrangler secret put EMAIL_WEBHOOK_SECRET
+  ```
+
+  A bounce or complaint event then stops future sends to that address on its own. Without
+  `EMAIL_WEBHOOK_SECRET` the webhook answers `404` and ShareOut keeps mailing addresses
+  that bounce; a wrong secret gets `401`.
 
 ## Inviting people without email
 

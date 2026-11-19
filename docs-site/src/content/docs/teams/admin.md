@@ -1,30 +1,47 @@
 ---
 title: Workspace admin
-description: Admin tools for schedules, automations, metric alerts, features, and member tokens.
+description: Admin tools for members, billing, schedules, automations, metric alerts, features, and member tokens.
 ---
 
 import { Aside } from '@astrojs/starlight/components';
 
 Workspace `admin` and `owner` roles get visibility and control over team-wide
-jobs, automations, metric alerts, feature flags, and member tokens.
+jobs, automations, metric alerts, feature flags, billing, and member tokens.
 
-On Home, open the **Admin** lens in the left rail. It is a ten-tab workspace
-control panel — no separate admin app:
+On Home, open the **Admin** lens in the left rail. It is the workspace control
+panel — no separate admin app. A sidebar groups its pages by topic, and Admin opens
+on **Members**:
 
-| Tab | What you manage |
-| --- | --- |
-| **Overview** | Plan badge, seat bar, storage/views/visitors tiles, actionable alerts (pending invites, failing runs, paused pages) with deep links into other tabs |
-| **Artifacts** | Sortable governance table — name, owner, dates, views, visitors, visibility, status; filter by visibility; pause/unpause, change visibility, **reassign owner** |
-| **Members** | Seat utilisation bar, invite/remove, role changes, pending invites, **access-request queue** (approve/deny), per-member activity metrics |
-| **Sharing** | External sharing — create client orgs via a guided add flow, invite their people, share folders at a capability, read receipts, mint scoped API tokens, **notes about each client** (private intel the assistant remembers) |
-| **Automation** | Schedules and crew triggers as sortable tables with run-now, enable/disable, and run history |
-| **AI** | Spend/balance/requests/tokens, per-model usage, BYO LLM key management (OpenAI / Vercel Gateway) |
-| **Security** | Membership domain allowlist editor (preserves explicit emails on save), append-only **audit log** feed |
-| **Support** | Support tickets from your workspace across every channel — list, thread, edit the AI-drafted reply, **Approve & send**, resolve |
-| **Settings** | Publishing policy, whether members can create Team Space folders, workspace logo (branding), **file inbox** address (`{slug}@inbox.shareout.site`), read-only feature flags |
+| Group | Page | What you manage |
+| --- | --- | --- |
+| Reports | **Summary** | How the workspace was used, month by month. Only the owner and the admins they choose see this page — see [Summary](#summary) |
+| People | **Members** | Seat bar, **Invite people**, remove, role changes, pending invites (resend, copy link, revoke), per-member activity |
+| People | **Sharing** | External sharing — create client orgs via a guided add flow, invite their people, share folders at a capability, read receipts, mint scoped API tokens, **notes about each client** (private intel the assistant remembers) |
+| People | **Support** | Support tickets from your workspace across every channel — list, thread, edit the AI-drafted reply, **Approve & send**, resolve |
+| Content | **Artifacts** | Sortable governance table — name, owner, dates, views, visitors, visibility, status; filter by visibility; pause/unpause, change visibility, **reassign owner** |
+| Content | **Automations** | Scheduled jobs, AI task automations and the data connectors they use, as sortable tables with run-now, enable/disable, and run history |
+| AI & billing | **Billing** | What the workspace spends, the monthly AI budget, the AI report, invoices and billing details — see [Billing](#billing) |
+| AI & billing | **AI & models** | The AI model the workspace uses, your own provider key (OpenAI / Vercel Gateway), spend, requests and tokens per model |
+| Security | **Access** | **Access requests** (approve/deny), the membership domain allowlist (preserves explicit emails on save), session length |
+| Security | **Publishing** | Publish approvals waiting for you, and the publishing policy |
+| Security | **Agent tokens** | Workspace agent tokens (`sot_`) — create and revoke |
+| Security | **Activity log** | The append-only **audit log** feed |
+| Workspace | **General** | Language, whether members can create Team Space folders, the **file inbox** address (`{slug}@<inbox domain>`), read-only feature flags |
+| Workspace | **Branding** | Workspace logo, accent color, hide the footer on shared pages |
+| Workspace | **Custom domain** | Serve your pages from your own domain — see [Custom domain](/teams/custom-domain/) |
 
-Quick links from Overview jump into the tab that needs attention. Schedules,
-Alerts, and Crew AI also have their own Home lenses for day-to-day work.
+A badge on a sidebar entry counts what waits for you there: pending invites
+(Members), access requests (Access), publish approvals (Publishing), failing
+automations (Automations), unpaid invoices and a monthly AI budget that is near or
+reached (Billing). Schedules, Alerts, and Crew AI also have their own Home lenses for
+day-to-day work.
+
+Deep-link a page with `#l/admin/<page>` (for example `#l/admin/billing`) or
+`/home?view=admin&tab=<page>`. Page keys: `summary`, `members`, `clients` (Sharing),
+`support`, `artifacts`, `automation`, `billing`, `ai`, `access`, `publishing`, `tokens`,
+`audit`, `general`, `branding`, `domains`. Old tab names still resolve: `overview` and
+`people` open Members, `usage` opens Billing, `security` opens Access, `settings` opens
+General.
 
 ### Artifact governance API
 
@@ -40,7 +57,7 @@ and last-updated metadata. All `POST` routes require `admin` or `owner`.
 
 ### Support tickets
 
-The **Support** tab is the team workbench for customer tickets. A ticket can arrive
+The **Support** page is the team workbench for customer tickets. A ticket can arrive
 from any channel — the in-app Help button, the REST API, the Slack or Telegram bot,
 or email — and lands as one thread. When it opens, an AI assistant **triages** it
 (category + priority) and **drafts a reply**. Nothing is ever sent automatically: an
@@ -69,8 +86,9 @@ GET  /v1/access-requests/incoming
 POST /v1/access-requests/{requestId}   ← { "action": "approve" | "deny" }
 ```
 
-The Members tab surfaces both queues. Approving an access request grants the
-requester workspace membership per your [membership policy](/teams/workspaces/#membership-policy).
+Pending invites are on the **Members** page; access requests are on **Access**.
+Approving an access request grants the requester workspace membership per your
+[membership policy](/teams/workspaces/#membership-policy).
 
 ### Run Inspector
 
@@ -83,9 +101,90 @@ GET /v1/workspaces/{id}/runs?surface=job&status=failed&limit=50
 GET /v1/workspaces/{id}/runs/{surface}/{runId}
 ```
 
-`surface` is `crew`, `job`, or `alert`. The Home **Runs** widget and Automation
-tab link into the same data. Job runs record per-query fetch steps; crew runs
+`surface` is `crew`, `job`, or `alert`. The Home **Runs** widget and the Automations
+page link into the same data. Job runs record per-query fetch steps; crew runs
 use the existing `crew_run_events` ledger.
+
+## Summary
+
+**Admin → Summary** is a month-by-month report of how the workspace was used. Pick a
+month to see:
+
+- **Active people**, **Page views**, **Publishes** and **Questions to AI**, each compared
+  with the month before
+- **Reading** — views by signed-in people, day by day (an author opening their own page
+  doesn't count), the total with anonymous views, and the most read pages
+- **Pages & knowledge** — what the workspace holds at the end of the month, and what changed
+- **AI & automations** — questions to the AI, members using it, AI spend, scheduled job
+  and AI task runs, emails sent
+- **By member** — what each member did that month
+- **Readers outside the team** — people who aren't members and opened a page shared with them
+
+**Who can see it.** The workspace owner always can. The owner picks which admins can too,
+under **Who can see this** (up to 50); other admins don't see the page in their sidebar,
+and members never do. The instance's own operators can open it too.
+
+```http
+GET /v1/workspaces/{id}/summary?month=YYYY-MM   ← the report (default: this month)
+GET /v1/workspaces/{id}/summary/access          ← { can_view, can_manage }
+GET /v1/workspaces/{id}/summary/viewers         ← owner: the admins, each with can_view
+PUT /v1/workspaces/{id}/summary/viewers         ← owner: { "user_ids": ["usr_…"] } replaces the list
+```
+
+A malformed month is `400 INVALID_MONTH`; anyone without access gets `403`. Agent tokens
+are refused.
+
+## Billing
+
+**Admin → Billing** is one page for owners and admins. Every amount on it is what the
+workspace pays. From top to bottom:
+
+1. **Spend** — this month (or **Last month**): what the workspace spent so far, the
+   **Projected month-end** and the **Previous month**, then **By category** (Storage,
+   Serving, Automations, AI, Email, Browser) and **By day**. **Download CSV** exports the
+   month. AI is up to date; the other categories update nightly, so today's use shows up
+   tomorrow.
+2. **Monthly AI budget** — a ceiling on every AI call the workspace makes (questions,
+   automations, Knowledge, summaries). Type an amount in **Monthly budget (USD)** and
+   **Save**; **Remove budget** takes it away. At 80% it reads **Near the limit** and the
+   Billing entry in the sidebar gets a badge. Once it is reached, new AI work is paused
+   until the first day of next month (UTC). Search, embeddings, audio transcription and
+   publish safety checks are never paused. Beside it, **AI by type** shows where this
+   month's AI went, and **Today** shows the tokens each member and the workspace's
+   automations used today on the agent inside artifacts, against their daily cap (reset
+   at midnight UTC).
+3. **AI report** — one month of AI, by use, by model (tokens in and out), by automation,
+   by page, by person, every kind of AI call, and by day, with **Download CSV**. Its total
+   is the same as the budget's and the invoice's.
+4. **Invoices** — invoices issued to the workspace, each with its status (**Unpaid**,
+   **Paid**, **Void**), due date, the invoice document to download and **How to pay**.
+   To pay one:
+   1. Pay by bank transfer with the details on the invoice.
+   2. On the invoice, click **Attach transfer proof** and pick the receipt (PDF, PNG, JPG
+      or WEBP, up to 10 MB) — or reply to the invoice email with the receipt attached.
+   3. The invoice is marked **Paid**, and whoever issued it is told.
+
+   If the upload is refused, check the file type and size. An emailed receipt only counts
+   when the reply comes from the billing email or an owner or admin, with the receipt as an
+   attachment.
+5. **Billing details** — who invoices are made out to: country, legal name, tax ID (in
+   Argentina the CUIT, IVA condition and fiscal address), city, province, postal code,
+   phone and an optional billing email. Invoice emails go to the billing email, or to the
+   owners and admins when there is none.
+
+```http
+GET /v1/workspaces/{id}/spend?month=YYYY-MM[&format=csv]       ← admin+
+GET /v1/workspaces/{id}/ai-limits                               ← budget, spend by kind, today's caps
+PUT /v1/workspaces/{id}/llm/budget        ← { "monthlyBudgetUsd": 100 } (above 0, up to 100000) or null
+GET /v1/workspaces/{id}/ai-report?month=YYYY-MM[&format=csv]   ← admin+
+GET /v1/workspaces/{id}/invoices                                ← admin+
+PUT /v1/workspaces/{id}/invoices/{invoiceId}/proof              ← raw file body: marks it paid
+GET /v1/workspaces/{id}/billing-profile                         ← admin+
+PUT /v1/workspaces/{id}/billing-profile   ← the whole profile; 400 lists each refused field
+```
+
+A malformed `month` is `400 INVALID_MONTH`. Agent tokens are refused on every billing route.
+A call refused because the budget is reached carries the code `workspace_budget`.
 
 ## Schedules
 
@@ -111,7 +210,7 @@ Manage crew trigger automations across artifacts:
 | `GET` | `/v1/workspaces/{id}/automations` | List all crew triggers. |
 | `GET` | `/v1/workspaces/{id}/automations/{triggerId}/runs` | Run history. |
 | `POST` | `/v1/workspaces/{id}/automations/{triggerId}/run` | Dispatch now. |
-| `PATCH` | `/v1/workspaces/{id}/automations/{triggerId}` | Enable or disable. |
+| `PATCH` | `/v1/workspaces/{id}/automations/{triggerId}` | Change the trigger (`enabled`, `cron`) or the task it runs (`name`, `instructions`, `model`, `maxIterations`, `runBudgetMicroUsd`). Send only the fields to change. |
 | `DELETE` | `/v1/workspaces/{id}/automations/{triggerId}` | Delete trigger. |
 
 ## Metric alerts
@@ -129,7 +228,8 @@ Full reference: [Metric alerts](/guides/metric-alerts/).
 ## Features
 
 Read the enabled/disabled feature flags for the workspace. Any member can
-view them; only ShareOut super-admins can change them.
+view them (admins see them, read-only, under **Admin → General → Features**); only
+ShareOut super-admins can change them.
 
 Notable flags:
 
@@ -215,7 +315,7 @@ Content-Type: application/json
 `admin` or `owner`. Failed job/crew runs surface in **Needs You** even when
 the `run` kind is ambient in Pulse.
 
-See [Your workspace (Home)](/everyone/your-workspace/#brief--needs-you-and-pulse).
+See [Your workspace (Home)](/everyone/your-workspace/#home--needs-you-for-you-recent).
 
 ## Session length policy
 
@@ -273,7 +373,7 @@ and session-policy changes. Entries are retained for one year.
 ## Context files (Guidance in Knowledge)
 
 Workspace context files (agent house style) now live in the **Knowledge** lens under the
-**Guidance** branch — not a separate Admin tab. Admins create, edit (≤ 64 KB, lowercase
+**Guidance** branch — not a separate Admin page. Admins create, edit (≤ 64 KB, lowercase
 `.md`), set the entry point, or delete files there. Members can read.
 
 REST routes for context files are documented in
@@ -281,6 +381,6 @@ REST routes for context files are documented in
 [Workspace Knowledge](/teams/knowledge/#guidance-house-rules).
 
 <Aside type="tip">
-The Admin lens in Home surfaces most of the above as native tabs. The REST routes
-let you script the same operations.
+The Admin lens in Home surfaces most of the above as pages in its sidebar. The REST
+routes let you script the same operations.
 </Aside>

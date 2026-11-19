@@ -55,7 +55,7 @@ no de ShareOut.
 
    Guía: [Smoke del data plane](/es/self-host/data-smoke/).
 
-5. **Day 1** — clave de AI si querés Crear con AI / Crew; invitá a alguien; apuntá
+5. **Day 1** — clave de AI si querés **Nuevo → Describilo a la IA** / Crew; invitá a alguien; apuntá
    agentes a `GET $ORIGIN/v1/skill` con `origin` en `~/.shareout/credentials`. Ver el
    [README del repo → Day 1](https://github.com/getshareout/shareout#day-1-after-health-is-green).
 
@@ -70,6 +70,7 @@ no de ShareOut.
 | Microsoft sign-in | `MICROSOFT_CLIENT_ID` + `MICROSOFT_CLIENT_SECRET` (`MICROSOFT_TENANT` opcional); callback `{origin}/auth/microsoft/callback` — [setup](/es/self-host/secrets/#entrar-con-microsoft) |
 | OTP por email real | Binding `EMAIL` + vars de from-address |
 | Subdominios de workspace | DNS wildcard `*.tudominio` → worker; apex = host de `SHAREOUT_BASE_URL` |
+| Dominios propios de workspace | `CUSTOM_DOMAINS_CNAME_TARGET`, más `CF_CUSTOM_HOSTNAMES_TOKEN` + `CF_CUSTOM_HOSTNAMES_ZONE_ID` para que Cloudflare for SaaS emita los certificados — [configuración](/es/teams/custom-domain/#para-quien-opera-la-instancia) |
 | CDN de contenido separado | Seteá `ARTIFACT_ORIGIN` a una segunda zona (hardening opcional) |
 
 Servir same-zone (sin CDN) es el default y alcanza para la mayoría de self-hosts.

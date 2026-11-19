@@ -25,7 +25,7 @@ Visitors browse the shell URL; they do not need to know the content URL.
 
 | Concern | Where it lives |
 |---------|----------------|
-| Auto TL;DR + tags | Background on every HTML publish — fills empty `description` and `artifact_tags` for search/cards |
+| Auto TL;DR + tags | Background on every HTML, Markdown, CSV or PDF publish — fills empty `description` and `artifact_tags` for search/cards |
 | Link previews (OG tags) | Shell URL (`/a/` or `/p/`) — crawlers never execute iframe JS |
 | Session cookies | `$ORIGIN_HOST` only — not visible to artifact JS |
 | Your HTML/CSS/JS | Content host iframe |
@@ -127,7 +127,7 @@ await module.setAutoPublish(true, { delay: 30000 }); // 30 sec
 
 ## Auto TL;DR and tags (search index)
 
-On every **HTML publish**, ShareOut runs a background job (best-effort — never blocks publish) that reads the production entrypoint HTML and asks the model for:
+On every publish whose production entrypoint is **HTML, Markdown, CSV or PDF** (`SUMMARY_ARTIFACT_TYPES` — so converted documents such as PDF → Markdown or XLSX → CSV are summarized too; a PDF is read as Markdown first), ShareOut runs a background job (best-effort — never blocks publish) that reads the entrypoint and asks the model for:
 
 ```json
 { "summary": "…", "tags": ["…", "…"] }
@@ -138,7 +138,7 @@ On every **HTML publish**, ShareOut runs a background job (best-effort — never
 | `summary` | Artifact `description` — **only if the author left description empty** |
 | `tags` | `artifact_tags` table — merged with any tags you set manually |
 
-Both feed **⌘K search**, Home cards, and link-preview fallbacks. Re-publishing unchanged HTML is a no-op (`auto_summary_hash` dedupes). An hourly drip backfill generates summaries for pages published before this feature shipped.
+Both feed **⌘K search**, Home cards, and link-preview fallbacks. Re-publishing unchanged content is a no-op (`auto_summary_hash` dedupes). An hourly drip backfill generates summaries for pages published before this feature shipped.
 
 Authors can always override description and tags in the Inspector or via `PATCH /v1/artifacts/{id}`.
 

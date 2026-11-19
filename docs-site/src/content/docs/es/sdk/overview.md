@@ -86,12 +86,25 @@ con `sdk.clearMockData()`.
 | 2b | [`sdk.grid(name)`](/es/sdk/grid/) | Grilla editable (tabla o Sheets) |
 | 3 | [`sdk.realtime(id)`](/es/sdk/realtime/) | Colaboración en vivo — documentos, pizarras |
 
+## Trabajar con datos
+
+| API | Hace |
+| --- | --- |
+| [`sdk.dataset(name)`](/es/sdk/datasets/) | Leer extractos JSON/CSV versionados desde R2 |
+| [`sdk.connection(name)`](/es/sdk/connections/) | Consulta en vivo REST / warehouse + `materialize` |
+| [`sdk.platform`](/es/sdk/live-data/#proveedores-de-plataforma-bigquery-snowflake-ga-shopify) | Proveedores OAuth/warehouse (BigQuery, GA, Shopify, …) |
+| [Guía de datos en vivo](/es/sdk/live-data/) | Auth en el sandbox, proveedores de plataforma, paginación |
+| [`sdk.sheets`](/es/sdk/sheets/) | Leer y escribir Google Sheets |
+| [`sdk.workspace.table(name)`](/es/sdk/tables/) | Compartir una tabla entre artefactos de un workspace (Teams) |
+| [`sdk.blobs`](/es/sdk/blobs/) | Almacenamiento de archivos, servido directo desde R2 |
+| [`sdk.files`](/es/sdk/files/) | Incrustar Assets del workspace (`dlv_*`) entre artefactos |
+| [`sdk.mcp`](/es/sdk/mcp/) | Usar la cuenta propia de quien mira en un servidor MCP remoto (artefactos solo para miembros) |
+| [`sdk.knowledge.search(q, { limit, full })`](/es/sdk/knowledge/) | Buscar en el Knowledge del workspace — pasajes citados de sus Archivos y artefactos (solo miembros con sesión) |
+
 ## Todo lo demás
 
 | API | Hace |
 | --- | --- |
-| [`sdk.blobs`](/es/sdk/blobs/) | Almacenamiento de archivos, servido directo desde R2 |
-| [`sdk.files`](/es/sdk/files/) | Incrustar Assets del workspace (`dlv_*`) entre artefactos |
 | [`sdk.email`](/es/sdk/email/) | Email de formulario de contacto al dueño del artefacto |
 | [`sdk.python`](/es/sdk/python/) | Ejecutá Python en el navegador (Pyodide) |
 | [`sdk.agent`](/es/guides/ai-agent/) | Agente de chat para visitantes |
@@ -121,6 +134,9 @@ Cada página de store más abajo muestra la forma de su manifest.
 try {
   await sdk.json.get('key');
 } catch (e) {
-  if (e instanceof ShareOutError) console.log(e.code, e.status, e.message);
+  if (e instanceof ShareOutError) console.log(e.code, e.status, e.message, e.requestId);
 }
 ```
+
+`ShareOutError` (también `ShareOut.ShareOutError`) trae `code`, `status`, `hint`,
+`suggestion`, `reason` y `requestId` — citá el `requestId` en un pedido de soporte.

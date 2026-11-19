@@ -86,7 +86,19 @@ tooling/scripts/       ← ci-check, gitleaks, boundary helpers
 | `D1_READ_REPLICAS` | `1` to read through D1 Sessions (read replicas; enable read replication on the database first); writes hand back an `x-d1-bookmark` header / `__d1b` cookie for read-your-writes. Unset = primary only |
 | `CUSTOM_DOMAINS_CNAME_TARGET` | Turns on workspace custom domains; the hostname customers CNAME to. Alone = manual mode (DNS TXT check) |
 | `CF_CUSTOM_HOSTNAMES_TOKEN` / `CF_CUSTOM_HOSTNAMES_ZONE_ID` | Optional; provision custom domains via Cloudflare for SaaS (token: Zone → SSL and Certificates: Edit) |
-| `SUPPORT_ALERT_TELEGRAM_CHAT_ID` | Optional; Telegram chat pinged on every new support ticket (needs `TELEGRAM_BOT_TOKEN`) |
+| `SUPPORT_ALERT_TELEGRAM_CHAT_ID` | Optional; the operator's Telegram chat for new support tickets, failed page builds, an AI provider out of credit, daily AI spend and low gateway credit (needs `TELEGRAM_BOT_TOKEN`) |
+| `AI_SPEND_ALERT_USD_PER_DAY` | Optional; one Telegram alert a day once the instance's AI spend for the UTC day crosses this. Unset = off |
+| `AI_CREDIT_ALERT_USD` | Vercel AI Gateway credit floor (USD) for the hourly check: Telegram alert + error log. Default 20 |
+| `BUILD_AGENT` | `on` forces the AI page build agent everywhere, `off` disables it everywhere; unset = the `build_agent` feature flag |
+| `BUILD_EFFORT` | Reasoning effort of AI page builds: `low` / `medium` (default) / `high` |
+| `BUILD_MODEL` | Page builds only, when no workspace/instance model is picked: gateway slug, or first-party id on Anthropic direct |
+| `SCAN_MODEL` | Model that transcribes scanned PDFs; default Claude Haiku 5.5. Gateway slug or first-party id ([self-host AI](docs-site/src/content/docs/self-host/ai.md#all-ai-settings)) |
+| `EMAIL_WEBHOOK_SECRET` | Turns on the bounce/complaint webhook `/v1/webhooks/email-events` (header `x-webhook-secret`); unset = 404, bounces never suppressed |
+| `TELEGRAM_LOGIN_LINKS` | `1` = page links in Telegram bot replies sign the member in with one tap (needs BotFather `/setdomain`) |
+| `GOOGLE_DRIVE_CLIENT_ID` / `SECRET` | Optional Google Drive folder import + spreadsheet sync (own OAuth client). Unset = hidden. [Detail](docs-site/src/content/docs/self-host/secrets.md) |
+| `GOOGLE_DRIVE_FILE_CLIENT_ID` / `SECRET` | Optional separate Cloud project for the spreadsheet sync's `drive.file` consent; unset = uses `GOOGLE_DRIVE_CLIENT_ID` |
+| `GOOGLE_DRIVE_SA_KEY` | Optional Drive import by sharing a folder with the workspace's own service account (JSON key of the minter account) |
+| `MICROSOFT_FILES_CLIENT_ID` / `SECRET` / `TENANT` | Optional OneDrive / SharePoint folder import (Graph, delegated); tenant default `common`. Unset = hidden |
 | `KNOWLEDGE_EMBED_MODEL` | Model of the multilingual Knowledge index (binding `KNOWLEDGE_VECTORS_V2`, 1024-d cosine; create commands in `wrangler.toml`): `@cf/baai/bge-m3` (default) or `@cf/qwen/qwen3-embedding-0.6b`. The 768-d indexes keep `@cf/baai/bge-base-en-v1.5` |
 | `KNOWLEDGE_VECTORS_READ` | `v2` = Knowledge and page search read `KNOWLEDGE_VECTORS_V2` for each workspace it fully covers; the rest stay on the 768-d indexes until backfilled. Unset = v1. Rollout: [self-host ops](docs-site/src/content/docs/self-host/ops.md#multilingual-knowledge-search) |
 
@@ -138,6 +150,15 @@ repo root.
   merging is the maintainer's call. A PR is squash-merged once its branch has been
   through `integrate.sh`; a batch, or a branch that needed fixes there, lands as one
   `integration/<name>` PR.
+- **Every user-visible change ships with its words, in the same PR.** A change people or
+  integrators notice (an API route, an MCP tool or its text, UI copy, the SDK, the OpenAPI spec)
+  adds its line to `CHANGELOG.md` → `## Release notes` under today's date — plain English for
+  someone who uses ShareOut, an `es:` line, a short `Integrators:` line with the routes/tools —
+  plus the technical entry under `## [Unreleased]`, and updates the skill, the MCP text (tool
+  description or server instructions) and the docs-site pages (en + es) to match. The docs site's
+  What's new / Novedades pages render that section (`docs-site/src/lib/release-notes.mjs`), so
+  never keep a second copy. `check:changelog` (pre-push) fails a branch that touches those paths
+  without `CHANGELOG.md`; when it really isn't user-visible, put `Changelog: none` in a commit message.
 - **Committed bundles:** build outputs (`public/_bundles/*`, `src/discovery/*`,
   `src/official-skills/*.generated.ts`) live in git. After editing `sdk/`,
   `editor-client/`, `chat-core/` or `skills/ShareOutSkill/`, run `npm run build:sdk` /

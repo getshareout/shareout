@@ -32,7 +32,7 @@ Create or update an artifact.
 }
 ```
 
-`message` (optional, max 500 chars) is the change note for this version, shown in the History tab. Send one when you update an existing artifact. Without one, a short "what changed" line is generated in the background from the diff against the previous version and stored with `message_source: "ai"`. Workspaces can turn that off with the `ai.version_summaries` feature.
+`message` (optional, max 500 chars) is the change note for this version, shown in the artifact's version history (Home: **Details → More → Versions**). Send one when you update an existing artifact. Without one, a short "what changed" line is generated in the background from the diff against the previous version and stored with `message_source: "ai"`. Workspaces can turn that off with the `ai.version_summaries` feature.
 
 **Response:**
 ```json
@@ -338,21 +338,28 @@ does not give them content access to a member's private page.
 
 ### GET /v1/artifacts/{id}/collaborators
 
-List all collaborators.
+List all collaborators: `{ "collaborators": [{ "email", "role", "added_at", "pending" }] }`.
+`pending: true` means nobody has signed in with that email yet (invited, never opened
+it) — the share dialog shows it as "Invited · hasn't signed in yet".
 
 ### POST /v1/artifacts/{id}/collaborators
 
 Add collaborators. Pass `"notify": true` to email each newly added person the link
 and how to sign in (an emailed code, no password; no account needed). The share
 happens even when the daily email limit is reached; `notified` says who got the email.
+`message` is an optional note from the sharer, included in that email (only with
+`notify: true`; longer notes are cut at 1000 characters).
 
 ```json
 {
   "emails": ["user@example.com"],
   "role": "editor",
-  "notify": true
+  "notify": true,
+  "message": "Numbers for Thursday's review"
 }
 ```
+
+The response carries the updated `collaborators` list (with `pending`).
 
 ### DELETE /v1/artifacts/{id}/collaborators/{email}
 

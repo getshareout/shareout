@@ -170,7 +170,7 @@ export function instanceBody(cfg: InstanceConfig): string {
        ${check('sa-ws-knowledge', 'Knowledge', false)}
      </div>
      <details style="margin-top:var(--space-2)"><summary class="sa-muted">Advanced: connectors, feature flags, hooks (JSON merged into the spec)</summary>
-       <textarea id="sa-ws-advanced" class="so-c-textarea" rows="5" style="width:100%;margin-top:var(--space-2)" placeholder='{"connectors":[…],"policy":{"features":{"ai.crew":false}},"templates":"…","custom_domain":"…"}'></textarea>
+       <textarea id="sa-ws-advanced" class="so-c-textarea" rows="5" style="width:100%;margin-top:var(--space-2)" placeholder='{"connectors":[…],"policy":{"features":{"ai.crew":false}},"custom_domain":"…"}'></textarea>
      </details>
      <div style="margin-top:var(--space-2)"><button id="sa-ws-create" class="so-c-btn so-c-btn--primary so-c-btn--sm" type="button">Provision</button></div>
      <div id="sa-ws-result" class="sa-muted" style="margin-top:var(--space-2)"></div>`,

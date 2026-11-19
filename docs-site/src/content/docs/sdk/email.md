@@ -45,6 +45,28 @@ await sdk.email.notifyOwner({
 50 emails/day per account · 10/day per artifact (SDK + jobs combined).
 </Aside>
 
+## When email isn't available
+
+On an instance with no email sending set up, a send throws a `ShareOutError` with
+`status: 503` and `code: "EMAIL_UNAVAILABLE"`. Check `status().enabled` first and fall
+back, as in the example above.
+
+## Unsubscribe
+
+Every email an artifact sends — from the SDK, a scheduled job or a crew — carries an
+**Unsubscribe** link in its footer and a one-click `List-Unsubscribe` header. The opt-out
+is **per artifact**: that address stops getting email from this artifact only, not from
+your other artifacts, and the confirmation page lets them opt back in. Later sends skip
+the address (job and crew results list it under `skippedOptedOut`); a send whose only
+recipient opted out fails.
+
+Owners and editors can list who opted out:
+
+```http
+GET /v1/data/{artifactId}/email/optouts
+→ { "success": true, "data": { "optouts": [{ "email": "ana@acme.com", "created_at": "…" }] } }
+```
+
 ## Scheduled & bulk email
 
 For cron sends or multiple recipients, use a [job](/guides/jobs/) instead

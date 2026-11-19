@@ -85,7 +85,7 @@ When `require_approval` is active, members and admins can drive the flow in the 
 
 | Surface | Who | What |
 | --- | --- | --- |
-| **Admin → Settings** | `admin`/`owner` | Set policy (`allow` / `prohibit` / `require_approval`) and `approvals_required` (1–10). |
+| **Admin → Publishing** | `admin`/`owner` | Set policy (`allow` / `prohibit` / `require_approval`) and `approvals_required` (1–10); the same page lists publish approvals waiting for you (sidebar badge). |
 | **Home bulk visibility** | Member requester | Changing visibility to `public` opens an approver picker (exactly N workspace members). |
 | **Editor visibility select** | Member requester | Same picker when a held change needs nomination. |
 | **Approvals queue** | Any member | Left-nav **Approvals** view + badge; nominated approvers approve/reject; requesters see pending items. |

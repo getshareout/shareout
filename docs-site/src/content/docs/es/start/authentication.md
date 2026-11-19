@@ -43,7 +43,9 @@ usá un **token de Agente del workspace** (prefijo `sot_`) en lugar de un token 
 scopes de acción (`artifacts:read`, `artifacts:publish`, `data:read`, `data:write`), y se
 revoca de forma independiente de cualquier empleado.
 
-Creá uno como owner/admin del workspace y usalo igual que un token personal:
+Creá uno como owner/admin del workspace. Funciona en las rutas de artefactos, publicación, datos y
+soporte (publicar, actualizar, leer y escribir los datos de un artefacto, abrir un ticket de soporte)
+dentro de su workspace y sus scopes; cualquier otra ruta responde `403 INSUFFICIENT_SCOPE`:
 
 ```bash
 curl -X POST "$ORIGIN/v1/workspaces/{workspace_id}/agent-tokens" \

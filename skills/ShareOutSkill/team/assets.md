@@ -1,6 +1,8 @@
 # Assets & Deliverables
 
-A per-scope **asset library**: store any file once, reuse it across artifacts by a stable URL, organize in folders, and deliver bundles to clients via a public download link. Surfaced in Home → **Assets**. One hidden bucket per workspace (shared) and one personal bucket (`workspace_id` NULL).
+A per-scope **asset library**: store any file once, reuse it across artifacts by a stable URL, organize in folders, and deliver bundles to clients via a public download link. One hidden bucket per workspace (shared) and one personal bucket (`workspace_id` NULL).
+
+> **The Assets lens is retired.** Home has no **Assets** entry and `#l/assets` opens Home. Files people upload from Home — **New → Upload files**, drop or paste — become artifacts (`POST /v1/home/import`: documents, images and video, the original kept inside; audio, fonts and archives are refused). Point people there, not at an Assets tab. The library and the REST API below still back the workspace file inbox, chat attachments, `sdk.files` URLs and delivery links, and existing file links keep working.
 
 ## Why it matters for artifacts
 
@@ -20,7 +22,7 @@ Files can land in the library from three other channels — each records **prove
 | **Chat attach** | Paperclip in the Home **Ask your workspace…** composer | You (uploads to your scope's asset bucket) |
 | **Share from phone** | Install ShareOut as a PWA, then **Share → ShareOut** from any app | You — opens Home with the file ready to attach in chat |
 
-The workspace inbox address is in **Admin → Settings → File inbox** (copy with one click). Admins get a bell notification and optional Telegram ping when a member emails files in. Spreadsheets (`.xlsx`, `.csv`), decks (`.pptx`), PDFs, and images are typical payloads.
+The workspace inbox address is in **Admin → General → File inbox** (copy with one click). Admins get a bell notification and optional Telegram ping when a member emails files in. Spreadsheets (`.xlsx`, `.csv`), decks (`.pptx`), PDFs, and images are typical payloads.
 
 > **Not the same as a page inbox:** a **page inbox** (`your-page@inbox.example.com`) captures mail *into one artifact* for automations — see [../integrations/inbound-email.md](../integrations/inbound-email.md). The **workspace file inbox** feeds the shared **Assets** library and the AI assistant instead.
 
@@ -53,7 +55,7 @@ Open a file's **comments** control to leave a thread — same comment system as 
 
 On a file tile, **Share with a person** sends a single file to one outside email — no client org required. Pick **View** or **Comment**; they get an invite (if new) and the file appears on their **`/shared`** portal with a comment thread when granted **Comment**. The dialog shows **Shared with** (existing grants) and **Revoke** per person. Returns `409` if that email is already an internal workspace member — use a normal collaborator invite instead.
 
-Folder-level **Share with a person** is available in the Assets lens (folder tile) and via the API (`resource_type: "folder"`). The share dialog lists **who already has access** with per-grant **Revoke** — same for files.
+Folder-level **Share with a person** is on the folder's **Who has access** panel in Home → **Artifacts** and via the API (`resource_type: "folder"`). The share dialog lists **who already has access** with per-grant **Revoke** — same for files.
 
 ## REST API
 

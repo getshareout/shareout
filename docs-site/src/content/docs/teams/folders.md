@@ -6,10 +6,11 @@ description: Organize workspace artifacts into shared folders visible to all wor
 import { Aside } from '@astrojs/starlight/components';
 
 **Team Space folders** are shared folders inside a Teams workspace. Every
-member can see and move artifacts into them. `owner` and `admin` create,
-rename, and delete any folder. Members create folders and rename or delete the
-ones they created, unless an admin turned **Members can create folders** off
-(Admin → Settings, or `members_can_create_folders` on `PATCH /v1/workspaces/{id}`).
+member can see them; an artifact's owner or editors (or a workspace admin) can move
+it into one. `owner` and `admin` create, rename, and delete any folder. Members
+create folders and rename or delete the ones they created, unless an admin turned **Members can create folders** off
+(Admin → General → **Team Space folders**, or `members_can_create_folders` on
+`PATCH /v1/workspaces/{id}`).
 
 <Aside>
 Personal folders (not tied to any workspace) use `/v1/folders`. This page
@@ -119,7 +120,8 @@ Slugs are unique per parent level within the workspace.
 
 ## Move an artifact into a folder
 
-Any workspace member can file a workspace artifact:
+The artifact's owner, one of its editors, or a workspace `admin`/`owner` can file it.
+Anyone else gets `403 FORBIDDEN`:
 
 ```http
 POST /v1/workspaces/{workspaceId}/artifacts/{artifactId}/move
