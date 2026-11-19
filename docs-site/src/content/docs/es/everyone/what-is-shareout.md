@@ -1,14 +1,14 @@
 ---
 title: ¿Qué es ShareOut?
-description: ShareOut convierte una planilla, un reporte o una idea en un artefacto con su propio link, y lo mantiene al día — en ShareOut Cloud o en el ShareOut de tu empresa.
+description: ShareOut convierte una planilla, un reporte o una idea en un artefacto con su propio link, y lo mantiene al día — en shareout.site o en el ShareOut de tu empresa.
 ---
 
 ShareOut convierte una idea, una planilla o un reporte en un **artefacto**: algo
 que se abre en el navegador, con su propio link. Vos (o un asistente como Claude o
 ChatGPT) describís lo que querés y lo arma. No hace falta código.
 
-Lo usás en **ShareOut Cloud**, en [shareout.site](https://shareout.site) (por ahora,
-las cuentas nuevas son por invitación), o en el ShareOut propio de tu empresa, que
+Lo usás en [shareout.site](https://shareout.site), el ShareOut alojado (las cuentas
+nuevas son por invitación), o en el ShareOut propio de tu empresa, que
 alguien [instala en su cuenta de Cloudflare](/es/self-host/overview/).
 
 Pensalo como mandarle un mensaje a un amigo que sabe un montón de hacer páginas web. Le decís:

@@ -13,7 +13,7 @@ y tiene links a estas guías y a [Novedades](/es/whats-new/).
 
 Otros canales (si están configurados):
 
-- **Email** — la dirección que configuró tu admin (en ShareOut Cloud, usá Ayuda en Home)
+- **Email** — la dirección que configuró tu admin (en shareout.site, usá Ayuda en Home)
 - **Slack** — `/shareout support <qué pasó>` si el bot está vinculado
 - **Telegram** — `/support <qué pasó>` si el bot está vinculado
 
