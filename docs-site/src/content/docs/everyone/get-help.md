@@ -13,7 +13,7 @@ and status, and links to these guides and to [What's new](/whats-new/).
 
 Other in-product channels (when configured):
 
-- **Email** — whatever support address your admin set (on shareout.site, use Help in Home)
+- **Email** — whatever support address your admin set (on ShareOut Cloud, use Help in Home)
 - **Slack** — `/shareout support <what went wrong>` if the Slack bot is linked
 - **Telegram** — `/support <what went wrong>` if the Telegram bot is linked
 

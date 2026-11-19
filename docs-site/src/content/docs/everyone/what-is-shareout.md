@@ -1,14 +1,14 @@
 ---
 title: What is ShareOut?
-description: ShareOut turns a spreadsheet, a report or an idea into a page with its own link, and keeps it up to date — on shareout.site or your company's own ShareOut.
+description: ShareOut turns a spreadsheet, a report or an idea into a page with its own link, and keeps it up to date — on ShareOut Cloud or your company's own ShareOut.
 ---
 
 ShareOut turns an idea, a spreadsheet or a report into a real web page with its own
 link. You (or an assistant like Claude or ChatGPT) describe what you want, and it
 builds it. No code required.
 
-You use it at [shareout.site](https://shareout.site), the hosted ShareOut (new
-accounts are by invitation), or on your company's own ShareOut, which someone
+You use it on **ShareOut Cloud** at [shareout.site](https://shareout.site) (new
+accounts are by invitation for now), or on your company's own ShareOut, which someone
 [installs on their Cloudflare account](/self-host/overview/).
 
 Think of it like texting a friend who happens to be great at making websites. You say:
