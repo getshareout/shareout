@@ -173,36 +173,6 @@ to a whole company:
 - `/admin?view=costs` puts it next to the rest of the instance spend
 - per-workspace keys move the bill to the workspace that generates it
 
-### What a workspace is charged: cost × markup
-
-Every AI amount a workspace sees — its Admin → Billing (spend, monthly AI budget, AI
-report), its Summary, crew and Knowledge costs, and the AI usage line on an invoice — is
-its **price**: the metered cost × a markup. Storage, serving, email and browser time are
-not marked up. The markup in force is the first of:
-
-1. the workspace's own markup;
-2. the instance default;
-3. none — the workspace is billed at cost (1×).
-
-Set the instance default in `/admin?view=instance` → **AI defaults** (*AI resale
-markup*), or:
-
-```bash
-curl -sS -X PUT "$ORIGIN/v1/admin/ai-settings" \
-  -H "Authorization: Bearer $SHAREOUT_TOKEN" -H 'Content-Type: application/json' \
-  -d '{"defaultMarkup":1.5}'
-```
-
-One workspace's markup is set from its Admin → Billing (a block only instance admins
-see) or with `PUT /v1/workspaces/$WORKSPACE_ID/ai-markup` `{"markup": 1.5}`; `null`
-falls back to the instance default. Both take a multiplier from 1 (at cost) to 10;
-anything else is `400 VALIDATION_ERROR`. Workspace admins never see the cost, the markup
-or the margin, and a workspace markup change is not written to that workspace's audit
-log, which its admins can read.
-
-A workspace's **monthly AI budget** (set by its own admins in Admin → Billing) is
-measured at its price, so the budget, the AI report and an invoice's usage line agree.
-
 ### Alerts
 
 Set `SUPPORT_ALERT_TELEGRAM_CHAT_ID` (a Telegram chat id) and `TELEGRAM_BOT_TOKEN` and

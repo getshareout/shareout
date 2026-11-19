@@ -209,7 +209,7 @@ the per-note routes return `404` — never an error.
 | `PUT` | `/v1/workspaces/{id}/knowledge/files/{path}` | Member+ (`index.md`: Admin+) | Replace a note's markdown; marks it as hand-edited |
 | `DELETE` | `/v1/workspaces/{id}/knowledge/files/{path}?forget=1` | Admin+ | Delete a note; `forget=1` stops it being re-learned |
 | `POST` | `/v1/workspaces/{id}/knowledge/enable` | Admin+ | Turn learning on or off (**paid plan** required to enable) |
-| `POST` | `/v1/workspaces/{id}/knowledge/backfill` | Admin+ | Queue up to 200 recent live pages for notes, and every page and File not yet learned for search (up to 300 a call); returns `{ queued, kicked, corpus, corpusRemaining }` (**paid plan**) |
+| `POST` | `/v1/workspaces/{id}/knowledge/backfill` | Admin+ | Queue up to 200 recent live pages for notes, and every page and File not yet learned for search (up to 300 a call); returns `{ queued, kicked, corpus, corpusRemaining }` |
 | `POST` | `/v1/workspaces/{id}/knowledge/reindex` | Admin+ | Re-learn every live page and File (or only `{ "artifactIds": [...] }`, 1–300) even when unchanged; `202 { queued, remaining, skipped }`. Once per workspace per 10 minutes (`429 RATE_LIMITED` with `Retry-After`) |
 | `GET` | `/v1/workspaces/{id}/knowledge/search?q=&limit=&full=1&format=md` | Member+ | Cited passages from Files and pages; passages are cut at 700 characters unless `full=1`; `limit` 1–30 (default 10); `format=md` for compact markdown |
 | `POST` | `/v1/workspaces/{id}/knowledge/entities` | Admin+ | Add an entity, confirmed by the team |

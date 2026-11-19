@@ -179,38 +179,6 @@ instancia a toda una empresa:
 - `/admin?view=costs` lo pone al lado del resto del gasto
 - las claves por espacio mueven la cuenta al espacio que la genera
 
-### Lo que se le cobra a un espacio: costo × recargo
-
-Cada monto de IA que ve un espacio — su Admin → Facturación (gasto, presupuesto mensual de
-IA, reporte de IA), su Resumen, los costos de crews y de Knowledge, y la línea de uso de IA
-de una factura — es su **precio**: el costo medido × un recargo (markup). El almacenamiento,
-las visitas, el email y el tiempo de navegador no llevan recargo. El recargo vigente es el
-primero de:
-
-1. el recargo propio del espacio;
-2. el default de la instancia;
-3. ninguno — al espacio se le cobra al costo (1×).
-
-Fijá el default de la instancia en `/admin?view=instance` → **AI defaults** (*AI resale
-markup*), o:
-
-```bash
-curl -sS -X PUT "$ORIGIN/v1/admin/ai-settings" \
-  -H "Authorization: Bearer $SHAREOUT_TOKEN" -H 'Content-Type: application/json' \
-  -d '{"defaultMarkup":1.5}'
-```
-
-El recargo de un espacio se fija desde su Admin → Facturación (un bloque que solo ven los
-admins de la instancia) o con `PUT /v1/workspaces/$WORKSPACE_ID/ai-markup`
-`{"markup": 1.5}`; `null` vuelve al default de la instancia. Los dos aceptan un
-multiplicador de 1 (al costo) a 10; cualquier otro valor es `400 VALIDATION_ERROR`. Los
-admins del espacio nunca ven el costo, el recargo ni el margen, y un cambio de recargo no
-se escribe en el registro de auditoría del espacio, que sus admins pueden leer.
-
-El **presupuesto mensual de IA** de un espacio (lo fijan sus propios admins en
-Admin → Facturación) se mide a su precio, así el presupuesto, el reporte de IA y la línea de
-uso de una factura coinciden.
-
 ### Alertas
 
 Configurá `SUPPORT_ALERT_TELEGRAM_CHAT_ID` (el id de un chat de Telegram) y

@@ -187,7 +187,7 @@ las rutas requieren membresía del workspace.
 | `PUT` | `/v1/workspaces/{id}/knowledge/files/{path}` | Member+ (`index.md`: Admin+) | Reemplazar markdown; marca como editada a mano |
 | `DELETE` | `/v1/workspaces/{id}/knowledge/files/{path}?forget=1` | Admin+ | Eliminar nota; `forget=1` evita re-aprendizaje |
 | `POST` | `/v1/workspaces/{id}/knowledge/enable` | Admin+ | Activar/desactivar (**plan pago** para activar) |
-| `POST` | `/v1/workspaces/{id}/knowledge/backfill` | Admin+ | Encolar hasta 200 artefactos recientes para notas, y cada artefacto y Archivo que falte aprender para búsqueda (hasta 300 por llamada); `{ queued, kicked, corpus, corpusRemaining }` (**plan pago**) |
+| `POST` | `/v1/workspaces/{id}/knowledge/backfill` | Admin+ | Encolar hasta 200 artefactos recientes para notas, y cada artefacto y Archivo que falte aprender para búsqueda (hasta 300 por llamada); `{ queued, kicked, corpus, corpusRemaining }` |
 | `POST` | `/v1/workspaces/{id}/knowledge/reindex` | Admin+ | Re-aprender todos los artefactos live y Archivos (o solo `{ "artifactIds": [...] }`, 1–300) aunque no hayan cambiado; `202 { queued, remaining, skipped }`. Una vez por workspace cada 10 minutos (`429 RATE_LIMITED` con `Retry-After`) |
 | `GET` | `/v1/workspaces/{id}/knowledge/search?q=&limit=&full=1&format=md` | Member+ | Pasajes citados de Archivos y artefactos; se cortan en 700 caracteres salvo con `full=1`; `limit` 1–30 (10 por defecto); `format=md` para markdown compacto |
 | `POST` | `/v1/workspaces/{id}/knowledge/entities` | Admin+ | Crear una entidad, confirmada por el equipo |

@@ -116,9 +116,9 @@ adds to both (AGENTS.md → Gate contract).
   - Guide: /teams/admin/
   - Guía: /es/teams/admin/
   - Integrators: deep links `#l/admin/<page>`. (#280)
-- **Workspaces get invoices and see their AI price.** The operator can bill a workspace, attach the receipt and mark it paid; AI usage is shown at the workspace's price.
-  - es: **Los workspaces reciben facturas y ven su precio de IA.** El operador puede facturarle a un workspace, adjuntar el comprobante y marcarla como pagada; el uso de IA se muestra al precio del workspace.
-  - Integrators: `/v1/workspaces/{id}/invoices…`; self-host markup `PUT /v1/admin/ai-settings`, `PUT /v1/workspaces/{id}/ai-markup`. (#278, #279)
+- **Workspaces get invoices.** The operator can bill a workspace, attach the receipt and mark it paid.
+  - es: **Los workspaces reciben facturas.** El operador puede facturarle a un workspace, adjuntar el comprobante y marcarla como pagada.
+  - Integrators: `/v1/workspaces/{id}/invoices…`. (#278, #279)
 
 ### 2026-10-29
 
@@ -361,7 +361,7 @@ adds to both (AGENTS.md → Gate contract).
 - **Backfilled 2026-11-18 — shipped 2026-10-16 → 2026-11-18 without an entry** (newest first; details in each PR):
   - **One share dialog** for the Home tab and the viewer: anyone with the link / everyone in the workspace / people you choose / only you; invite anyone by email with an optional `message` (≤ 1,000 chars) on `POST /v1/artifacts/{id}/collaborators`; invited people who haven't signed in are `pending`; `GET /v1/artifacts/{id}` returns `workspace_name`. (#303)
   - **Scanned PDFs are transcribed by a small model** (Claude Haiku 5.5 unless `SCAN_MODEL` is set). (#301)
-  - **Billing for workspaces:** Admin → Billing gets an **AI report** (`GET /v1/workspaces/{id}/ai-report?month=YYYY-MM[&format=csv]`), **Summary** for chosen admins (`GET …/summary?month=`, `…/summary/access`, `GET|PUT …/summary/viewers`), billing details incl. Argentine tax fields (`GET|PUT …/billing-profile`), and **invoices** the operator issues, with the receipt attached and paid/unpaid state (`/v1/workspaces/{id}/invoices…`). AI is resold at a markup: price = cost × markup (workspace `ai_markup_bps`, else the instance's `default_markup_bps`, else at cost; `PUT /v1/admin/ai-settings`, `PUT /v1/workspaces/{id}/ai-markup`); workspaces see only their price and the monthly AI budget is measured at price. (#278, #279, #288, #291)
+  - **Billing for workspaces:** Admin → Billing gets an **AI report** (`GET /v1/workspaces/{id}/ai-report?month=YYYY-MM[&format=csv]`), **Summary** for chosen admins (`GET …/summary?month=`, `…/summary/access`, `GET|PUT …/summary/viewers`), billing details incl. Argentine tax fields (`GET|PUT …/billing-profile`), and **invoices** the operator issues, with the receipt attached and paid/unpaid state (`/v1/workspaces/{id}/invoices…`). (#278, #279, #288, #291)
   - **AI page builds as durable jobs:** a build keeps running after the tab closes and a bell notice says when it is done (`/v1/builds*`, session only); `BUILD_AGENT` turns on the tool-using build agent (writes, checks, tests and fixes the page), with per-workspace `ai.build_agent`, `BUILD_EFFORT` and `BUILD_MODEL`, and the workspace's brand in builds; one agent engine for the assistant and the builder (history up to 200 messages, older ones folded into a summary; page edits in pieces). Admin Health traces every build; ops alerts on failed builds, low AI credit (`AI_CREDIT_ALERT_USD`, default 20) and daily spend (`AI_SPEND_ALERT_USD_PER_DAY`). A cut-off AI page is never published (32k output cap; failures in the reader's language), and viewers of a page that throws see an error bar with *Report to support*. (#268, #269, #270, #273, #274, #275, #276)
   - **Sharing a page emails the person** (new people get a sign-in code); the workspace assistant can share, unshare and change visibility. (#271)
   - **A detail page for every automation and AI task** with its runs and full editing; `PATCH /v1/workspaces/{id}/automations/{id}` also takes `cron`, `name`, `instructions`, `model`, `maxIterations`, `runBudgetMicroUsd`. (#267)

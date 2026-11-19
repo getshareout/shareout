@@ -95,7 +95,7 @@ export const SUMMARY_COPY: Record<'en' | 'es', Record<string, string>> = {
     "sum.colViews": "Vistas",
     "sum.colReaders": "Lectores",
     "sum.colLastView": "Última vista",
-    "sum.deleted": "borrada",
+    "sum.deleted": "borrado",
     "sum.pagesKnowledge": "Artefactos y conocimiento",
     "sum.pagesKnowledgeIntro": "Lo que tiene el espacio a fin de mes, y lo que cambió.",
     "sum.pagesLive": "Artefactos",
