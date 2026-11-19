@@ -10,6 +10,18 @@ adds to both (AGENTS.md → Gate contract).
 
 ## Release notes
 
+### 2026-11-19
+
+- **Find what's new and the how-to guides from inside ShareOut.** Help & support in Home now links to the guides and to What's new, a What's new button sits next to Documentation, and the email update, the Google Drive sync and Table from an Excel file each link to their step-by-step guide — in your language.
+  - es: **Encontrá las novedades y las guías desde ShareOut.** Ayuda y soporte en Home ahora tiene links a las guías y a Novedades, hay un botón de Novedades al lado de Documentación, y la actualización por email, la sincronización con Google Drive y Tabla desde un Excel enlazan a su guía paso a paso — en tu idioma.
+  - Guide: /everyone/get-help/
+  - Guía: /es/everyone/get-help/
+  - Integrators: What's new is also an Atom feed on the docs site, `/whats-new.xml` and `/es/whats-new.xml`; each change has its own link, `/whats-new/#<date>-<headline>`. Home markup can localize a link with `data-i18n-href="<copy key>"`.
+- **The docs start with the basics.** The docs home now opens with a "Start here" path in plain words — what ShareOut is, your first page, keeping it up to date, sharing — plus the latest changes and where you use ShareOut. The developer reference has its own clearly labelled sections.
+  - es: **La documentación arranca por lo básico.** La portada de la documentación ahora abre con un camino "Empezá acá" en palabras simples — qué es ShareOut, tu primer artefacto, cómo mantenerlo al día, cómo compartirlo — más las últimas novedades y dónde usás ShareOut. La referencia para developers tiene sus propias secciones, bien marcadas.
+  - Guide: /
+  - Guía: /es/
+
 ### 2026-11-18
 
 - **Keep a table up to date by email.** Email the Excel or CSV to the page's own address and the table updates itself — no Google account, no sign-in. Only the people you list can send it, and you see how many rows arrived.

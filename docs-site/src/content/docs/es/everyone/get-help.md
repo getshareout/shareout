@@ -8,17 +8,18 @@ description: ¿Te trabaste? Abrí un ticket desde ShareOut si tu instancia lo pe
 ## En tu instancia
 
 Si el admin habilitó soporte in-product, abrí **Home** → **Ayuda** (**?** abajo a la
-izquierda). Escribí un resumen y **Enviar**. El mismo panel muestra **Tus tickets**.
+izquierda). Escribí un resumen y **Enviar**. El mismo panel muestra **Tus tickets**,
+y tiene links a estas guías y a [Novedades](/es/whats-new/).
 
 Otros canales (si están configurados):
 
-- **Email** — la dirección que configuró tu admin (no hay un inbox cloud global de ShareOut)
+- **Email** — la dirección que configuró tu admin (en ShareOut Cloud, usá Ayuda en Home)
 - **Slack** — `/shareout support <qué pasó>` si el bot está vinculado
 - **Telegram** — `/support <qué pasó>` si el bot está vinculado
 
 ## Proyecto open-source
 
-El producto es self-hosted. Bugs y docs del código público:
+El código de ShareOut es abierto. Bugs y docs del código público:
 
 - [GitHub Issues](https://github.com/getshareout/shareout/issues)
 - [SUPPORT.md](https://github.com/getshareout/shareout/blob/main/SUPPORT.md)

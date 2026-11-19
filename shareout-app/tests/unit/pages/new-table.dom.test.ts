@@ -97,6 +97,9 @@ describe('New → Tabla desde un Excel', () => {
     expect(tiles).toEqual(['emailsync', 'drivesync', 'sheetlink']);
     expect(m.querySelector('[data-aauto="emailsync"]')!.textContent).toContain('Mandando el Excel por email');
     expect(m.textContent).not.toMatch(/dataset|job|página/i);
+    // How to keep it up to date, step by step, in Spanish.
+    expect(m.querySelector('[data-nt-guide]')!.getAttribute('href')).toBe(t('new.keepGuideUrl'));
+    expect(t('new.keepGuideUrl')).toMatch(/^https:\/\/docs\.shareout\.site\/es\//);
 
     (m.querySelector('[data-aauto="emailsync"]') as HTMLButtonElement).click();
     expect(modal()).toBeNull();

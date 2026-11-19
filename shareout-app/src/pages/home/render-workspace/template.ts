@@ -105,7 +105,8 @@ export function buildWorkspaceBody(args: RenderArgs): string {
       <div class="wsx__railspace"></div>
       <footer class="wsx__railfoot">
         <button class="wsx__footbtn" id="wsxHelpBtn" type="button" data-i18n-aria="help.title" data-i18n-tip="help.title" aria-label="Help &amp; support" data-tip="Help &amp; support">${svg('<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><line x1="4.93" y1="4.93" x2="9.17" y2="9.17"/><line x1="14.83" y1="14.83" x2="19.07" y2="19.07"/><line x1="14.83" y1="9.17" x2="19.07" y2="4.93"/><line x1="4.93" y1="19.07" x2="9.17" y2="14.83"/>')}</button>
-        <a class="wsx__footbtn" href="https://docs.shareout.site" target="_blank" rel="noopener" data-i18n-aria="foot.docs" data-i18n-tip="foot.docs" aria-label="Documentation" data-tip="Documentation">${svg('<path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>')}</a>
+        <a class="wsx__footbtn" id="wsxWhatsNew" href="https://docs.shareout.site/whats-new/" target="_blank" rel="noopener" data-i18n-href="foot.whatsNewUrl" data-i18n-aria="foot.whatsNew" data-i18n-tip="foot.whatsNew" aria-label="What’s new" data-tip="What’s new">${svg('<path d="M12 3l1.8 4.6L18.5 9l-4.7 1.4L12 15l-1.8-4.6L5.5 9l4.7-1.4z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/>')}</a>
+        <a class="wsx__footbtn" href="https://docs.shareout.site/" target="_blank" rel="noopener" data-i18n-href="foot.docsUrl" data-i18n-aria="foot.docs" data-i18n-tip="foot.docs" aria-label="Documentation" data-tip="Documentation">${svg('<path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>')}</a>
       </footer>
     </aside>
 
@@ -316,6 +317,7 @@ export function buildWorkspaceBody(args: RenderArgs): string {
   <section class="wsx__help-panel" id="wsxHelpPanel" hidden data-i18n-aria="help.title" aria-label="Help and support">
     <header class="wsx__help-head"><span data-i18n="help.title">Help &amp; support</span><button type="button" id="wsxHelpClose" data-i18n-aria="help.close" aria-label="Close">${svg('<path d="M18 6L6 18M6 6l12 12"/>')}</button></header>
     <div class="wsx__help-body">
+      <nav class="wsx__help-links" data-i18n-aria="help.guides" aria-label="How-to guides"><a class="wsx-link" href="https://docs.shareout.site/" target="_blank" rel="noopener" data-i18n-href="foot.docsUrl" data-i18n="help.guides">How-to guides</a><a class="wsx-link" href="https://docs.shareout.site/whats-new/" target="_blank" rel="noopener" data-i18n-href="foot.whatsNewUrl" data-i18n="foot.whatsNew">What’s new</a></nav>
       <div class="wsx__help-form" id="wsxHelpForm">
       <p class="wsx-lens__intro" data-i18n="help.intro">Hit a bug or have a question? Tell us — we'll reply here and by email.</p>
       <div class="wsx-field">

@@ -1,13 +1,14 @@
 ---
 // Renders CHANGELOG.md → "## Release notes" (the one source) for What's new / Novedades.
-import { loadReleaseNotes, inlineHtml } from '../lib/release-notes.mjs';
+// Each change has its own link (#<date>-<headline>); the integrator detail is folded away.
+import { loadReleaseNotes, inlineHtml, withAnchors } from '../lib/release-notes.mjs';
 
 interface Props { lang: 'en' | 'es' }
 const { lang } = Astro.props;
-const days = loadReleaseNotes();
+const days = withAnchors(loadReleaseNotes());
 const L = lang === 'es'
-	? { locale: 'es-AR', guide: 'Ver la guía', tech: 'Para integradores' }
-	: { locale: 'en-US', guide: 'Read the guide', tech: 'For integrators' };
+	? { locale: 'es-AR', guide: 'Ver la guía', tech: 'Para integradores', link: 'Link a este cambio' }
+	: { locale: 'en-US', guide: 'Read the guide', tech: 'For integrators', link: 'Link to this change' };
 const fmt = new Intl.DateTimeFormat(L.locale, { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
 const label = (d: string) => fmt.format(new Date(`${d}T12:00:00Z`));
 ---
@@ -20,10 +21,15 @@ const label = (d: string) => fmt.format(new Date(`${d}T12:00:00Z`));
 					const text = lang === 'es' ? e.es : e.en;
 					const guide = lang === 'es' ? e.guia : e.guide;
 					return (
-						<li>
-							<p set:html={inlineHtml(text)} />
+						<li id={e.anchor}>
+							<p><Fragment set:html={inlineHtml(text)} /> <a class="rn-anchor" href={`#${e.anchor}`} aria-label={L.link} title={L.link}>#</a></p>
 							{guide && <p class="rn-guide"><a href={guide}>{L.guide} →</a></p>}
-							{e.tech && <p class="rn-tech"><span>{L.tech}:</span> <Fragment set:html={inlineHtml(e.tech)} /></p>}
+							{e.tech && (
+								<details class="rn-tech">
+									<summary>{L.tech}</summary>
+									<p set:html={inlineHtml(e.tech)} />
+								</details>
+							)}
 						</li>
 					);
 				})}
@@ -34,9 +40,13 @@ const label = (d: string) => fmt.format(new Date(`${d}T12:00:00Z`));
 
 <style>
 	.release-notes ul { list-style: none; padding-left: 0; }
-	.release-notes li { margin: 0 0 1.25rem; padding-left: 0.9rem; border-left: 2px solid var(--sl-color-gray-5); }
+	.release-notes li { margin: 0 0 1.25rem; padding-left: 0.9rem; border-left: 2px solid var(--sl-color-gray-5); scroll-margin-top: 5rem; }
+	.release-notes li:target { border-left-color: var(--sl-color-accent); }
 	.release-notes li p { margin: 0.2rem 0; }
+	.rn-anchor { color: var(--sl-color-gray-4); text-decoration: none; font-size: var(--sl-text-sm); }
+	.rn-anchor:hover, .rn-anchor:focus { color: var(--sl-color-accent); }
 	.rn-guide { font-size: var(--sl-text-sm); }
-	.rn-tech { font-size: var(--sl-text-xs); color: var(--sl-color-gray-3); }
-	.rn-tech span { font-weight: 600; }
+	.rn-tech { margin-top: 0.2rem; font-size: var(--sl-text-xs); color: var(--sl-color-gray-3); }
+	.rn-tech summary { cursor: pointer; font-weight: 600; width: fit-content; }
+	.rn-tech p { margin: 0.2rem 0 0; }
 </style>

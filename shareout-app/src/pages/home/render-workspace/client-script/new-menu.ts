@@ -95,7 +95,7 @@ export const workspace_client_new_menu_JS = `  // ===== New menu: describe it to
       + '<p class="wsx-lens__intro" role="status" data-nt-done="1"><b>\\u2713 ' + esc(done) + '</b></p>'
       + '<p class="wsx-lens__intro">' + esc(t('new.keepIntro')) + '</p>'
       + '<div class="wsx-qa-grid">' + dataInTiles(['emailsync', 'drivesync', 'sheetlink'], false) + '</div>'
-      + '<p class="wsx-field__note">' + esc(t('new.keepEasiest')) + ' ' + esc(t('new.keepLaterNote')) + '</p>'
+      + '<p class="wsx-field__note">' + esc(t('new.keepEasiest')) + ' ' + esc(t('new.keepLaterNote')) + ' <a class="wsx-link" href="' + esc(t('new.keepGuideUrl')) + '" target="_blank" rel="noopener" data-nt-guide="1">' + esc(t('guide.stepByStep')) + ' \\u2192</a></p>'
       + '<div class="wsx-cform__foot"><button class="wsx-abtn" type="button" data-nt-later="1">' + esc(t('new.keepLater')) + '</button></div></div>');
     var art = { id: d.artifactId, name: d.name };
     mo.body.querySelector('[data-nt-later]').addEventListener('click', function () { mo.close(); });

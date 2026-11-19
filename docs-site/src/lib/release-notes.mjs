@@ -111,3 +111,73 @@ export function inlineHtml(text, repo = 'https://github.com/getshareout/shareout
 		})
 		.join('');
 }
+
+/** The bold lead of an entry ("**Keep a table up to date by email.** …") without the stars or the final period. */
+export function headline(text) {
+	const m = text.match(/^\*\*([^*]+)\*\*/);
+	return (m ? m[1] : text.split(/(?<=\.)\s/)[0]).trim().replace(/[.:]$/, '');
+}
+
+/**
+ * A stable anchor per entry: the date plus the English headline, so a shared link points at the
+ * same change on What's new and on Novedades. Repeats on one date get -2, -3.
+ */
+export function withAnchors(days) {
+	return days.map((day) => {
+		const seen = new Map();
+		return {
+			...day,
+			entries: day.entries.map((e) => {
+				const slug = headline(e.en)
+					.normalize('NFD')
+					.replace(/[̀-ͯ]/g, '')
+					.toLowerCase()
+					.replace(/[^a-z0-9]+/g, '-')
+					.replace(/^-+|-+$/g, '')
+					.split('-')
+					.reduce((acc, w) => (acc && acc.length + w.length >= 60 ? acc : acc ? `${acc}-${w}` : w), '');
+				const base = `${day.date}-${slug || 'change'}`;
+				const n = (seen.get(base) || 0) + 1;
+				seen.set(base, n);
+				return { ...e, anchor: n > 1 ? `${base}-${n}` : base };
+			}),
+		};
+	});
+}
+
+/** Atom feed of the Release notes in one language. `site` has no trailing slash. */
+export function atomFeed(days, { lang, site, repo }) {
+	const es = lang === 'es';
+	const page = `${site}${es ? '/es' : ''}/whats-new/`;
+	const title = es ? 'ShareOut — Novedades' : 'ShareOut — What’s new';
+	const guideLabel = es ? 'Ver la guía' : 'Read the guide';
+	const entries = withAnchors(days).flatMap((d) =>
+		d.entries.map((e) => {
+			const text = es ? e.es : e.en;
+			const guide = es ? e.guia : e.guide;
+			const html = `<p>${inlineHtml(text, repo)}</p>` + (guide ? `<p><a href="${esc(site + guide)}">${guideLabel} →</a></p>` : '');
+			return [
+				'  <entry>',
+				`    <id>${esc(page + '#' + e.anchor)}</id>`,
+				`    <title>${esc(headline(text))}</title>`,
+				`    <link rel="alternate" href="${esc(page + '#' + e.anchor)}"/>`,
+				`    <updated>${d.date}T12:00:00Z</updated>`,
+				`    <content type="html">${esc(html)}</content>`,
+				'  </entry>',
+			].join('\n');
+		}),
+	);
+	return [
+		'<?xml version="1.0" encoding="utf-8"?>',
+		`<feed xmlns="http://www.w3.org/2005/Atom" xml:lang="${es ? 'es' : 'en'}">`,
+		`  <id>${esc(page)}</id>`,
+		`  <title>${esc(title)}</title>`,
+		`  <link rel="alternate" href="${esc(page)}"/>`,
+		`  <link rel="self" href="${esc(`${site}${es ? '/es' : ''}/whats-new.xml`)}"/>`,
+		`  <updated>${days.length ? days[0].date : '1970-01-01'}T12:00:00Z</updated>`,
+		'  <author><name>ShareOut</name></author>',
+		...entries,
+		'</feed>',
+		'',
+	].join('\n');
+}

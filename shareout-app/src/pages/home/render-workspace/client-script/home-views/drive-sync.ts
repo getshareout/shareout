@@ -40,6 +40,7 @@ export const workspace_client_home_views_driveSync_JS = `  // ===== Sync a datas
       var who = d.connected ? (d.accountEmail ? t('fimp.connectedAs').replace('{email}', d.accountEmail) : t('fimp.connected')) : '';
       var b = dsBody((problem ? '<p class="wsx-cform__err" role="alert">' + esc(problem) + '</p>' : '')
         + '<p class="wsx-lens__intro">' + esc(t('dsync.intro')) + '</p>'
+        + '<p class="wsx-field__note"><a class="wsx-link" href="' + esc(t('dsync.guideUrl')) + '" target="_blank" rel="noopener" data-ds-guide="1">' + esc(t('guide.stepByStep')) + ' \\u2192</a></p>'
         + '<div class="wsx-cn__key"><span><b>' + esc(t('fimp.p.google_drive')) + '</b>' + (who ? ' <span class="wsx-skill__hint">' + esc(who) + '</span>' : '') + '</span><span>'
         + dsBtn('data-ds-pick="1"', t('dsync.pick'), true) + '</span></div>'
         + '<p class="wsx-field__note">' + esc(t('dsync.consentNote')) + '</p>'

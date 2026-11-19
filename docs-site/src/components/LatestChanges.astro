@@ -1,0 +1,26 @@
+---
+// The newest few changes from What's new / Novedades, headline only, each linking to its entry.
+import { headline, loadReleaseNotes, withAnchors } from '../lib/release-notes.mjs';
+
+interface Props { lang: 'en' | 'es'; count?: number }
+const { lang, count = 3 } = Astro.props;
+const es = lang === 'es';
+const page = es ? '/es/whats-new/' : '/whats-new/';
+const fmt = new Intl.DateTimeFormat(es ? 'es-AR' : 'en-US', { day: 'numeric', month: 'short', timeZone: 'UTC' });
+const items = withAnchors(loadReleaseNotes())
+	.flatMap((d) => d.entries.map((e) => ({ date: d.date, anchor: e.anchor, title: headline(es ? e.es : e.en) })))
+	.slice(0, count);
+---
+<ul class="latest-changes">
+	{items.map((i) => (
+		<li><span class="lc-date">{fmt.format(new Date(`${i.date}T12:00:00Z`))}</span> <a href={`${page}#${i.anchor}`}>{i.title}</a></li>
+	))}
+</ul>
+<p class="lc-all"><a href={page}>{es ? 'Ver todas las novedades →' : 'See everything that’s new →'}</a></p>
+
+<style>
+	.latest-changes { list-style: none; padding-left: 0; }
+	.latest-changes li { margin: 0.35rem 0; }
+	.lc-date { display: inline-block; min-width: 4.5rem; color: var(--sl-color-gray-3); font-size: var(--sl-text-sm); }
+	.lc-all { font-size: var(--sl-text-sm); }
+</style>
