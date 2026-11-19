@@ -12,6 +12,11 @@ adds to both (AGENTS.md → Gate contract).
 
 ### 2026-11-19
 
+- **What's new on shareout.site opens the live list.** On ShareOut Cloud, the Changelog link at the bottom of shareout.site — and the short address shareout.site/whats-new — opens this list, in Spanish when your browser is in Spanish.
+  - es: **Novedades en shareout.site abre la lista al día.** En ShareOut Cloud, el link Novedades al pie de shareout.site — y la dirección corta shareout.site/whats-new — abre esta lista, en español si tu navegador está en español.
+  - Guide: /whats-new/
+  - Guía: /es/whats-new/
+  - Integrators: where `MARKETING_ORIGIN` is set, `GET /resources/changelog` and `/whats-new` on the apex answer 302 to the docs What's new (`/es/` for an `es` Accept-Language) instead of proxying the marketing site; without a marketing site they stay 404. (#324)
 - **Find what's new and the how-to guides from inside ShareOut.** Help & support in Home now links to the guides and to What's new, a What's new button sits next to Documentation, and the email update, the Google Drive sync and Table from an Excel file each link to their step-by-step guide — in your language.
   - es: **Encontrá las novedades y las guías desde ShareOut.** Ayuda y soporte en Home ahora tiene links a las guías y a Novedades, hay un botón de Novedades al lado de Documentación, y la actualización por email, la sincronización con Google Drive y Tabla desde un Excel enlazan a su guía paso a paso — en tu idioma.
   - Guide: /everyone/get-help/

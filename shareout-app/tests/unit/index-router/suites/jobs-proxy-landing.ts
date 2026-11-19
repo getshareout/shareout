@@ -110,6 +110,32 @@ describe('index router — jobs, proxy, workspace pages, landing', () => {
     }
   });
 
+  it('the landing\'s What\'s new link and /whats-new open the docs What\'s new, in Spanish for Spanish browsers', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+    try {
+      const env = createEnv(undefined, { MARKETING_ORIGIN: 'marketing.example.com' });
+      for (const path of ['/resources/changelog', '/resources/changelog/', '/whats-new']) {
+        const en = await fetchPath(path, { headers: { 'Accept-Language': 'en-US,en;q=0.9' } }, APEX, env);
+        expect(en.status, path).toBe(302);
+        expect(en.headers.get('Location'), path).toBe('https://docs.shareout.site/whats-new/');
+        expect(en.headers.get('Vary')).toBe('Accept-Language');
+      }
+      const es = await fetchPath('/resources/changelog', { headers: { 'Accept-Language': 'es-AR,es;q=0.9,en;q=0.8' } }, APEX, env);
+      expect(es.headers.get('Location')).toBe('https://docs.shareout.site/es/whats-new/');
+      const none = await fetchPath('/whats-new', undefined, APEX, env);
+      expect(none.headers.get('Location')).toBe('https://docs.shareout.site/whats-new/');
+      // Never fetched from the marketing site.
+      expect(fetchSpy).not.toHaveBeenCalled();
+    } finally {
+      fetchSpy.mockRestore();
+    }
+  });
+
+  it('/whats-new stays a 404 on an instance without a marketing site', async () => {
+    const response = await fetchPath('/whats-new');
+    expect(response.status).toBe(404);
+  });
+
   it('blocks US visitors on the marketing homepage when MARKETING_US_BLOCKED is set', async () => {
     const env = createEnv(undefined, {
       MARKETING_US_BLOCKED: '1',
