@@ -32,6 +32,8 @@ function buildNav(args: RenderArgs, canManage: boolean): NavGroup[] {
     { items: [v('brief', 'Home', 'brief'), v('artifacts', 'Artifacts', 'browse'), v('library', 'AI skills', 'library'), v('schedules', 'Automations', 'recent'), ...(ws && canManage ? [v('crew', 'AI tasks', 'crew')] : []), ...(ws ? [{ ...v('connectors', 'Data', 'plug'), i18n: 'nav.data' }, v('knowledge', 'Knowledge', 'knowledge'), v('catalog', 'Catalog', 'catalog')] : [])] },
     { items: ws && canManage ? [v('admin', 'Admin', 'admin')] : [] },
   ];
+  // Direct messages: every internal member of the workspace, right under Home.
+  if (ws && args.workspaceRole) groups[0]!.items.splice(1, 0, v('messages', 'Messages', 'messages'));
   return groups.filter(g => g.items.length);
 }
 
@@ -248,6 +250,7 @@ export function buildWorkspaceBody(args: RenderArgs): string {
               <div class="wsx-adm__main" id="wsxAdminMount"><div class="wsx-empty" data-i18n="common.loading">Loading…</div></div>
             </div>
           </div>
+          <div class="wsx__view" data-view="messages"><div class="wsx-dm" id="wsxMsgMount"><div class="wsx-empty" data-i18n="common.loading">Loading…</div></div></div>
           <div class="wsx__view" data-view="agent">
             <h2 class="wsx__viewtitle" id="wsxAgentTitle" data-i18n="view.results">Results</h2>
             <div id="wsxAgentMount"></div>

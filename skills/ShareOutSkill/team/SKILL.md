@@ -1,6 +1,6 @@
 ---
 name: "shareout-workspace-skill"
-description: "Workspace administration overlay for ShareOut. Load after the base skill when the user asks to manage workspace members and roles, internal workspace visibility, subdomains, membership policy, publish governance, workspace connectors, the Home assistant, activity feed, admin portal and Run Inspector, skill marketplace, support workbench, file inbox, Workspace Knowledge, or external sharing with clients. On self-host / OSS there are no paid plan gates — use workspace roles, not Pro/Teams language."
+description: "Workspace administration overlay for ShareOut. Load after the base skill when the user asks to manage workspace members and roles, internal workspace visibility, subdomains, membership policy, publish governance, workspace connectors, the Home assistant, activity feed, admin portal and Run Inspector, skill marketplace, support workbench, file inbox, Workspace Knowledge, direct messages between members, or external sharing with clients. On self-host / OSS there are no paid plan gates — use workspace roles, not Pro/Teams language."
 ---
 
 # ShareOut Workspace Skill
@@ -147,6 +147,7 @@ One artifact owns a table and opts it into the workspace; others read/write with
 | --- | --- |
 | Members | `GET/POST /v1/workspaces/{id}/members` · [admin-portal.md](admin-portal.md) |
 | Bulk invites | `POST /v1/workspaces/{id}/members/invite` |
+| Direct messages between members | `GET/POST /v1/workspaces/{id}/messages` · [messages.md](messages.md) |
 | Pending invites | `GET/DELETE /v1/workspaces/{id}/invites` |
 | Artifact governance | `GET /v1/workspaces/{id}/admin/artifacts` · [admin-portal.md](admin-portal.md) |
 | Run Inspector | `GET /v1/workspaces/{id}/runs` · [admin-portal.md](admin-portal.md#run-inspector) |

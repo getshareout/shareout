@@ -1,4 +1,4 @@
-/** Notifications bell + right-docked panel: publish approvals (actionable) + activity that needs you. */
+/** Notifications bell + right-docked panel: publish approvals (actionable), unread direct messages, and activity that needs you. */
 export const workspace_client_notifications_JS = `
   // ===== notifications: bell + panel (approvals + needs-you activity) =====
   (function () {
@@ -22,7 +22,10 @@ export const workspace_client_notifications_JS = `
     function decidable() { return approvals.filter(function (a) { return a.viewer_can_decide; }).length; }
     function openActions() { return actions.filter(function (a) { return !a.resolved; }).length; }
     function overdueActions() { return actions.filter(function (a) { return !a.resolved && a.due_at && Date.parse(a.due_at) < Date.now(); }).length; }
-    function total() { return decidable() + (needsViewed ? 0 : needs.length) + openActions(); }
+    // Unread direct messages (messages-badge.ts): the same count as the rail badge.
+    function msgCount() { return wsId && typeof msgFetchUnread === 'function' ? msgUnread.n : 0; }
+    function msgList() { return msgCount() ? msgUnread.threads : []; }
+    function total() { return decidable() + (needsViewed ? 0 : needs.length) + openActions() + msgCount(); }
     function setBadge() {
       var n = total();
       if (n > 0) { badge.hidden = false; badge.textContent = n > 99 ? '99+' : String(n); }
@@ -99,11 +102,22 @@ export const workspace_client_notifications_JS = `
         + foot + '</div>';
     }
 
+    function msgCard(th) {
+      var n = th.unread || 0;
+      return '<a class="wsx-ncard" href="#l/messages/' + encodeURIComponent(th.with.id) + '" data-msg-with="' + esc(th.with.id) + '">'
+        + msgAv(th.with, 'wsx-ncard__ic')
+        + '<span class="wsx-ncard__main"><span class="wsx-ncard__top">' + esc(msgName(th.with)) + '</span><span class="wsx-ncard__sum">' + esc(th.last ? th.last.body : '') + '</span>'
+        + '<span class="wsx-ncard__time">' + (th.last ? timeAgo(Date.parse(th.last.at)) : '') + (n > 1 ? ' \\u00B7 ' + esc(t('msg.newN').replace('{n}', String(n))) : '') + '</span></span></a>';
+    }
+
     function render() {
       if (tab === 'seen') { renderSeen(); return; }
-      var html = '';
+      var html = '', msgs = msgList();
       if (approvals.length) {
         html += '<div class="wsx__notif-sec">' + esc(t('notif.approvals')) + '</div>' + approvals.map(apprCard).join('');
+      }
+      if (msgs.length) {
+        html += '<div class="wsx__notif-sec">' + esc(t('nav.messages')) + '</div>' + msgs.map(msgCard).join('');
       }
       if (actions.length) {
         var od = overdueActions();
@@ -113,7 +127,7 @@ export const workspace_client_notifications_JS = `
       if (needs.length) {
         html += '<div class="wsx__notif-sec">' + esc(t('notif.recent')) + '</div>' + needs.map(needCard).join('');
       }
-      if (!approvals.length && !actions.length && !needs.length) {
+      if (!approvals.length && !actions.length && !needs.length && !msgs.length) {
         html = '<div class="wsx-notif-empty">' + svgBell + '<div class="wsx-notif-empty__t">' + esc(t('notif.emptyTitle')) + '</div><div class="wsx-notif-empty__s">' + esc(t('notif.emptySub')) + '</div></div>';
       }
       body.innerHTML = html;
@@ -159,6 +173,7 @@ export const workspace_client_notifications_JS = `
             .catch(function () { approvals = []; })
         );
       } else { approvals = []; }
+      if (wsId && typeof msgFetchUnread === 'function') jobs.push(msgFetchUnread());
       return Promise.all(jobs).then(function () { loaded = true; setBadge(); if (!panel.hidden) render(); });
     }
 
@@ -192,7 +207,7 @@ export const workspace_client_notifications_JS = `
     // runs behind, and a failure puts the item back where it was with an error toast.
     function takeOut(arr, id) { var at = -1, it = null; var rest = arr.filter(function (x, i) { if (x.id === id) { at = i; it = x; return false; } return true; }); return { rest: rest, at: at, it: it }; }
     function putBack(arr, id, at, it) { if (it && !arr.some(function (x) { return x.id === id; })) arr.splice(at < 0 ? arr.length : at, 0, it); }
-    function afterChange() { setBadge(); if (readAll) readAll.hidden = !needs.length; if (!approvals.length && !actions.length && !needs.length) render(); }
+    function afterChange() { setBadge(); if (readAll) readAll.hidden = !needs.length; if (!approvals.length && !actions.length && !needs.length && !msgList().length) render(); }
     function post(url, method, payload) {
       return fetch(url, { method: method, credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload) });
     }
@@ -262,6 +277,8 @@ export const workspace_client_notifications_JS = `
     }
 
     body.addEventListener('click', function (e) {
+      var mw = e.target.closest('[data-msg-with]');
+      if (mw) { e.preventDefault(); close(); msgGo(mw.getAttribute('data-msg-with')); return; }
       var dn = e.target.closest('[data-done]');
       if (dn) { e.preventDefault(); e.stopPropagation(); resolveAction(dn, true); return; }
       var ro = e.target.closest('[data-reopen]');
@@ -308,6 +325,9 @@ export const workspace_client_notifications_JS = `
         error: t('evt.dismissFailed'),
       });
     });
+
+    // Messages read or arrived (Messages view, polls): repaint the count and the open panel.
+    document.addEventListener('wsx:msg-unread', function () { setBadge(); if (!panel.hidden && tab === 'unread') render(); });
 
     // Prime the badge on load so the count shows without opening the panel.
     load(false, true);

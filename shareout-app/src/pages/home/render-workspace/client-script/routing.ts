@@ -15,6 +15,8 @@ export const workspace_client_routing_JS = `  // ===== deep-link routing (hash) 
     if (lens === 'schedules' && schedDetail) return 'l/schedules/' + encodeURIComponent(schedDetail);
     var crewId = lens === 'crew' && wsxChunkGet('crew', 'crewDetail');
     if (crewId) return 'l/crew/' + encodeURIComponent(crewId);
+    var msgId = lens === 'messages' && wsxChunkGet('messages', 'msgWith');
+    if (msgId) return 'l/messages/' + encodeURIComponent(msgId);
     return 'l/' + lens;
   }
   function syncHash() {
@@ -58,6 +60,8 @@ export const workspace_client_routing_JS = `  // ===== deep-link routing (hash) 
       openView(lens);
       if (lens === 'catalog' && typeof catRoute === 'function') catRoute(decodeURIComponent(sub));
       if (lens === 'knowledge' && typeof knRoute === 'function') knRoute(decodeURIComponent(sub));
+      // #l/messages/<userId> — the conversation with that person (the Telegram notice links here).
+      if (lens === 'messages' && (sub || wsxChunkGet('messages', 'msgWith'))) msgRoute(decodeURIComponent(sub));
     } finally { routeApplying = false; }
   }
   window.addEventListener('popstate', function () { applyHash(); });

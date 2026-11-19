@@ -27,6 +27,7 @@ import { MCP_CONNECTORS_COPY } from './copy/mcp-connectors';
 import { MODALS_COPY } from './copy/modals';
 import { NEW_MENU_COPY } from './copy/new-menu';
 import { NOTIF_COPY } from './copy/notifications';
+import { MESSAGES_COPY } from './copy/messages';
 import { REVIEW_COPY } from './copy/review';
 import { PAGES_COPY } from './copy/pages';
 import { ONBOARDING_COPY } from './copy/onboarding';
@@ -65,6 +66,7 @@ const COPY_MODULES: HomeLocaleCopy[] = [
   ONBOARDING_COPY,
   MODALS_COPY,
   NOTIF_COPY,
+  MESSAGES_COPY,
   AGENT_COPY,
   TIME_COPY,
   STUDIO_COPY,

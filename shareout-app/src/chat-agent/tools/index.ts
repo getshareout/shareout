@@ -26,6 +26,7 @@ import { presentArtifactTool } from './present-artifact';
 import { listSkillsTool, readSkillTool, saveSkillTool } from './skills';
 import { reportProblemTool } from './report-problem';
 import { listMembersTool, inviteMembersTool } from './members';
+import { sendMessageTool, readMessagesTool } from './messages';
 import { findPassagesTool } from './passages';
 import { listVersionsTool, listCommentsTool, restoreVersionTool, approveVersionTool, resolveCommentTool, assignCommentTool } from './history';
 
@@ -85,6 +86,8 @@ export const ACCOUNT_TOOLS: AccountTool[] = [
   reportProblemTool,
   listMembersTool,
   inviteMembersTool,
+  sendMessageTool,
+  readMessagesTool,
 ];
 
 // Capability-gated tool groups. A surface opts into each via Capabilities
@@ -121,7 +124,7 @@ const WRITE_TOOLS = new Set([
   'manage_alert', 'manage_job', 'share_artifact', 'unshare_artifact', 'set_page_visibility', 'ask_crew', 'edit_page',
   'add_table_row', 'update_table_row', 'delete_table_row', 'set_json_value', 'set_client_notes',
   'watch_metric', 'present_artifact', 'report_problem', 'save_skill', 'invite_members', 'catalog_update',
-  'restore_version', 'approve_version', 'resolve_comment', 'assign_comment',
+  'restore_version', 'approve_version', 'resolve_comment', 'assign_comment', 'send_message',
 ]);
 
 /** The tool set for a turn: always-on account tools plus capability-gated groups. */

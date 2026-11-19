@@ -58,6 +58,9 @@ const RATE_LIMITS = {
   adminBridgeAsk: { limit: 30, windowSeconds: 3600 },
   // "Ask an admin" from a refused action; per-reason dedupe sits in the handler.
   adminRequest: { limit: 20, windowSeconds: 3600 },
+  // Direct messages between workspace members, per sender across every surface (Home, assistant,
+  // MCP, API): roomy for a person typing, a ceiling for an assistant stuck in a loop.
+  directMessage: { limit: 120, windowSeconds: 3600 },
   // MCP connector OAuth. Registration is per IP but generous: hosted AI apps register
   // one client per connection from a handful of shared egress IPs. Token calls are
   // per client (one connection), MCP calls per user.

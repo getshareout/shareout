@@ -117,7 +117,7 @@ function systemPrompt(platform: PlatformId, caps: Capabilities, selectedWorkspac
   // Messaging apps carry the assistant for ShareOut only — WhatsApp's terms forbid offering a
   // general-purpose AI assistant on its business platform.
   const topicLine = platform === 'telegram' || platform === 'whatsapp'
-    ? 'Stay on ShareOut: this workspace’s pages, data, knowledge, sharing, schedules and alerts. For anything unrelated (general knowledge, writing, coding, chit-chat), say in one sentence that you only help with ShareOut here.'
+    ? 'Stay on ShareOut: this workspace’s pages, data, knowledge, sharing, schedules, alerts and messages with teammates. For anything unrelated (general knowledge, writing, coding, chit-chat), say in one sentence that you only help with ShareOut here.'
     : null;
   const citeLine = 'When the user asks where something is covered or how a procedure, rule or step works, call find_passages first. Answer with the page (and sub-page) name, the section heading or number, a short quoted excerpt, and that passage’s `url` so they land on the right section. Never cite a passage the tool did not return.';
   const dataLine = caps.canQueryConnections

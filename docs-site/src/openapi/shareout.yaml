@@ -45,6 +45,8 @@ tags:
     description: Scheduled and event-driven tasks.
   - name: Folders
     description: Organize artifacts into personal and Team Space folders.
+  - name: Messages
+    description: Direct messages between internal members of a workspace, one to one.
   - name: Knowledge
     description: Per-workspace learned knowledge — notes, search, entities.
   - name: Tokens
@@ -3528,6 +3530,212 @@ paths:
           description: Moved
         "404":
           $ref: "#/components/responses/NotFound"
+  /v1/workspaces/{workspaceId}/messages:
+    parameters:
+      - $ref: "#/components/parameters/WorkspaceId"
+    get:
+      tags: [Messages]
+      summary: List your conversations
+      description: Your one-to-one conversations in the workspace, most recent first, each with the other person, the last message and how many are unread. Internal members only.
+      operationId: listDirectMessageThreads
+      parameters:
+        - name: unread
+          in: query
+          description: "`1` returns only conversations with unread messages."
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            maximum: 100
+      responses:
+        "200":
+          description: Conversations and the total unread
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  threads:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/DirectMessageThread"
+                  unread:
+                    type: integer
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    post:
+      tags: [Messages]
+      summary: Send a direct message
+      description: "Sends a message, as you, to another internal member of the workspace. `to` takes their name, email or user id; a name that matches several people answers 409 RECIPIENT_AMBIGUOUS with `candidates`. With a personal token the message is marked as written through your assistant (`sentVia: api`). The recipient sees it in the Messages menu and the bell, and on their linked Telegram. Workspace agent tokens are refused."
+      operationId: sendDirectMessage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [to, text]
+              properties:
+                to:
+                  type: string
+                  description: Name, email or user id of the recipient.
+                text:
+                  type: string
+                  maxLength: 4000
+                artifact_id:
+                  type: string
+                  description: Optional page the message is about; you must be able to open it, and it must be in this workspace.
+      responses:
+        "201":
+          description: Sent
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    $ref: "#/components/schemas/DirectMessage"
+                  thread_id:
+                    type: string
+                  recipient:
+                    $ref: "#/components/schemas/DirectMessagePerson"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+  /v1/workspaces/{workspaceId}/messages/unread:
+    parameters:
+      - $ref: "#/components/parameters/WorkspaceId"
+    get:
+      tags: [Messages]
+      summary: Count unread messages
+      operationId: countUnreadDirectMessages
+      responses:
+        "200":
+          description: Unread total
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  unread:
+                    type: integer
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /v1/workspaces/{workspaceId}/messages/people:
+    parameters:
+      - $ref: "#/components/parameters/WorkspaceId"
+    get:
+      tags: [Messages]
+      summary: People you can message
+      description: Internal, active members of the workspace other than you.
+      operationId: listMessageablePeople
+      responses:
+        "200":
+          description: People
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  people:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/DirectMessagePerson"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /v1/workspaces/{workspaceId}/messages/with/{userId}:
+    parameters:
+      - $ref: "#/components/parameters/WorkspaceId"
+      - name: userId
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [Messages]
+      summary: Read a conversation
+      description: Messages with one person, newest first. With no conversation yet, `thread_id` is null and `messages` empty. Reading does not mark it read; POST `/read` does.
+      operationId: getDirectMessageThread
+      parameters:
+        - name: before
+          in: query
+          description: ISO timestamp; messages created before it (paging back).
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            maximum: 100
+      responses:
+        "200":
+          description: The conversation
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  thread_id:
+                    type: [string, "null"]
+                  with:
+                    $ref: "#/components/schemas/DirectMessagePerson"
+                  messages:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/DirectMessage"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /v1/workspaces/{workspaceId}/messages/with/{userId}/read:
+    parameters:
+      - $ref: "#/components/parameters/WorkspaceId"
+      - name: userId
+        in: path
+        required: true
+        schema:
+          type: string
+    post:
+      tags: [Messages]
+      summary: Mark a conversation read
+      description: Reads up to `up_to`, the createdAt of the newest message you showed, so one that arrived after it stays unread. It lands on the newest message at or before `up_to` and never moves read state back. Without a body, everything there is now.
+      operationId: markDirectMessageThreadRead
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                up_to:
+                  type: string
+                  format: date-time
+      responses:
+        "200":
+          description: Marked read
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  read_up_to:
+                    type: [string, "null"]
+                    format: date-time
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
   /v1/workspaces/{workspaceId}/folders:
     parameters:
       - $ref: "#/components/parameters/WorkspaceId"
@@ -9239,6 +9447,68 @@ components:
           schema:
             $ref: "#/components/schemas/Error"
   schemas:
+    DirectMessagePerson:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: [string, "null"]
+        email:
+          type: [string, "null"]
+        picture:
+          type: [string, "null"]
+    DirectMessage:
+      type: object
+      properties:
+        id:
+          type: string
+        body:
+          type: string
+        sentByMe:
+          type: boolean
+        senderId:
+          type: [string, "null"]
+        sentVia:
+          type: string
+          enum: [web, api, mcp, assistant]
+          description: Where it was written; anything but `web` was written through the sender's assistant.
+        artifact:
+          type: [object, "null"]
+          properties:
+            id:
+              type: string
+            name:
+              type: string
+            slug:
+              type: [string, "null"]
+        createdAt:
+          type: string
+          format: date-time
+    DirectMessageThread:
+      type: object
+      properties:
+        id:
+          type: string
+        with:
+          $ref: "#/components/schemas/DirectMessagePerson"
+        last:
+          type: [object, "null"]
+          properties:
+            body:
+              type: string
+            sentByMe:
+              type: boolean
+            sentVia:
+              type: string
+            at:
+              type: string
+              format: date-time
+        unread:
+          type: integer
+        lastMessageAt:
+          type: string
+          format: date-time
     VerifyRequest:
       type: object
       properties:

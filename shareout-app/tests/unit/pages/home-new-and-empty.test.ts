@@ -90,9 +90,9 @@ describe('Rail structure', () => {
     expect(h).not.toContain('wsx__railgroup-title');
   });
 
-  it('member: adds Data, Knowledge and Catalog; Tables/Alerts stay reachable as chips', () => {
+  it('member: adds Messages, Data, Knowledge and Catalog; Tables/Alerts stay reachable as chips', () => {
     const h = rail({ workspaceId: 'wsp_1', workspaceRole: 'member' });
-    expect(visible(h)).toEqual(['brief', 'artifacts', 'library', 'schedules', 'connectors', 'knowledge', 'catalog']);
+    expect(visible(h)).toEqual(['brief', 'messages', 'artifacts', 'library', 'schedules', 'connectors', 'knowledge', 'catalog']);
     expect(hidden(h)).toEqual(expect.arrayContaining(['alerts', 'datasets']));
     expect(h).not.toContain('data-lens="crew"');
     expect(h).not.toContain('data-sib="knowledge"');
@@ -101,9 +101,20 @@ describe('Rail structure', () => {
 
   it('admin: adds AI tasks as its own item, and Admin', () => {
     const h = rail({ workspaceId: 'wsp_1', workspaceRole: 'admin' });
-    expect(visible(h)).toEqual(['brief', 'artifacts', 'library', 'schedules', 'crew', 'connectors', 'knowledge', 'catalog', 'admin']);
+    expect(visible(h)).toEqual(['brief', 'messages', 'artifacts', 'library', 'schedules', 'crew', 'connectors', 'knowledge', 'catalog', 'admin']);
     expect(hidden(h)).not.toContain('crew');
     expect(h).not.toContain('data-sib="crew"');
+  });
+
+  it('Messages: in a workspace for every internal member, never in the personal space or for outsiders', () => {
+    for (const role of ['owner', 'admin', 'member']) {
+      const h = rail({ workspaceId: 'wsp_1', workspaceRole: role });
+      expect(visible(h)).toContain('messages');
+      expect(h).toContain('data-i18n="nav.messages"');
+    }
+    expect(rail({})).not.toContain('data-lens="messages"');
+    expect(rail({ workspaceId: 'wsp_1', workspaceRole: null })).not.toContain('data-lens="messages"');
+    expect(rail({ workspace: 'wsp_1', workspaceRole: null })).not.toContain('data-lens="messages"');
   });
 
   it('has no separate Create with AI button', () => {

@@ -32,6 +32,7 @@ import { executeReviewAction } from './review-actions';
 import { upsertShareeContextFile } from '../workspace-context';
 import { isKnownShareeContextUpsertError, logAgentToolFailure, userFacingClientNotesError } from './errors';
 import { updateCatalogEntry, type CatalogEntryEdit } from '../catalog/edit';
+import { sendAndNotify } from '../messages/send';
 
 export type PendingAction =
   | { kind: 'alert_pause' | 'alert_resume' | 'alert_delete'; ruleId: string; label: string }
@@ -56,7 +57,8 @@ export type PendingAction =
   | { kind: 'watch_metric'; artifactId: string; artifactName: string; spec: Record<string, unknown> }
   | { kind: 'present_artifact'; artifactId: string; artifactName: string }
   | { kind: 'client_notes'; workspaceId: string; clientId: string; clientName: string; note: string; content: string }
-  | { kind: 'catalog_edit'; workspaceId: string; entryId: string; entryTitle: string; edit: CatalogEntryEdit; certified: boolean };
+  | { kind: 'catalog_edit'; workspaceId: string; entryId: string; entryTitle: string; edit: CatalogEntryEdit; certified: boolean }
+  | { kind: 'message_send'; workspaceId: string; recipientId: string; recipientName: string; text: string; artifactId?: string; artifactName?: string };
 
 // Staged-edit diff for plain-text prompts, trimmed so it can't blow past Telegram's message limit.
 function diffText(diff: string[], max = 2000): string {
@@ -137,6 +139,7 @@ export function describeActionRich(a: PendingAction, locale: Locale = 'en'): Act
     case 'watch_metric': return { kind: a.kind, title: 'Watch a metric', subject: a.artifactName, lines: kv(a.spec) };
     case 'present_artifact': return { kind: a.kind, title: 'Make a deck', subject: a.artifactName, detail: 'Generates a private slides artifact from this page with AI.' };
     case 'client_notes': return { kind: a.kind, title: `Save notes on ${a.clientName}`, subject: a.note, detail: 'Replaces the file. Every workspace member’s assistant reads these notes.', lines: [a.content.slice(0, 300) + (a.content.length > 300 ? '…' : '')] };
+    case 'message_send': return { kind: a.kind, title: 'Send a message', subject: a.recipientName, detail: `Sent as you, marked as written through your assistant${a.artifactName ? ` · about “${a.artifactName}”` : ''}.`, lines: [a.text.length > 600 ? a.text.slice(0, 600) + '…' : a.text] };
     case 'catalog_edit': return { kind: a.kind, title: 'Edit catalog entry', subject: a.entryTitle, detail: a.certified ? 'It is certified: after this edit it shows as changed since certification.' : undefined, lines: catalogEditLines(a.edit, '(removed)') };
   }
 }
@@ -179,6 +182,7 @@ function describeActionRichEs(a: PendingAction): ActionCard {
     case 'watch_metric': return { kind: a.kind, title: 'Vigilar una métrica', subject: a.artifactName, lines: kv(a.spec) };
     case 'present_artifact': return { kind: a.kind, title: 'Armar una presentación', subject: a.artifactName, detail: 'Genera con IA una presentación privada a partir de este artefacto.' };
     case 'client_notes': return { kind: a.kind, title: `Guardar notas sobre ${a.clientName}`, subject: a.note, detail: 'Reemplaza el archivo. El asistente de todos los miembros del espacio lee estas notas.', lines: [a.content.slice(0, 300) + (a.content.length > 300 ? '…' : '')] };
+    case 'message_send': return { kind: a.kind, title: 'Mandar un mensaje', subject: a.recipientName, detail: `Sale a tu nombre, marcado como escrito con tu asistente${a.artifactName ? ` · sobre “${a.artifactName}”` : ''}.`, lines: [a.text.length > 600 ? a.text.slice(0, 600) + '…' : a.text] };
     case 'catalog_edit': return { kind: a.kind, title: 'Editar entrada del catálogo', subject: a.entryTitle, detail: a.certified ? 'Está certificada: después de este cambio figura como modificada desde la certificación.' : undefined, lines: catalogEditLines(a.edit, '(se quita)') };
   }
 }
@@ -230,6 +234,8 @@ function describeActionEs(a: PendingAction): string {
     case 'present_artifact': return `¿Genero con IA una presentación privada a partir de “${a.artifactName}”?`;
     case 'client_notes':
       return `¿Guardo estas notas de “${a.note}” sobre ${a.clientName}? Reemplazan el archivo y las lee el asistente de todo el espacio.\n\n${a.content.slice(0, 600)}${a.content.length > 600 ? '…' : ''}`;
+    case 'message_send':
+      return `¿Le mando este mensaje a ${a.recipientName}?\n\n“${a.text}”${a.artifactName ? `\n\nSobre “${a.artifactName}”` : ''}`;
     case 'catalog_edit':
       return `¿Edito la entrada del catálogo “${a.entryTitle}”?${a.certified ? ' Está certificada: va a figurar como modificada desde la certificación.' : ''}\n\n${catalogEditLines(a.edit, '(se quita)').join('\n')}`;
   }
@@ -415,6 +421,8 @@ export function describeAction(a: PendingAction, locale: Locale = 'en'): string 
     case 'present_artifact': return `Generate a private slides deck from “${a.artifactName}” with AI?`;
     case 'client_notes':
       return `Save these notes (“${a.note}”) on ${a.clientName}? They replace the file and every workspace member’s assistant reads them.\n\n${a.content.slice(0, 600)}${a.content.length > 600 ? '…' : ''}`;
+    case 'message_send':
+      return `Send this message to ${a.recipientName}?\n\n“${a.text}”${a.artifactName ? `\n\nAbout “${a.artifactName}”` : ''}`;
     case 'catalog_edit':
       return `Edit the catalog entry “${a.entryTitle}”?${a.certified ? ' It is certified: it will show as changed since certification.' : ''}\n\n${catalogEditLines(a.edit, '(removed)').join('\n')}`;
   }
@@ -563,7 +571,19 @@ export async function executeAction(env: Env, userId: string, a: PendingAction, 
       return await executeClientNotes(env, userId, a);
     case 'catalog_edit':
       return await executeCatalogEdit(env, userId, a);
+    case 'message_send':
+      return await executeMessageSend(env, userId, a, locale);
   }
+}
+
+async function executeMessageSend(env: Env, userId: string, a: Extract<PendingAction, { kind: 'message_send' }>, locale: Locale): Promise<string> {
+  // sendAndNotify re-checks both people are internal members, as the Messages menu does.
+  const sent = await sendAndNotify(env, {
+    workspaceId: a.workspaceId, senderId: userId, recipientId: a.recipientId, body: a.text,
+    artifactId: a.artifactId ?? null, via: 'assistant',
+  });
+  if (!sent.ok) return locale === 'es' ? `No se pudo mandar: ${sent.message}` : `Couldn’t send it: ${sent.message}`;
+  return locale === 'es' ? `Listo — le mandé el mensaje a ${a.recipientName}.` : `Done — message sent to ${a.recipientName}.`;
 }
 
 async function executeCatalogEdit(env: Env, userId: string, a: Extract<PendingAction, { kind: 'catalog_edit' }>): Promise<string> {

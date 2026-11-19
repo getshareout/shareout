@@ -5,6 +5,7 @@ export const workspace_client_home_views_lensRouting_JS = `  var lenses = ws.que
   function openView(key) {
     lenses.forEach(function (x) { x.classList.toggle('is-parent', !!LENS_PARENT[key] && x.getAttribute('data-lens') === LENS_PARENT[key]); });
     if (key !== 'knowledge' && typeof knStopPoll === 'function') knStopPoll();
+    if (key !== 'messages' && typeof msgStopPoll === 'function') msgStopPoll();
     activateTab('home'); show(key === 'brief' ? 'brief' : key);
     if (key === 'artifacts') loadArtifacts();
     else if (key === 'assets' && !loaded.assets) { loaded.assets = 1; loadAssets(); }
@@ -16,6 +17,7 @@ export const workspace_client_home_views_lensRouting_JS = `  var lenses = ws.que
     else if (key === 'library' && !loaded.library) { loaded.library = 1; loadLibrary(); }
     else if (key === 'connectors' && !loaded.connectors) { loaded.connectors = 1; loadConnectors(); }
     else if (key === 'connect') loadConnect();
+    else if (key === 'messages') loadMessages();
     else if (key === 'catalog' && !loaded.catalog) { loaded.catalog = 1; loadCatalog(); }
     else if (key === 'knowledge' && !loaded.knowledge) { loaded.knowledge = 1; loadKnowledge(); }
     else if (key === 'admin' && (!loaded.admin || adFocus)) { loaded.admin = 1; loadAdmin(); }
@@ -30,6 +32,7 @@ export const workspace_client_home_views_lensRouting_JS = `  var lenses = ws.que
       var key = b.getAttribute('data-lens');
       if (key === 'schedules' && schedDetail) schedRoute('');
       if (key === 'crew' && wsxChunkGet('crew', 'crewDetail')) crewRoute('');
+      if (key === 'messages' && wsxChunkGet('messages', 'msgWith')) msgRoute('');
       openView(key);
     });
   });

@@ -9,6 +9,7 @@ import { routeWorkspaceInvoices } from './workspace-invoices';
 import { routeWorkspaceSummary } from './workspace-summary';
 import { routeWorkspaceBillingProfile } from './workspace-billing-profile';
 import { routeWorkspaceMembers } from './workspace-members-routes';
+import { routeWorkspaceMessages } from './workspace-messages';
 import { routeWorkspaceConnections } from './workspace-connections-routes';
 import { routeWorkspaceOps } from './workspace-ops-routes';
 import { routeWorkspaceAdminArtifacts } from './workspace-admin-artifacts-routes';
@@ -86,6 +87,7 @@ export async function routeWorkspaceApi(ctx: FetchContext): Promise<Response | n
     (await routeWorkspaceSummary(ctx)) ??
     (await routeWorkspaceBillingProfile(ctx)) ??
     (await routeWorkspaceMembers(ctx)) ??
+    (await routeWorkspaceMessages(ctx)) ??
     (await routeWorkspaceFolders(ctx)) ??
     (await routeWorkspaceVendorPackages(ctx)) ??
     (await routeWorkspaceOps(ctx)) ??

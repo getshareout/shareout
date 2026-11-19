@@ -42,6 +42,7 @@ import { workspace_client_home_views_driveSync_JS } from './home-views/drive-syn
 import { workspace_client_home_views_sheetLinkSync_JS } from './home-views/sheet-link-sync';
 import { workspace_client_home_views_emailSync_JS } from './home-views/email-sync';
 import { workspace_client_share_dialog_JS } from './share-popover';
+import { workspace_client_home_views_messages_JS } from './home-views/messages';
 
 interface ChunkDef { src: string; exports: string[]; soft?: string[]; vars?: string[] }
 
@@ -78,6 +79,7 @@ export const LAZY_CHUNKS: Record<string, ChunkDef> = {
   sheetlink: { src: workspace_client_home_views_autoDetailShared_JS + workspace_client_home_views_sheetLinkSync_JS, exports: ['openSheetLinkSync'] },
   emailsync: { src: workspace_client_home_views_emailSync_JS, exports: ['openEmailSync'] },
   share: { src: workspace_client_share_dialog_JS, exports: ['wsxOpenShare'] },
+  messages: { src: workspace_client_home_views_messages_JS, exports: ['loadMessages', 'msgRoute'], soft: ['msgStopPoll'], vars: ['msgWith'] },
 };
 
 export const lazyChunkPath = (name: string): string => `/sdk/home-lens-${name}.js`;
