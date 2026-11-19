@@ -4,7 +4,7 @@ import { isAuthUser, requireTokenOrSession } from '../helpers/auth-guard';
 import { json } from '../../workspaces/json-response';
 import { getInternalWorkspaceRole } from '../../workspaces/roles';
 import {
-  findThread, listMessageablePeople, listMessages, listThreads, markThreadRead, resolveRecipient, unreadCount,
+  findThread, isIsoTimestamp, listMessageablePeople, listMessages, listThreads, markThreadRead, resolveRecipient, unreadCount,
   type MessageError,
 } from '../../messages/store';
 import { sendAndNotify } from '../../messages/send';
@@ -17,7 +17,7 @@ import { sendAndNotify } from '../../messages/send';
 //   GET  /v1/workspaces/{ws}/messages/unread           { unread } for a badge
 //   GET  /v1/workspaces/{ws}/messages/people           who you can write to
 //   GET  /v1/workspaces/{ws}/messages/with/{userId}    one conversation (?before, ?limit)
-//   POST /v1/workspaces/{ws}/messages/with/{userId}/read   mark it read
+//   POST /v1/workspaces/{ws}/messages/with/{userId}/read   mark it read up to {up_to?} (the newest createdAt shown)
 
 const errorJson = (e: MessageError) =>
   new Response(JSON.stringify({ success: false, error: e.message, code: e.code, ...(e.candidates ? { candidates: e.candidates } : {}) }), {
@@ -87,9 +87,21 @@ async function handle(ctx: FetchContext, user: AuthUser, workspaceId: string, su
   if (withMatch) {
     const otherId = decodeURIComponent(withMatch[1]!);
     if (withMatch[2] && request.method === 'POST') {
+      // up_to: the createdAt of the newest message the reader was shown, so one that arrived after
+      // it stays unread. Without it, everything there is now.
+      let upTo: string | undefined;
+      const raw = await request.text();
+      if (raw.trim()) {
+        let body: { up_to?: unknown };
+        try { body = JSON.parse(raw); } catch { return json({ error: 'Body must be JSON: {"up_to": "<createdAt>"}', code: 'INVALID_JSON' }, 400); }
+        if (body?.up_to != null) {
+          if (!isIsoTimestamp(body.up_to)) return json({ error: 'up_to must be a message createdAt (ISO 8601, UTC).', code: 'VALIDATION_ERROR' }, 400);
+          upTo = body.up_to;
+        }
+      }
       const thread = await findThread(env, workspaceId, user.id, { withUserId: otherId });
-      if (thread) await markThreadRead(env, thread.id, user.id);
-      return json({ success: true });
+      const readUpTo = thread ? await markThreadRead(env, thread.id, user.id, upTo) : null;
+      return json({ success: true, read_up_to: readUpTo });
     }
     if (!withMatch[2] && request.method === 'GET') {
       const thread = await findThread(env, workspaceId, user.id, { withUserId: otherId });

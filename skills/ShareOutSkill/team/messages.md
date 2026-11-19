@@ -31,7 +31,7 @@ POST /v1/workspaces/{workspaceId}/messages                  # send {to, text, ar
 GET  /v1/workspaces/{workspaceId}/messages/unread           # { unread }
 GET  /v1/workspaces/{workspaceId}/messages/people           # who you can write to
 GET  /v1/workspaces/{workspaceId}/messages/with/{userId}    # one conversation, newest first (?before=<ISO>, ?limit)
-POST /v1/workspaces/{workspaceId}/messages/with/{userId}/read
+POST /v1/workspaces/{workspaceId}/messages/with/{userId}/read   # {up_to?}: the newest createdAt you showed
 ```
 
 ### Send
@@ -66,4 +66,4 @@ curl -X POST "$SHAREOUT/v1/workspaces/$WS/messages" \
   "last": { "body": "…", "sentByMe": false, "sentVia": "web", "at": "…" }, "unread": 2, "lastMessageAt": "…" }
 ```
 
-Reading a conversation does not mark it read; `POST …/with/{userId}/read` does (Home does it when the conversation opens; `read_messages` does it for the assistant and MCP).
+Reading a conversation does not mark it read; `POST …/with/{userId}/read` does, up to `up_to` — the createdAt of the newest message you showed — so a message that arrived after it stays unread (it lands on the newest real message at or before `up_to` and never moves back; without a body, everything there is now). Home sends it for what is on screen. `read_messages` (assistant and MCP) returns unread messages from the oldest, 20 at a time with `more_unread` for the rest, and reads up to the last one returned.

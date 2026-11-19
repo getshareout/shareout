@@ -109,6 +109,8 @@ describe('workspace messages', () => {
     expect($('.wsx-dm__log')!.textContent).toContain('through their assistant');
     expect($('.wsx-dm__art')!.getAttribute('href')).toBe('/a/ventas-octubre/');
     expect(posts(`/with/${MARTIN.id}/read`).length).toBeGreaterThan(0);
+    // Read up to the newest message on screen, not "now": one that arrives meanwhile stays unread.
+    expect(posts(`/with/${MARTIN.id}/read`)[0].body).toEqual({ up_to: martinMsgs[0].createdAt });
     expect(railBadge()?.hidden).toBe(true);
     expect($('#wsxNotifBadge')!.hidden).toBe(true);
   });

@@ -257,14 +257,20 @@ export async function listMessages(
 ): Promise<MessageView[]> {
   const limit = Math.min(Math.max(opts.limit ?? 50, 1), 100);
   const { results } = await env.DB.prepare(
-    `SELECT m.id, m.body, m.sent_by, m.sent_via, m.created_at,
-            a.id AS artifact_id, a.name AS artifact_name, a.slug AS artifact_slug
+    `SELECT ${MESSAGE_COLS}
        FROM direct_messages m
        LEFT JOIN artifacts a ON a.id = m.artifact_id AND a.deleted_at IS NULL
       WHERE m.thread_id = ? ${opts.before ? 'AND m.created_at < ?' : ''}
       ORDER BY m.created_at DESC, m.rowid DESC LIMIT ?`,
   ).bind(...(opts.before ? [threadId, opts.before, limit] : [threadId, limit])).all<MessageRow>();
-  return (results || []).map((r) => ({
+  return (results || []).map((r) => toView(r, userId));
+}
+
+const MESSAGE_COLS = `m.id, m.body, m.sent_by, m.sent_via, m.created_at,
+            a.id AS artifact_id, a.name AS artifact_name, a.slug AS artifact_slug`;
+
+function toView(r: MessageRow, userId: string): MessageView {
+  return {
     id: r.id,
     body: r.body,
     sentByMe: r.sent_by === userId,
@@ -272,10 +278,54 @@ export async function listMessages(
     sentVia: r.sent_via,
     artifact: r.artifact_id ? { id: r.artifact_id, name: r.artifact_name || '', slug: r.artifact_slug } : null,
     createdAt: r.created_at,
-  }));
+  };
 }
 
-export async function markThreadRead(env: Env, threadId: string, userId: string): Promise<void> {
-  await env.DB.prepare('UPDATE direct_message_members SET last_read_at = ? WHERE thread_id = ? AND user_id = ?')
-    .bind(new Date().toISOString(), threadId, userId).run();
+/** What a reader (the assistant, MCP) should see next, oldest first. With unread messages: from the
+ *  first unread one on, up to `limit`, and how many unread come after them — so nothing unread is
+ *  skipped. With nothing unread: the latest `limit`. Mark read up to the last one returned. */
+export async function messagesToRead(
+  env: Env, threadId: string, userId: string, limit = 20,
+): Promise<{ messages: MessageView[]; moreUnread: number }> {
+  const fromOther = '(m.sent_by IS NULL OR m.sent_by != ?)';
+  const unreadAfter = '(me.last_read_at IS NULL OR m.created_at > me.last_read_at)';
+  const first = await env.DB.prepare(
+    `SELECT MIN(m.created_at) AS at FROM direct_messages m
+       JOIN direct_message_members me ON me.thread_id = m.thread_id AND me.user_id = ?
+      WHERE m.thread_id = ? AND ${fromOther} AND ${unreadAfter}`,
+  ).bind(userId, threadId, userId).first<{ at: string | null }>();
+  if (!first?.at) return { messages: (await listMessages(env, threadId, userId, { limit })).reverse(), moreUnread: 0 };
+  const { results } = await env.DB.prepare(
+    `SELECT ${MESSAGE_COLS}
+       FROM direct_messages m
+       LEFT JOIN artifacts a ON a.id = m.artifact_id AND a.deleted_at IS NULL
+      WHERE m.thread_id = ? AND m.created_at >= ?
+      ORDER BY m.created_at ASC, m.rowid ASC LIMIT ?`,
+  ).bind(threadId, first.at, Math.min(Math.max(limit, 1), 100)).all<MessageRow>();
+  const messages = (results || []).map((r) => toView(r, userId));
+  const last = messages[messages.length - 1]?.createdAt ?? first.at;
+  const more = await env.DB.prepare(
+    `SELECT COUNT(*) AS n FROM direct_messages m WHERE m.thread_id = ? AND ${fromOther} AND m.created_at > ?`,
+  ).bind(threadId, userId, last).first<{ n: number }>();
+  return { messages, moreUnread: Number(more?.n) || 0 };
+}
+
+const ISO_TS = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,3})?Z$/;
+export const isIsoTimestamp = (v: unknown): v is string => typeof v === 'string' && ISO_TS.test(v);
+
+/** Read the conversation up to `upTo` — the createdAt of the newest message the reader was shown —
+ *  so a message that arrived after it stays unread. It lands on the newest real message at or before
+ *  `upTo` (a future date cannot read what has not been written) and never moves read state back.
+ *  Without `upTo`: up to the newest message there is. Returns the timestamp read up to, or null. */
+export async function markThreadRead(env: Env, threadId: string, userId: string, upTo?: string): Promise<string | null> {
+  const row = await env.DB.prepare(
+    `SELECT MAX(created_at) AS at FROM direct_messages WHERE thread_id = ?${upTo ? ' AND created_at <= ?' : ''}`,
+  ).bind(...(upTo ? [threadId, upTo] : [threadId])).first<{ at: string | null }>();
+  const at = row?.at;
+  if (!at) return null;
+  await env.DB.prepare(
+    `UPDATE direct_message_members SET last_read_at = ?
+      WHERE thread_id = ? AND user_id = ? AND (last_read_at IS NULL OR last_read_at < ?)`,
+  ).bind(at, threadId, userId, at).run();
+  return at;
 }

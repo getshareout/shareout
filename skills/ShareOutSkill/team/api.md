@@ -488,7 +488,7 @@ One-to-one messages between internal members of a workspace (Home's Messages men
 | `GET` | `/v1/workspaces/{id}/messages/unread` | `{ unread }` for a badge. |
 | `GET` | `/v1/workspaces/{id}/messages/people` | Who you can write to. |
 | `GET` | `/v1/workspaces/{id}/messages/with/{userId}` | One conversation, newest first (`?before`, `?limit`). |
-| `POST` | `/v1/workspaces/{id}/messages/with/{userId}/read` | Mark it read. |
+| `POST` | `/v1/workspaces/{id}/messages/with/{userId}/read` | Mark it read up to `{up_to}` (the newest `createdAt` shown; optional). |
 
 Full reference: [messages.md](messages.md).
 

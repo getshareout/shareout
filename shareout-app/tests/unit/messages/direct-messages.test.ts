@@ -263,6 +263,44 @@ describe('direct messages: MCP', () => {
   });
 });
 
+const ts = (i: number) => `2026-01-01T00:00:${String(i).padStart(2, '0')}.000Z`;
+let readThread = '';
+
+describe('direct messages: read only what was shown', () => {
+  beforeAll(async () => {
+    // Bob writes Ana 25 messages, one second apart, none read.
+    const first = await sendDirectMessage(e, { workspaceId: B, senderId: bob, recipientId: ana, body: 'm0', via: 'web' });
+    if (!first.ok) throw new Error(first.message);
+    readThread = first.threadId;
+    await e.DB.prepare('UPDATE direct_messages SET created_at = ? WHERE id = ?').bind(ts(0), first.message.id).run();
+    const row = e.DB.prepare("INSERT INTO direct_messages (id, thread_id, sent_by, body, sent_via, created_at) VALUES (?, ?, ?, ?, 'web', ?)");
+    await e.DB.batch(Array.from({ length: 24 }, (_, k) => row.bind(`dm_read_${k + 1}`, readThread, bob, `m${k + 1}`, ts(k + 1))));
+  });
+
+  it('25 unread: read_messages shows the oldest 20 and leaves 5 unread; the next read shows those 5', async () => {
+    expect(await unreadCount(e, B, ana)).toBe(25);
+    const first = await readMessagesTool.execute({ env: e, userId: ana, selectedWorkspaceId: B }, { with: 'bob' }) as { messages: { text: string }[]; more_unread?: number };
+    expect(first.messages.map((m) => m.text)).toEqual(Array.from({ length: 20 }, (_, i) => `m${i}`));
+    expect(first.more_unread).toBe(5);
+    expect(await unreadCount(e, B, ana)).toBe(5);
+
+    const [, mcpRead] = MESSAGE_TOOLS;
+    const second = await mcpRead.run({ env: e, user: { id: ana, email: null, username: null }, origin: 'https://shareout.test', authorization: 'Bearer x' }, { workspace_id: B, with: 'bob' });
+    const out = second.structuredContent as { messages: { text: string }[]; more_unread?: number };
+    expect(out.messages.map((m) => m.text)).toEqual(['m20', 'm21', 'm22', 'm23', 'm24']);
+    expect(out.more_unread).toBeUndefined();
+    expect(await unreadCount(e, B, ana)).toBe(0);
+  });
+
+  it('a message that arrives after what was shown stays unread, and read state never moves back', async () => {
+    await e.DB.prepare("INSERT INTO direct_messages (id, thread_id, sent_by, body, sent_via, created_at) VALUES ('dm_read_late', ?, ?, 'late', 'web', ?)").bind(readThread, bob, ts(30)).run();
+    expect(await markThreadRead(e, readThread, ana, ts(24))).toBe(ts(24));
+    expect(await unreadCount(e, B, ana)).toBe(1);
+    await markThreadRead(e, readThread, ana, ts(5));
+    expect(await unreadCount(e, B, ana)).toBe(1);
+  });
+});
+
 describe('direct messages: REST API', () => {
   const call = async (user: string | null, method: string, path: string, body?: unknown, headers: Record<string, string> = {}) => {
     const request = new Request(`https://shareout.test${path}`, {
@@ -296,6 +334,16 @@ describe('direct messages: REST API', () => {
     const amb = await call(ana, 'POST', `/v1/workspaces/${A}/messages`, { to: 'Mart', text: 'x' });
     expect(amb!.status).toBe(409);
     expect(((await amb!.json()) as { candidates: unknown[] }).candidates).toHaveLength(2);
+  });
+
+  it('/read takes up_to: a future date reads only what exists, and a bad one is refused', async () => {
+    const res = await call(ana, 'POST', `/v1/workspaces/${B}/messages/with/${bob}/read`, { up_to: '2099-01-01T00:00:00.000Z' });
+    expect(await res!.json()).toMatchObject({ success: true, read_up_to: ts(30) });
+    expect(await unreadCount(e, B, ana)).toBe(0);
+    await e.DB.prepare("INSERT INTO direct_messages (id, thread_id, sent_by, body, sent_via, created_at) VALUES ('dm_read_after', ?, ?, 'after', 'web', ?)").bind(readThread, bob, ts(40)).run();
+    expect(await unreadCount(e, B, ana)).toBe(1);
+    expect((await call(ana, 'POST', `/v1/workspaces/${B}/messages/with/${bob}/read`, { up_to: 'yesterday' }))!.status).toBe(400);
+    expect(await unreadCount(e, B, ana)).toBe(1);
   });
 
   it('refuses non-members and external members; a new conversation opens empty', async () => {

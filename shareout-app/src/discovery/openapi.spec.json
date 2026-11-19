@@ -6059,10 +6059,49 @@
           "Messages"
         ],
         "summary": "Mark a conversation read",
+        "description": "Reads up to `up_to`, the createdAt of the newest message you showed, so one that arrived after it stays unread. It lands on the newest message at or before `up_to` and never moves read state back. Without a body, everything there is now.",
         "operationId": "markDirectMessageThreadRead",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "up_to": {
+                    "type": "string",
+                    "format": "date-time"
+                  }
+                }
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
-            "description": "Marked read"
+            "description": "Marked read",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "read_up_to": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "format": "date-time"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
           },
           "403": {
             "$ref": "#/components/responses/Forbidden"

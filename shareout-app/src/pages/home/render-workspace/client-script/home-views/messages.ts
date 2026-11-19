@@ -175,13 +175,19 @@ export const workspace_client_home_views_messages_JS = `  var MSG_COPY = ${JSON.
       msgPaintConv();
     });
   }
-  // Read on open (force), and on a poll only when something new came in. The badge and the bell
-  // drop the count at once; the request runs behind.
+  // Read on open (force), and on a poll only when something new came in — up to the newest message
+  // on screen, so one that arrives meanwhile stays unread. The badge and the bell drop the count at
+  // once; the request runs behind.
   function msgMarkRead(id, force) {
     var th = msgThread(id), n = th ? th.unread || 0 : 0;
     if (!force && !n) return;
+    var shown = msgConv && msgConv.id === id ? msgConv.messages : [];
+    var upTo = shown.length ? shown[shown.length - 1].createdAt : '';
+    if (!upTo) return;
     if (n) { th.unread = 0; msgSetUnread({ unread: msgUnread.n - n, threads: msgThreads }); msgPaintList(); }
-    fetch(msgBase() + '/with/' + encodeURIComponent(id) + '/read', { method: 'POST', credentials: 'same-origin' }).catch(function () {});
+    fetch(msgBase() + '/with/' + encodeURIComponent(id) + '/read', {
+      method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ up_to: upTo }),
+    }).catch(function () {});
   }
   function msgEarlier() {
     if (!msgConv || !msgConv.messages.length || msgConv.loadingMore) return;

@@ -71,7 +71,7 @@ your ShareOut account"). Allow, and the app is connected.
 | `list_members` | People in a workspace + pending invites (admins) |
 | `resend_invite` / `revoke_invite` | Admins: resend or cancel a pending invite by `email` |
 | `send_message` | Direct message, as the person, to another internal member of their workspace (`to` name or email, `text`, optional `artifact_id`). Two steps: without `confirm_token` it only stores the draft and returns a token; the same draft with the token sends it. The token works once, for 10 minutes, and a token that does not match the draft is spent. Shows as written through their assistant; the recipient is told on Home and Telegram — see [../team/messages.md](../team/messages.md) |
-| `read_messages` | The person's conversations (unread first), or with `with` the recent messages with one person (marked read) |
+| `read_messages` | The person's conversations (unread first), or with `with` the unread messages with one person from the oldest, 20 at a time (`more_unread` for the rest), read up to the last one returned |
 | `knowledge_search` | Cited passages from the workspace's learned Files and pages (`query`, optional `workspace_id`, `limit`) |
 | `knowledge_entity` | One company, person or project by `name` (or entity id): its connections, sources and quoted mentions |
 | `knowledge_facts` | Facts about `about` (amounts, dates, statuses), each with the quoted sentence and its source; optional `filter` |

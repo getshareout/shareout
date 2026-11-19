@@ -9,7 +9,7 @@ import type { PendingAction } from '../actions';
 import { scopedWorkspaceId } from '../scope';
 import { resolveArtifactAccessForUser } from '../access';
 import {
-  MESSAGE_MAX_CHARS, findThread, listMessages, listThreads, markThreadRead, resolveRecipient,
+  MESSAGE_MAX_CHARS, findThread, listThreads, markThreadRead, messagesToRead, resolveRecipient,
 } from '../../messages/store';
 import { conversationUrl } from '../../messages/notify';
 
@@ -76,7 +76,7 @@ export const readMessagesTool: AccountTool = {
   name: 'read_messages',
   description:
     'Read the user’s direct messages in the current workspace. Without `with`: their conversations, unread first, with the last message of each. '
-    + 'With `with` (a name or email): the recent messages with that person, oldest first, and marks them read. Use it for “did anyone write to me?” or “what did Ana say?”.',
+    + 'With `with` (a name or email): the unread messages with that person from the oldest (the latest ones when nothing is unread), oldest first, marked read up to the last one shown; more_unread says how many are left. Use it for “did anyone write to me?” or “what did Ana say?”.',
   input_schema: {
     type: 'object',
     properties: {
@@ -96,11 +96,13 @@ export const readMessagesTool: AccountTool = {
       const thread = await findThread(ctx.env, wsId, ctx.userId, { withUserId: who.person.id });
       const link = await conversationUrl(ctx.env, wsId, who.person.id);
       if (!thread) return { with: personLabel(who.person), messages: [], note: 'No messages with this person yet.', link };
-      const messages = (await listMessages(ctx.env, thread.id, ctx.userId, { limit: 20 })).reverse();
-      await markThreadRead(ctx.env, thread.id, ctx.userId);
+      // Unread first, in order; read only up to the last one shown, so nothing unread is skipped.
+      const { messages, moreUnread } = await messagesToRead(ctx.env, thread.id, ctx.userId, 20);
+      if (messages.length) await markThreadRead(ctx.env, thread.id, ctx.userId, messages[messages.length - 1].createdAt);
       return {
         with: personLabel(who.person),
         link,
+        ...(moreUnread ? { more_unread: moreUnread, note: `${moreUnread} more unread after these — read again to see them.` } : {}),
         messages: messages.map((m) => ({
           from: m.sentByMe ? 'you' : personLabel(who.person),
           text: m.body,

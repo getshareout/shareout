@@ -14,7 +14,7 @@ import {
 import type { BotWorkspace } from '../chat-agent/access';
 import { resolveArtifactAccessForUser } from '../chat-agent/access';
 import {
-  MESSAGE_MAX_CHARS, findThread, listMessages, listThreads, markThreadRead, resolveRecipient,
+  MESSAGE_MAX_CHARS, findThread, listThreads, markThreadRead, messagesToRead, resolveRecipient,
   type MessageError, type MessagePerson,
 } from '../messages/store';
 import { sendAndNotify } from '../messages/send';
@@ -129,7 +129,7 @@ const readMessages: ToolDef = {
   title: 'Read your messages',
   description: [
     'Reads the person\'s direct messages in their ShareOut workspace.',
-    'Without `with`: their conversations, unread first, with the last message of each. With `with` (a name or email): recent messages with that person, oldest first, which are then marked read.',
+    'Without `with`: their conversations, unread first, with the last message of each. With `with` (a name or email): the unread messages with that person from the oldest (the latest ones when nothing is unread), oldest first, marked read up to the last one returned; more_unread counts the rest.',
     'Replies go through send_message.',
   ].join(' '),
   inputSchema: {
@@ -152,8 +152,9 @@ const readMessages: ToolDef = {
       const link = await conversationUrl(ctx.env, ws.id, who.person.id);
       const thread = await findThread(ctx.env, ws.id, ctx.user.id, { withUserId: who.person.id });
       if (!thread) return ok(`No messages with ${personLabel(who.person)} yet.`, { with: personLabel(who.person), messages: [], link });
-      const messages = (await listMessages(ctx.env, thread.id, ctx.user.id, { limit: 20 })).reverse();
-      await markThreadRead(ctx.env, thread.id, ctx.user.id);
+      // Unread first, in order; read only up to the last one shown, so nothing unread is skipped.
+      const { messages, moreUnread } = await messagesToRead(ctx.env, thread.id, ctx.user.id, 20);
+      if (messages.length) await markThreadRead(ctx.env, thread.id, ctx.user.id, messages[messages.length - 1].createdAt);
       const rows = messages.map((m) => ({
         from: m.sentByMe ? 'you' : personLabel(who.person),
         text: m.body,
@@ -162,7 +163,10 @@ const readMessages: ToolDef = {
         at: m.createdAt,
       }));
       const lines = rows.map((r) => `${r.at.slice(0, 16).replace('T', ' ')} ${r.from}: ${r.text}`).join('\n');
-      return ok(`Messages with ${personLabel(who.person)} (oldest first):\n${lines}\n\nOpen in ShareOut: ${link}`, { with: personLabel(who.person), messages: rows, link });
+      const more = moreUnread ? `\n\n${moreUnread} more unread after these: call read_messages again with the same person to see them.` : '';
+      return ok(`Messages with ${personLabel(who.person)} (oldest first):\n${lines}${more}\n\nOpen in ShareOut: ${link}`, {
+        with: personLabel(who.person), messages: rows, link, ...(moreUnread ? { more_unread: moreUnread } : {}),
+      });
     }
     const threads = await listThreads(ctx.env, ws.id, ctx.user.id, { limit: 20, unreadOnly: args.unread_only === true });
     threads.sort((a, b) => Number(b.unread > 0) - Number(a.unread > 0));

@@ -127,7 +127,7 @@ POST /v1/workspaces/{id}/messages                    # {to, text, artifact_id?} 
 GET  /v1/workspaces/{id}/messages/unread
 GET  /v1/workspaces/{id}/messages/people
 GET  /v1/workspaces/{id}/messages/with/{userId}      # newest first (?before, ?limit)
-POST /v1/workspaces/{id}/messages/with/{userId}/read
+POST /v1/workspaces/{id}/messages/with/{userId}/read   # {up_to?}: the newest createdAt shown
 ```
 
 A name that matches several people answers `409 RECIPIENT_AMBIGUOUS` with `candidates`. The assistant (`send_message` with a confirm card, `read_messages`) and the MCP connector (`send_message` in two steps with a `confirm_token`, `read_messages`) follow the same rules. See [Messages](/teams/messages/).
