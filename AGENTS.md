@@ -138,6 +138,15 @@ repo root.
   merging is the maintainer's call. A PR is squash-merged once its branch has been
   through `integrate.sh`; a batch, or a branch that needed fixes there, lands as one
   `integration/<name>` PR.
+- **Every user-visible change ships with its words, in the same PR.** A change people or
+  integrators notice (an API route, an MCP tool or its text, UI copy, the SDK, the OpenAPI spec)
+  adds its line to `CHANGELOG.md` → `## Release notes` under today's date — plain English for
+  someone who uses ShareOut, an `es:` line, a short `Integrators:` line with the routes/tools —
+  plus the technical entry under `## [Unreleased]`, and updates the skill, the MCP text (tool
+  description or server instructions) and the docs-site pages (en + es) to match. The docs site's
+  What's new / Novedades pages render that section (`docs-site/src/lib/release-notes.mjs`), so
+  never keep a second copy. `check:changelog` (pre-push) fails a branch that touches those paths
+  without `CHANGELOG.md`; when it really isn't user-visible, put `Changelog: none` in a commit message.
 - **Committed bundles:** build outputs (`public/_bundles/*`, `src/discovery/*`,
   `src/official-skills/*.generated.ts`) live in git. After editing `sdk/`,
   `editor-client/`, `chat-core/` or `skills/ShareOutSkill/`, run `npm run build:sdk` /

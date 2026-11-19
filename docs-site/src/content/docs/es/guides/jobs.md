@@ -27,6 +27,8 @@ pasa. Mandá un reporte semanal por email, posteá un snapshot a Slack, refresc�
 | `email_sheet_sync` | En `email.received`: un Excel/CSV que un remitente permitido y verificado manda a la dirección del artefacto reemplaza uno de sus datasets |
 | `query_snapshot` | Corre queries fijas de warehouse/REST en schedule y escribe cada resultado en json/tabla/dataset |
 | `sheets_append` | Corre una query de conexión y agrega filas a una Google Sheet (historial diario creciente) |
+| `public_sheet_sync` | Copia una pestaña de una planilla compartida como "Cualquier persona que tenga el vínculo" a uno de los datasets del artefacto, según un horario. Sin iniciar sesión en Google |
+| `drive_file_sync` | Copia una pestaña de una planilla privada de Google Drive que el creador eligió en Google a uno de los datasets del artefacto, según un horario |
 
 ## Crear un job
 
@@ -171,6 +173,25 @@ curl -X POST https://shareout.site/v1/jobs \
 - Reenvío automático de Gmail: Gmail primero le manda una confirmación a la dirección del artefacto. Una genuina (DKIM y DMARC pasan para google.com según Cloudflare, el remitente de reenvío de Google, el link en un host propio de Google) no se rebota ni se vuelve datos: aparece en `forwarding` (`requester`, `confirmUrl`, `code` en las viejas, `expiresAt`) para que la abran los editores del artefacto. `POST /v1/artifacts/{id}/email-sync/forwarding/{confirmationId}` `{ "action": "opened" | "dismiss" }`. Outlook / Microsoft 365 no tiene paso de confirmación.
 - Borrar el job apaga la dirección y conserva los datos y la lista de remitentes (`senders_kept`).
 - Límites: 8 MB y 100.000 filas por archivo, 25 MB por email, 200 emails por día por artefacto.
+
+### `public_sheet_sync` y `drive_file_sync` — mantener un dataset al día con una planilla
+
+Los dos copian una pestaña de una planilla a uno de los datasets del artefacto según un horario
+cron. La app (Automatizar → **Actualizar los datos**) usa por defecto la primera pestaña, todos los
+días a las 08:00, y corre la primera sincronización en el momento. Paso a paso para personas:
+[Mantené un artefacto al día desde una planilla](/es/everyone/google-sheets/#mantené-un-artefacto-al-día-desde-una-planilla).
+
+- `public_sheet_sync` — `config: { link, dataset, sheet?, fileName? }`. El archivo tiene que estar
+  compartido como "Cualquier persona que tenga el vínculo" (una planilla de Google o un Excel en Drive).
+  Revisá el enlace antes con `POST /v1/workspaces/{workspaceId}/sheet-links/inspect` `{ "link": "…" }`
+  → sus pestañas, cantidad de filas y columnas. Cualquiera que tenga el enlace puede leer el archivo:
+  usalo solo para datos que pueden ser públicos.
+- `drive_file_sync` — `config: { fileId, dataset, sheet?, fileName? }`. Un archivo privado: la
+  persona lo elige una vez en la ventana de Google (`GET /v1/workspaces/{workspaceId}/file-imports/sheet-sync/pick`,
+  abierto en su navegador), y ShareOut solo puede leer los archivos elegidos así.
+  `GET /v1/workspaces/{workspaceId}/file-imports/sheet-sync` → `picked` es el último que eligió.
+- Una corrida cuyas filas no cambiaron no escribe nada. Límites: 8 MB y 100.000 filas por archivo.
+- Referencia completa de la config: `api/jobs.md` del skill (`PublicSheetSyncConfig`, `DriveFileSyncConfig`).
 
 ## Reintentos
 

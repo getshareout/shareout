@@ -1,0 +1,42 @@
+---
+// Renders CHANGELOG.md → "## Release notes" (the one source) for What's new / Novedades.
+import { loadReleaseNotes, inlineHtml } from '../lib/release-notes.mjs';
+
+interface Props { lang: 'en' | 'es' }
+const { lang } = Astro.props;
+const days = loadReleaseNotes();
+const L = lang === 'es'
+	? { locale: 'es-AR', guide: 'Ver la guía', tech: 'Para integradores' }
+	: { locale: 'en-US', guide: 'Read the guide', tech: 'For integrators' };
+const fmt = new Intl.DateTimeFormat(L.locale, { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
+const label = (d: string) => fmt.format(new Date(`${d}T12:00:00Z`));
+---
+<div class="release-notes">
+	{days.map((day) => (
+		<section>
+			<h2 id={day.date}>{label(day.date)}</h2>
+			<ul>
+				{day.entries.map((e) => {
+					const text = lang === 'es' ? e.es : e.en;
+					const guide = lang === 'es' ? e.guia : e.guide;
+					return (
+						<li>
+							<p set:html={inlineHtml(text)} />
+							{guide && <p class="rn-guide"><a href={guide}>{L.guide} →</a></p>}
+							{e.tech && <p class="rn-tech"><span>{L.tech}:</span> <Fragment set:html={inlineHtml(e.tech)} /></p>}
+						</li>
+					);
+				})}
+			</ul>
+		</section>
+	))}
+</div>
+
+<style>
+	.release-notes ul { list-style: none; padding-left: 0; }
+	.release-notes li { margin: 0 0 1.25rem; padding-left: 0.9rem; border-left: 2px solid var(--sl-color-gray-5); }
+	.release-notes li p { margin: 0.2rem 0; }
+	.rn-guide { font-size: var(--sl-text-sm); }
+	.rn-tech { font-size: var(--sl-text-xs); color: var(--sl-color-gray-3); }
+	.rn-tech span { font-weight: 600; }
+</style>

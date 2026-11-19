@@ -12,8 +12,9 @@ Pick email, Slack, or Telegram, choose how often, and ShareOut creates the job f
 no API calls needed. Owners and editors can schedule delivery to other people; viewers
 can subscribe to get the page sent to their own inbox on a recurring schedule.
 
-The **Automate** tab in the Inspector on Home lists only the schedules for the artifact
-you're looking at. Owners and editors see the shared schedules and their own personal
+The **Automate** tab in the Inspector on Home (on a phone: **Options → Automate**) starts with
+**Update the data** — from Google Drive, a shared link, or by emailing the Excel — and lists only
+the schedules for the artifact you're looking at. Owners and editors see the shared schedules and their own personal
 deliveries; someone else's personal subscription (an email or DM to themselves) stays
 private to them.
 
@@ -38,7 +39,7 @@ private to them.
 | **Email** people | A weekly report, a digest, a heads-up |
 | **Post to Slack** | A summary, a snapshot, or a PDF to your channel |
 | **Post to Discord** | Ping your community server |
-| **Refresh your data** | Pull the latest from your spreadsheet or store |
+| **Refresh your data** | Pull the latest from your spreadsheet or store — see [Keep a page up to date from a spreadsheet](/everyone/google-sheets/#keep-a-page-up-to-date-from-a-spreadsheet) |
 | **Notify another app** | Send a signal to a tool you use |
 
 ## Real examples

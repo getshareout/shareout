@@ -58,8 +58,10 @@ link. A file it can't use (too big, empty, not a spreadsheet) gets one sentence 
 ## Update your page's numbers by emailing the Excel
 
 Does someone send you the same spreadsheet every week? Your page can update itself from it.
-Open the page from Home and choose **Update by email**. Say who sends the file (just their
-email address), press **Turn on**, and you get the page's address. Then, each time:
+Open the page from Home, go to **Automate → Update the data** (on a phone: **Options → Automate**)
+and choose **By emailing the Excel**.
+Say who sends the file (just their email address), press **Turn on**, and you get the page's
+address. Then, each time:
 
 1. Open your mail.
 2. Write a new email to the page's address.

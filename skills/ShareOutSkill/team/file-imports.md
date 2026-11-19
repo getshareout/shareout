@@ -23,6 +23,30 @@ Copy a whole remote folder (with subfolders) into workspace files, keep it in sy
 
 `ref` is opaque: take it from a browse entry with `selectable: true`.
 
+## Google Drive by sharing (when the instance sets `GOOGLE_DRIVE_SA_KEY`)
+
+Instead of the OAuth consent, the workspace gets its **own** Google service-account email and the
+person shares a Drive folder with it (Viewer). `GET …/file-imports` → `share` is
+`{ provider: "google_drive", shareEmail }` when this is on (`shareEmail: null` until first use),
+`null` when the instance has no key — then only the OAuth path above exists.
+
+| Do | Call |
+|---|---|
+| The workspace's share email (created on first use) | `POST /v1/workspaces/{ws}/file-imports/share/google_drive` → `{ shareEmail }` |
+| Folders shared with it | `GET /v1/workspaces/{ws}/file-imports/browse/google_drive?access=share&ref=root` → `{ entries, shareEmail }` |
+| A folder from its pasted link | `GET …/browse/google_drive?access=share&link=<folder link>` (a file link → `400 NOT_A_FOLDER`) |
+| Import it | `POST …/file-imports/sources` `{ provider: "google_drive", ref, name, access: "share", … }` |
+| Move an OAuth-imported folder onto sharing (nothing re-imports) | `PATCH …/file-imports/sources/{id}` `{ access: "share" }` |
+
+What to tell the person, in order: share the folder in Drive with the email (Viewer); come back and
+pick it. Files added to the folder later come over on the next sync; unsharing it stops the sync.
+A company Google Workspace may block sharing outside the organization — their Google admin has to
+allow it. Errors: `SHARE_EMAIL_NOT_READY` (`409`, a just-made account Google hasn't finished — try
+again in a minute), `SHARE_EMAIL_LIMIT` (`503`, the instance reached Google's account limit; never
+a shared account), `SHARE_EMAIL_FAILED` (`502`), `NOT_CONFIGURED` / `PROVIDER_NOT_CONFIGURED` (`404`, no key).
+An agent can create the email and start the import, but the sharing itself is the person's step
+in Drive.
+
 ## Run results
 
 `run.status`: `queued` → `walking` → `importing` → `done` | `stopped` | `failed`. `run.counts`: `found`, `imported`, `converted` (pages), `unchanged`, `skipped`, `failed`. `run.errors[]`: `{ path, status, code, message }`.

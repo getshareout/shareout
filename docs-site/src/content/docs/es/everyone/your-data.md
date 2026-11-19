@@ -24,6 +24,7 @@ Agregá un producto nuevo, cambiá un precio, sacá algo agotado — tu artefact
 ## De dónde puede venir la lista
 
 - **La cargás vos** — perfecto para una lista chica y a mano.
+- **Un Excel o CSV que ya tenés** — **Nuevo → Tabla desde un Excel** lo convierte en un artefacto con una tabla en un paso. (Mirá [Empezá desde un Excel](/es/everyone/inbox/#empezá-desde-un-excel).)
 - **Una planilla que conectás** — guardá tu info en Google Sheets y el artefacto la sigue. (Mirá [Conectá tus herramientas](/es/everyone/connect/).)
 - **Respuestas de formularios** — lo que la gente envía también puede ser una lista (una lista de inscriptos, un registro de pedidos).
 
@@ -36,7 +37,7 @@ Agregá un producto nuevo, cambiá un precio, sacá algo agotado — tu artefact
 - Unas preguntas frecuentes
 
 :::tip[Que se mantenga al día solo]
-Conectá una planilla y tu lista se actualiza sola cada vez que editás la planilla — genial para un menú o un artefacto de "qué hay en stock". Más en [Conectá tus herramientas](/es/everyone/connect/).
+Conectá una planilla y tu lista se actualiza sola cada vez que editás la planilla — genial para un menú o un artefacto de "qué hay en stock". Más en [Mantené un artefacto al día desde una planilla](/es/everyone/google-sheets/#mantené-un-artefacto-al-día-desde-una-planilla) — desde Google Drive, un enlace o mandando el Excel por email.
 :::
 
 ## Qué sigue

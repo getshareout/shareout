@@ -91,6 +91,7 @@ export default defineConfig({
 						{ label: 'Your workspace (Home)', slug: 'everyone/your-workspace', translations: { es: 'Tu workspace (Home)' } },
 						{ label: 'Folder guides', slug: 'everyone/folder-guides', translations: { es: 'Guías de carpeta' } },
 						{ label: 'Files & deliverables', slug: 'everyone/assets', translations: { es: 'Archivos y entregas' } },
+						{ label: "What's new", slug: 'whats-new', translations: { es: 'Novedades' } },
 					],
 				},
 				{

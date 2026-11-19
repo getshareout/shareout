@@ -6,4 +6,5 @@
      suite on a feature branch; it runs once on the integrated branch (tooling/scripts/integrate.sh). -->
 - [ ] Targeted tests (in `shareout-app/`): `npm run test:affected` or `TZ=UTC npx vitest run <files>`
 - [ ] Light pre-push checks pass — static guards, typecheck, secrets, bundles (by hand, from the repo root: `SHAREOUT_CHECK_MODE=light ./tooling/scripts/ci-check-fast.sh`)
+- [ ] (if user-visible) `CHANGELOG.md` → Release notes line (en + `es:` + `Integrators:`) and Unreleased entry; skill, MCP text and docs (en + es) updated in this PR
 - [ ] (if UI) human visual pass

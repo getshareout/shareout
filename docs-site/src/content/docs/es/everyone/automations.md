@@ -13,8 +13,9 @@ el job por vos — sin llamadas a la API. Los owners y editores pueden programar
 otras personas; los viewers pueden suscribirse para recibir el artefacto en su propio mail de
 forma recurrente.
 
-La pestaña **Automate** del Inspector en Home lista solo los schedules del artefacto que
-estás mirando. Owners y editores ven los schedules compartidos y sus propios envíos
+La pestaña **Automatizar** del Inspector en Inicio (en el celular: **Opciones → Automatizar**)
+empieza con **Actualizar los datos** — desde Google Drive, un enlace o mandando el Excel por email —
+y lista solo los schedules del artefacto que estás mirando. Owners y editores ven los schedules compartidos y sus propios envíos
 personales; la suscripción personal de otra persona (un email o DM a sí misma) queda
 privada.
 
@@ -39,7 +40,7 @@ privada.
 | **Mandar mails** | Un reporte semanal, un resumen, un aviso |
 | **Postear a Slack** | Un resumen, una captura o un PDF a tu canal |
 | **Postear a Discord** | Avisar a tu servidor de la comunidad |
-| **Actualizar tus datos** | Traer lo último de tu planilla o tu tienda |
+| **Actualizar tus datos** | Traer lo último de tu planilla o tu tienda — mirá [Mantené un artefacto al día desde una planilla](/es/everyone/google-sheets/#mantené-un-artefacto-al-día-desde-una-planilla) |
 | **Avisar a otra app** | Mandar una señal a una herramienta que usás |
 
 ## Ejemplos reales

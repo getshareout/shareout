@@ -27,6 +27,8 @@ happens. Email a weekly report, post a snapshot to Slack, refresh a dataset.
 | `email_sheet_sync` | On `email.received`: an Excel/CSV emailed to the page's address by an allowed, verified sender replaces one of its datasets |
 | `query_snapshot` | Run fixed warehouse/REST queries on a schedule and write each result to json/table/dataset |
 | `sheets_append` | Run one connection query and append rows to a Google Sheet (growing daily history) |
+| `public_sheet_sync` | Copy one tab of a spreadsheet shared as "Anyone with the link" into one of the page's datasets, on a schedule. No Google sign-in |
+| `drive_file_sync` | Copy one tab of a private Google Drive spreadsheet the creator picked in Google into one of the page's datasets, on a schedule |
 
 ## Create a job
 
@@ -181,6 +183,23 @@ curl -X POST https://shareout.site/v1/jobs \
 - Gmail auto-forwarding: Gmail emails the page's address a confirmation first. A genuine one (DKIM and DMARC pass for google.com per Cloudflare, Google's forwarding sender, its link on Google's own host) is not bounced and never becomes data: it shows in `forwarding` (`requester`, `confirmUrl`, `code` on older ones, `expiresAt`) for the page's editors to open. `POST /v1/artifacts/{id}/email-sync/forwarding/{confirmationId}` `{ "action": "opened" | "dismiss" }`. Outlook / Microsoft 365 has no confirmation step.
 - Deleting the job turns the address off and keeps the data and the sender list (`senders_kept`).
 - Limits: 8 MB and 100,000 rows per file, 25 MB per email, 200 emails a day per page.
+
+### `public_sheet_sync` and `drive_file_sync` — keep a dataset in sync with a spreadsheet
+
+Both copy one tab of a spreadsheet into one of the page's datasets on a cron schedule. The UI
+(Automate → **Update the data**) defaults to the first tab, every day at 08:00, and runs the first
+sync right away. Step-by-step for people: [Keep a page up to date from a spreadsheet](/everyone/google-sheets/#keep-a-page-up-to-date-from-a-spreadsheet).
+
+- `public_sheet_sync` — `config: { link, dataset, sheet?, fileName? }`. The file must be shared
+  as "Anyone with the link" (a Google Sheet or an Excel file in Drive). Check the link first with
+  `POST /v1/workspaces/{workspaceId}/sheet-links/inspect` `{ "link": "…" }` → its tabs, row count
+  and columns. Anyone who has the link can read the file, so use it only for data that can be public.
+- `drive_file_sync` — `config: { fileId, dataset, sheet?, fileName? }`. A private file: the person
+  picks it once in Google's own window (`GET /v1/workspaces/{workspaceId}/file-imports/sheet-sync/pick`,
+  opened in their browser), and ShareOut can read only the files picked that way.
+  `GET /v1/workspaces/{workspaceId}/file-imports/sheet-sync` → `picked` is the last file they picked.
+- A run whose rows did not change writes nothing. Limits: 8 MB and 100,000 rows per file.
+- Full config reference: the skill's `api/jobs.md` (`PublicSheetSyncConfig`, `DriveFileSyncConfig`).
 
 ## Retries
 

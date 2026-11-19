@@ -10,8 +10,9 @@ Also see [MAINTAINING.md](MAINTAINING.md) (who merges, merge style) and
 
 - Package version lives in `shareout-app/package.json` (`0.1.0` today).
 - Tags use semver with an optional pre-release suffix: `v0.1.0-pre`, `v0.1.0`.
-- Document user-facing changes in [CHANGELOG.md](CHANGELOG.md) under **Unreleased**,
-  then move them under a dated version heading when tagging.
+- Document user-facing changes in [CHANGELOG.md](CHANGELOG.md): a plain-language line under
+  **Release notes** (dated; the docs site's What's new / Novedades pages render it) and the
+  technical entry under **Unreleased**, which moves under a dated version heading when tagging.
 
 ## Checklist before a tag
 
