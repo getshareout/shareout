@@ -135,8 +135,13 @@ Per-scope asset library — one hidden bucket per workspace (shared) and one per
 | `POST` | `/v1/workspaces/{id}/assets/collections/{id}/send` | `{ to, expiresAt?, gate?, password?, domains? }` → email link. Member+. |
 | `GET` | `/v1/workspaces/{id}/assets/links` | List sent delivery links (gate, expiry, `viewCount`, revoked). Member+. |
 | `POST` | `/v1/workspaces/{id}/assets/links/{linkId}/revoke` | Revoke link (page + bytes 404). Member+. |
+| `POST` | `/v1/workspaces/{id}/assets/to-artifacts` | `{ dryRun?, limit?, retry? }` → Files become pages (`converted`, `kept`, `inProgress`, `remaining`); repeat until `remaining` is 0. Owner/admin. |
+| `GET` | `/v1/workspaces/{id}/assets/duplicates` | Pages made from the same file, matched by content (`groups[]` of `sha256`, `pages[]`). Read-only. Owner/admin. |
+| `POST` | `/v1/workspaces/{id}/assets/duplicates/remove` | `{ keep, remove[], confirm: true }` → trash copies of `keep` (30 days). Owner only. |
 
 `gate`: `none` (default), `password` + `password`, or `domain` + `domains[]`. Protected deliveries stream bytes through `/d/<token>/file/<blobId>` after the gate clears. First open emails the link creator (`asset_delivery_opened`).
+
+**Files → pages and copies.** `to-artifacts` is safe to call again while a batch is still running (a timeout and a retry): a file is claimed before it is read, `inProgress` counts files another call is still converting, and a file never becomes two pages. `duplicates` compares the file each page came from (the original an import keeps, else the page's own file) by its sha256, never by name, so two different documents with one name are never grouped; hand-written HTML pages are never grouped and a private page shows only to its owner. `duplicates/remove` refuses the whole request (`409 NOT_A_DUPLICATE`) if any page is not a copy of `keep`, and nothing is ever removed without it.
 
 Limits: 500 MB/file · 10 GB/bucket · 10 000 files. See [Files & deliverables](/everyone/assets/).
 
