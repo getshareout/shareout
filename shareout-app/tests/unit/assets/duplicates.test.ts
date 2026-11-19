@@ -46,9 +46,9 @@ beforeAll(async () => {
   ]);
 });
 
-async function page(filename: string, body: string, ws = WS): Promise<string> {
+async function page(filename: string, body: string, ws = WS, as = OWNER, visibility: 'workspace' | 'private' = 'workspace'): Promise<string> {
   const p = await convertToPage(e, {
-    user: { id: OWNER, email: 'owner@acme.test' }, workspaceId: ws, folderId: null, visibility: 'workspace',
+    user: { id: as, email: `${as}@acme.test` }, workspaceId: ws, folderId: null, visibility,
     filename, displayName: filename, bytes: enc(body), slug: null,
   });
   if (!p.ok) throw new Error(p.message);
@@ -92,29 +92,32 @@ describe('duplicate pages', () => {
   let scanB = '';
   let sameName = '';
   let elsewhere = '';
+  let othersPrivate = '';
 
   it('groups pages by the content of their source file, not by name, within one workspace', async () => {
     first = await page('Acme report.md', '# Q3\n\nSame bytes.');
     copy = await page('Acme report.md', '# Q3\n\nSame bytes.');
     sameName = await page('Acme report.csv', 'a,b\n1,2');           // same name, different file
     elsewhere = await page('Acme other.md', '# Q3\n\nSame bytes.', WS2); // same file, other workspace
+    othersPrivate = await page('Acme mine.md', '# Q3\n\nSame bytes.', WS, ADMIN, 'private'); // same file, someone else's private page
     // Two transcriptions of one scan differ; the kept original is what matches.
     scanA = await imported('Acme scan', '# Scan\n\nfirst reading', 'PDF-BYTES');
     scanB = await imported('Acme scan', '# Scan\n\nsecond reading', 'PDF-BYTES');
     const html = '<!doctype html><title>Acme</title><p>Hello</p>';
     const pages = [await handwritten('Acme home', html), await handwritten('Acme home copy', html)];
 
-    const groups = await findDuplicatePages(e, WS);
+    const groups = await findDuplicatePages(e, WS, OWNER);
     expect(groups.map((g) => g.pages.map((p) => p.id).sort()).sort()).toEqual([[first, copy].sort(), [scanA, scanB].sort()].sort());
-    for (const id of [sameName, ...pages]) expect(groups.flatMap((g) => g.pages.map((p) => p.id))).not.toContain(id);
+    for (const id of [sameName, othersPrivate, ...pages]) expect(groups.flatMap((g) => g.pages.map((p) => p.id))).not.toContain(id);
     expect(groups.every((g) => /^[0-9a-f]{64}$/.test(g.sha256))).toBe(true);
-    expect(await findDuplicatePages(e, WS2)).toEqual([]);
+    expect(await findDuplicatePages(e, WS2, OWNER)).toEqual([]);
   });
 
-  it('lists for owners and admins only, and never deletes anything', async () => {
+  it('lists for owners and admins only, each seeing private pages of their own only, and never deletes anything', async () => {
     const res = await call(ADMIN, 'duplicates');
     expect(res.status).toBe(200);
-    expect(((await res.json()) as { groups: unknown[] }).groups).toHaveLength(2);
+    const groups = ((await res.json()) as { groups: Array<{ pages: Array<{ id: string }> }> }).groups;
+    expect(groups.map((g) => g.pages.map((p) => p.id).sort()).sort()).toEqual([[first, copy, othersPrivate].sort(), [scanA, scanB].sort()].sort());
     expect(await deletedAt(copy)).toBeNull();
   });
 
@@ -135,6 +138,9 @@ describe('duplicate pages', () => {
     // The same bytes in another workspace are not this workspace's copy to remove.
     expect((await remove(OWNER, { keep: first, remove: [elsewhere], confirm: true })).status).toBe(409);
     expect(await deletedAt(elsewhere)).toBeNull();
+    // Nor is another member's private page, even with the same bytes.
+    expect((await remove(OWNER, { keep: first, remove: [othersPrivate], confirm: true })).status).toBe(409);
+    expect(await deletedAt(othersPrivate)).toBeNull();
 
     // A file that became the removed page now points at the kept one.
     await e.DB.prepare(`INSERT INTO asset_deliverables (id, bucket_artifact_id, workspace_id, owner_id, name, deleted_at, type_metadata)
@@ -150,7 +156,7 @@ describe('duplicate pages', () => {
     expect(await deletedAt(first)).toBeNull();
     expect(await e.DB.prepare("SELECT json_extract(type_metadata, '$.toArtifact') AS t FROM asset_deliverables WHERE id = 'dlv_dup'").first('t')).toBe(first);
 
-    const left = await findDuplicatePages(e, WS);
+    const left = await findDuplicatePages(e, WS, OWNER);
     expect(left.map((g) => g.pages.map((p) => p.id).sort())).toEqual([[scanA, scanB].sort()]);
   });
 });

@@ -3,8 +3,9 @@
  * documents can share a name and differ. The source file of a page is the original an
  * import keeps (type_metadata.source.original), else its entrypoint when the page is the
  * document itself (markdown, csv, pdf, image…). Hand-written HTML pages have no source
- * file and are never grouped. Finding is read-only; removing needs the workspace owner's
- * explicit confirmation and uses the ordinary 30-day trash.
+ * file and are never grouped. A private page exists only for its owner, here as in every
+ * list. Finding is read-only; removing needs the workspace owner's explicit confirmation
+ * and uses the ordinary 30-day trash.
  */
 import type { Env } from '../types';
 import { RETENTION_DAYS, softDeleteArtifact } from '../artifacts/crud';
@@ -22,14 +23,14 @@ const SOURCES = `
     JOIN versions v ON v.id = dp.version_id
     JOIN assets s ON s.version_id = v.id
      AND s.path = COALESCE(json_extract(a.type_metadata, '$.source.original'), CASE WHEN a.artifact_type <> 'html' THEN v.entrypoint END)
-   WHERE a.workspace_id = ? AND a.deleted_at IS NULL`;
+   WHERE a.workspace_id = ? AND a.deleted_at IS NULL AND (a.visibility != 'private' OR a.owner_id = ?)`;
 
-/** Every set of two or more live pages in the workspace whose source files are byte-identical. Oldest page first. */
-export async function findDuplicatePages(env: Env, workspaceId: string): Promise<DuplicateGroup[]> {
+/** Every set of two or more live pages `userId` can see in the workspace whose source files are byte-identical. Oldest page first. */
+export async function findDuplicatePages(env: Env, workspaceId: string, userId: string): Promise<DuplicateGroup[]> {
   const rows = (await env.DB.prepare(`
     SELECT * FROM (SELECT x.*, COUNT(*) OVER (PARTITION BY x.sha256) AS n FROM (${SOURCES}) x)
      WHERE n > 1 ORDER BY sha256, created_at, id
-  `).bind(workspaceId).all<Row>()).results || [];
+  `).bind(workspaceId, userId).all<Row>()).results || [];
   const groups = new Map<string, DuplicateGroup>();
   for (const r of rows) {
     const g = groups.get(r.sha256) ?? { sha256: r.sha256, sizeBytes: r.size_bytes, pages: [] };
@@ -44,14 +45,14 @@ export type RemoveDuplicatesResult =
   | { ok: false; code: 'NOT_A_DUPLICATE' | 'NOTHING_TO_REMOVE'; message: string };
 
 /**
- * Trash `remove`, keeping `keep`. Every page must be a live page of this workspace with the
- * same source file as `keep`, or nothing is removed. Files that pointed at a removed page now
+ * Trash `remove`, keeping `keep`. Every page must be a live page of this workspace that
+ * `userId` can see, with the same source file as `keep`, or nothing is removed. Files that pointed at a removed page now
  * point at the kept one.
  */
-export async function removeDuplicatePages(env: Env, workspaceId: string, keep: string, remove: string[]): Promise<RemoveDuplicatesResult> {
+export async function removeDuplicatePages(env: Env, workspaceId: string, userId: string, keep: string, remove: string[]): Promise<RemoveDuplicatesResult> {
   const ids = [...new Set(remove)].filter((id) => id !== keep);
   if (!ids.length) return { ok: false, code: 'NOTHING_TO_REMOVE', message: 'Name at least one page to remove other than the one you keep.' };
-  const rows = (await env.DB.prepare(`${SOURCES} AND a.id IN ${JSON_IN}`).bind(workspaceId, jsonList([keep, ...ids])).all<Row>()).results || [];
+  const rows = (await env.DB.prepare(`${SOURCES} AND a.id IN ${JSON_IN}`).bind(workspaceId, userId, jsonList([keep, ...ids])).all<Row>()).results || [];
   const hash = rows.find((r) => r.id === keep)?.sha256;
   const bad = ids.filter((id) => !hash || rows.find((r) => r.id === id)?.sha256 !== hash);
   if (bad.length) return { ok: false, code: 'NOT_A_DUPLICATE', message: `Not a copy of the page you keep: ${bad.join(', ')}. Nothing was removed.` };

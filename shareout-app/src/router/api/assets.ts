@@ -22,7 +22,8 @@
  *   ...same under /v1/workspaces/{ws}/assets (any member; deleting another member's file needs owner/admin).
  *   POST   /v1/workspaces/{ws}/assets/to-artifacts  { dryRun?, limit?, retry? } → Files become artifacts (owner/admin);
  *          safe to retry mid-run: `inProgress` counts files another call is still converting
- *   GET    /v1/workspaces/{ws}/assets/duplicates   → pages made from byte-identical files, grouped (owner/admin, read-only)
+ *   GET    /v1/workspaces/{ws}/assets/duplicates   → pages made from byte-identical files, grouped (owner/admin, read-only;
+ *          others' private pages never appear)
  *   POST   /v1/workspaces/{ws}/assets/duplicates/remove  { keep, remove[], confirm: true } → trash copies of `keep` (owner only, 30 days)
  */
 import type { FetchContext } from '../context';
@@ -116,7 +117,7 @@ export async function routeAssetApi(ctx: FetchContext): Promise<Response | null>
   }
   if (sub === 'duplicates' && method === 'GET' && workspaceId) {
     if (!isWsAdmin) return forbidden();
-    return json({ groups: await findDuplicatePages(env, workspaceId) });
+    return json({ groups: await findDuplicatePages(env, workspaceId, user.id) });
   }
   if (sub === 'duplicates/remove' && method === 'POST' && workspaceId) {
     // Never automatic: only the workspace owner, naming each page and confirming.
@@ -126,7 +127,7 @@ export async function routeAssetApi(ctx: FetchContext): Promise<Response | null>
       return json({ error: 'keep (page id) and remove (page ids) required', code: 'BAD_REQUEST' }, 400);
     }
     if (b.confirm !== true) return json({ error: 'Send confirm: true to move these pages to the trash.', code: 'CONFIRM_REQUIRED' }, 400);
-    const res = await removeDuplicatePages(env, workspaceId, b.keep, b.remove as string[]);
+    const res = await removeDuplicatePages(env, workspaceId, user.id, b.keep, b.remove as string[]);
     return res.ok ? json(res) : json({ error: res.message, code: res.code }, res.code === 'NOT_A_DUPLICATE' ? 409 : 400);
   }
 
