@@ -60,6 +60,9 @@ beforeAll(async () => {
     e.DB.prepare(`INSERT INTO artifacts (id, name, slug, owner_id, workspace_id, visibility) VALUES
       ('art_dm_private', 'Martin private', 'dm-martin-private', ?, ?, 'private'),
       ('art_dm_shared', 'Ventas octubre', 'dm-ventas', ?, ?, 'workspace')`).bind(martin, A, ana, A),
+    e.DB.prepare(`INSERT INTO users (id, email, name) VALUES ('usr_dm_mg2', 'mg@beta.test', 'Martín Gómez'), ('usr_dm_mg3', 'mgp@beta.test', 'Martín Gómez Pérez')`),
+    e.DB.prepare(`INSERT INTO workspace_members (id, workspace_id, user_id, role, member_class) VALUES
+      ('wm_dm9', ?, 'usr_dm_mg2', 'member', 'internal'), ('wm_dm10', ?, 'usr_dm_mg3', 'member', 'internal')`).bind(B, B),
   ]);
 });
 
@@ -119,6 +122,11 @@ describe('direct messages: store', () => {
     expect(!amb.ok && amb.candidates?.map((c) => c.id).sort()).toEqual([martin, martina].sort());
     expect(await resolveRecipient(e, A, ana, 'guest@other.test')).toMatchObject({ ok: false, code: 'RECIPIENT_NOT_FOUND' });
     expect(await resolveRecipient(e, A, ana, 'ana@acme.test')).toMatchObject({ ok: false, code: 'RECIPIENT_IS_SELF' });
+  });
+
+  it('prefers the person whose full name is exactly what was said', async () => {
+    expect(await resolveRecipient(e, B, ana, 'Martín Gómez')).toMatchObject({ ok: true, person: { id: 'usr_dm_mg2' } });
+    expect(await resolveRecipient(e, B, ana, 'martin')).toMatchObject({ ok: false, code: 'RECIPIENT_AMBIGUOUS' });
   });
 
   it('keeps each workspace’s conversations to itself', async () => {

@@ -81,6 +81,9 @@ export async function resolveRecipient(
       || needle.split(/\s+/).every((w) => w && name.split(/\s+/).some((n) => n.startsWith(w)));
   });
   if (byName.length === 1) return { ok: true, person: byName[0] };
+  // "Martín Gómez" picks Martín Gómez even when Martín Gómez Pérez also matches.
+  const exactName = byName.filter((p) => fold(p.name || '') === needle);
+  if (exactName.length === 1) return { ok: true, person: exactName[0] };
   if (byName.length > 1) {
     return fail(409, 'RECIPIENT_AMBIGUOUS', `More than one person matches "${q}". Say which one.`, { candidates: byName.slice(0, 8) });
   }
