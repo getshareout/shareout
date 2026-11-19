@@ -156,10 +156,10 @@ export async function sendDirectMessage(env: Env, input: SendInput): Promise<Sen
       `INSERT INTO direct_messages (id, thread_id, sent_by, body, artifact_id, sent_via, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
     ).bind(id, thread.id, input.senderId, body, artifact?.id ?? null, input.via, now),
+    // The sender's read state is left alone: a send from the assistant, MCP or the API must not
+    // mark as read what the other person wrote and the sender never saw. Their own messages never
+    // count as unread; opening the conversation (markThreadRead) is what reads it.
     env.DB.prepare('UPDATE direct_message_threads SET last_message_at = ? WHERE id = ?').bind(now, thread.id),
-    // Your own message is read by you.
-    env.DB.prepare('UPDATE direct_message_members SET last_read_at = ? WHERE thread_id = ? AND user_id = ?')
-      .bind(now, thread.id, input.senderId),
   ]);
 
   return {

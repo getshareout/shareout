@@ -1,9 +1,11 @@
 /**
  * Direct messages over MCP: the person's own AI (Claude, ChatGPT…) sends and reads their messages
  * with workspace members. send_message is two steps, like the confirm button in ShareOut's own
- * assistant: the first call only returns the draft and a confirm_token; the message goes out when
- * the same draft comes back with that token, after the person said yes. The token is bound to the
- * person, workspace, recipient, page and exact text, and lasts about 10 minutes.
+ * assistant: the first call stores the draft (direct_message_drafts) and returns its id as the
+ * confirm_token; the message goes out when the same draft comes back with that token, after the
+ * person said yes. The confirming call deletes the draft and sends what it holds, so a token sends
+ * once, only for the person it was drafted for, within 10 minutes. A token that does not match the
+ * draft exactly is spent too: the next try starts from a new draft.
  */
 import {
   NOT_MEMBER, fail, invalid, ok, resolveWorkspace, str, workspaceChoiceText,
@@ -16,9 +18,10 @@ import {
   type MessageError, type MessagePerson,
 } from '../messages/store';
 import { sendAndNotify } from '../messages/send';
+import { generateId } from '../crypto-utils';
 import { conversationUrl } from '../messages/notify';
 
-const WINDOW_MS = 10 * 60 * 1000;
+const DRAFT_MS = 10 * 60 * 1000;
 
 const personLabel = (p: MessagePerson) => (p.name && p.email ? `${p.name} (${p.email})` : p.name || p.email || 'someone');
 
@@ -41,26 +44,12 @@ function recipientProblem(e: MessageError): ToolResult {
   return invalid(e.message);
 }
 
-/** HMAC over the exact draft, per 10-minute window (the current and the previous one are accepted). */
-export async function confirmToken(secret: string, parts: string[], window: number): Promise<string> {
-  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
-  const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(['dm-confirm', window, ...parts].join('\u0000')));
-  return [...new Uint8Array(sig)].slice(0, 16).map((b) => b.toString(16).padStart(2, '0')).join('');
-}
-
-function safeEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  let diff = 0;
-  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  return diff === 0;
-}
-
 const sendMessage: ToolDef = {
   name: 'send_message',
   title: 'Send a message to someone in the workspace',
   description: [
     'Sends a direct message, as the person, to another member of their ShareOut workspace; it shows as written through their assistant, and the recipient sees it in ShareOut (and on Telegram when linked).',
-    'Two steps: a call without confirm_token sends nothing and returns the draft and a confirm_token; the same to, text and artifact_id with that token sends it (the token lasts about 10 minutes).',
+    'Two steps: a call without confirm_token sends nothing and returns the draft and a confirm_token; the same to, text and artifact_id with that token sends it. A token works once, for 10 minutes; a token that does not match the draft is spent and sends nothing.',
     'to: a name or email; when several people match, the candidates come back instead. text: at most 4000 characters. artifact_id: optional page the message is about.',
   ].join(' '),
   inputSchema: {
@@ -96,22 +85,34 @@ const sendMessage: ToolDef = {
       artifactName = row.name;
     }
 
-    const parts = [ctx.user.id, ws.id, who.person.id, artifactId || '', text];
-    const now = Math.floor(Date.now() / WINDOW_MS);
     const given = str(args.confirm_token, 100);
     if (!given) {
-      const token = await confirmToken(ctx.env.SESSION_SECRET, parts, now);
+      const now = Date.now();
+      const token = generateId('dmd');
+      await ctx.env.DB.batch([
+        // Drafts nobody confirmed go when the same person drafts again.
+        ctx.env.DB.prepare('DELETE FROM direct_message_drafts WHERE sent_by = ? AND expires_at < ?').bind(ctx.user.id, new Date(now).toISOString()),
+        ctx.env.DB.prepare(
+          `INSERT INTO direct_message_drafts (id, workspace_id, sent_by, recipient_id, body, artifact_id, expires_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        ).bind(token, ws.id, ctx.user.id, who.person.id, text, artifactId, new Date(now + DRAFT_MS).toISOString()),
+      ]);
       const about = artifactName ? `\nAbout: "${artifactName}"` : '';
       return ok(
         `Nothing sent yet. Show the person this draft and ask them to confirm:\nTo: ${personLabel(who.person)}\nText: "${text}"${about}\n`
-        + 'When they say yes, call send_message again with the same to, text and artifact_id and this confirm_token.',
+        + 'When they say yes, call send_message again with the same to, text and artifact_id and this confirm_token. It works once, for 10 minutes.',
         { draft: { to: personLabel(who.person), text, ...(artifactName ? { page: artifactName } : {}) }, confirm_token: token, sent: false },
       );
     }
-    const current = await confirmToken(ctx.env.SESSION_SECRET, parts, now);
-    const previous = await confirmToken(ctx.env.SESSION_SECRET, parts, now - 1);
-    if (!safeEqual(given, current) && !safeEqual(given, previous)) {
-      return invalid('Nothing was sent: the confirm_token does not match this exact draft (or it expired). Call send_message without confirm_token to get a new draft, and confirm it with the person.');
+    // Spend the token whatever happens next: one draft, one send, only by the person it is for.
+    const draft = await ctx.env.DB.prepare(
+      `DELETE FROM direct_message_drafts WHERE id = ? AND sent_by = ?
+       RETURNING workspace_id, recipient_id, body, artifact_id, expires_at`,
+    ).bind(given, ctx.user.id).first<{ workspace_id: string; recipient_id: string; body: string; artifact_id: string | null; expires_at: string }>();
+    const matches = !!draft && draft.expires_at > new Date().toISOString() && draft.workspace_id === ws.id
+      && draft.recipient_id === who.person.id && draft.body === text && (draft.artifact_id ?? null) === (artifactId ?? null);
+    if (!matches) {
+      return invalid('Nothing was sent: this confirm_token was already used, expired, or does not match this exact draft. Call send_message without confirm_token for a new draft, and confirm it with the person.');
     }
 
     const sent = await sendAndNotify(ctx.env, {

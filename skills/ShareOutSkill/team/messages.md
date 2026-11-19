@@ -8,7 +8,7 @@ Every way in uses the same rules:
 | --- | --- |
 | Home | **Messages** menu (conversations + composer, "New message" picks a person) and the bell (unread conversations) |
 | ShareOut assistant (Home chat, Telegram) | `send_message` (shows a confirm card; sent only after the person taps confirm) and `read_messages` |
-| MCP (Claude, ChatGPT…) | `send_message` (two steps with a `confirm_token`) and `read_messages` — see [../integrations/mcp-connector.md](../integrations/mcp-connector.md) |
+| MCP (Claude, ChatGPT…) | `send_message` (two steps: a stored draft, then a single-use `confirm_token` valid 10 minutes) and `read_messages` — see [../integrations/mcp-connector.md](../integrations/mcp-connector.md) |
 | REST API | `/v1/workspaces/{workspaceId}/messages…` (below) |
 
 ## Rules

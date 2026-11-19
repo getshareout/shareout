@@ -35,3 +35,19 @@ CREATE TABLE IF NOT EXISTS direct_messages (
   created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
 );
 CREATE INDEX IF NOT EXISTS idx_direct_messages_thread_created ON direct_messages(thread_id, created_at DESC);
+
+-- A message an MCP client drafted for the person (src/mcp/message-tools.ts). send_message's first
+-- call stores it and returns its id as the confirm_token; the second call deletes the row and sends
+-- what it holds (DELETE … RETURNING), so a token sends once, only for its sender, within
+-- `expires_at` (10 minutes). Drafts nobody confirmed are removed on the sender's next draft.
+CREATE TABLE IF NOT EXISTS direct_message_drafts (
+  id           TEXT PRIMARY KEY,                                               -- dmd_… (the confirm_token)
+  workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  sent_by      TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  recipient_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  body         TEXT NOT NULL,
+  artifact_id  TEXT REFERENCES artifacts(id) ON DELETE CASCADE,
+  expires_at   TEXT NOT NULL,
+  created_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+CREATE INDEX IF NOT EXISTS idx_direct_message_drafts_sender ON direct_message_drafts(sent_by, expires_at);

@@ -44,7 +44,6 @@ const send = (over: Partial<SendInput>) => sendDirectMessage(e, { workspaceId: A
 
 beforeAll(async () => {
   await applyMigrations();
-  (e as unknown as { SESSION_SECRET: string }).SESSION_SECRET = 'dm-test-secret';
   await e.DB.batch([
     e.DB.prepare(`INSERT INTO users (id, email, name, is_service, disabled) VALUES
       (?, 'ana@acme.test', 'Ana Pérez', 0, 0), (?, 'martin.gomez@acme.test', 'Martín Gómez', 0, 0),
@@ -75,15 +74,16 @@ describe('direct messages: store', () => {
     const second = await sendDirectMessage(e, { workspaceId: A, senderId: martin, recipientId: ana, body: 'hola Ana', via: 'web' });
     expect(second.ok && first.ok && second.threadId === first.threadId).toBe(true);
 
-    // Replying reads what came before: Martín has nothing unread until Ana writes again.
-    expect(await unreadCount(e, A, martin)).toBe(0);
+    // Sending does not read what the other person wrote (an assistant may send without opening it).
+    expect(await unreadCount(e, A, martin)).toBe(1);
     expect(await unreadCount(e, A, ana)).toBe(1);
     await send({ body: '¿viste los números?' });
-    expect(await unreadCount(e, A, martin)).toBe(1);
+    expect(await unreadCount(e, A, martin)).toBe(2);
+    expect(await unreadCount(e, A, ana)).toBe(1);
 
     const [thread] = await listThreads(e, A, martin);
     expect(thread.with.id).toBe(ana);
-    expect(thread.unread).toBe(1);
+    expect(thread.unread).toBe(2);
     expect(thread.last).toMatchObject({ body: '¿viste los números?', sentByMe: false });
 
     const messages = await listMessages(e, thread.id, martin);
@@ -200,29 +200,60 @@ describe('direct messages: MCP', () => {
   const [sendTool, readTool] = MESSAGE_TOOLS;
   const mcp = (id: string): McpContext => ({ env: e, user: { id, email: null, username: null }, origin: 'https://shareout.test', authorization: 'Bearer x' });
 
-  it('send_message is two steps: a draft with a token, then the send — bound to the exact text', async () => {
+  const draftFor = async (user: string, text: string) => {
+    const draft = await sendTool.run(mcp(user), { workspace_id: A, to: 'martina@acme.test', text });
+    return (draft.structuredContent as { confirm_token: string; sent: boolean });
+  };
+  const drafts = async () => (await e.DB.prepare('SELECT COUNT(*) AS n FROM direct_message_drafts').first<{ n: number }>())!.n;
+
+  it('send_message is two steps: a stored draft with a token, then one send', async () => {
     const before = await count();
-    const draft = await sendTool.run(mcp(ana), { workspace_id: A, to: 'martina@acme.test', text: 'desde Claude' });
-    const token = (draft.structuredContent as { confirm_token: string; sent: boolean });
-    expect(token.sent).toBe(false);
+    const draft = await draftFor(ana, 'desde Claude');
+    expect(draft.sent).toBe(false);
     expect(await count()).toBe(before);
 
-    const tampered = await sendTool.run(mcp(ana), { workspace_id: A, to: 'martina@acme.test', text: 'otra cosa', confirm_token: token.confirm_token });
-    expect(tampered.isError).toBe(true);
-    expect(await count()).toBe(before);
-
-    const sent = await sendTool.run(mcp(ana), { workspace_id: A, to: 'martina@acme.test', text: 'desde Claude', confirm_token: token.confirm_token });
+    const sent = await sendTool.run(mcp(ana), { workspace_id: A, to: 'martina@acme.test', text: 'desde Claude', confirm_token: draft.confirm_token });
     expect(sent.structuredContent).toMatchObject({ sent: true });
+    expect(await count()).toBe(before + 1);
     const thread = await findThread(e, A, martina, { withUserId: ana });
     const [last] = await listMessages(e, thread!.id, martina, { limit: 1 });
     expect(last).toMatchObject({ body: 'desde Claude', sentVia: 'mcp' });
+
+    // The same token again sends nothing: no duplicates, no replay.
+    const again = await sendTool.run(mcp(ana), { workspace_id: A, to: 'martina@acme.test', text: 'desde Claude', confirm_token: draft.confirm_token });
+    expect(again.isError).toBe(true);
+    expect(await count()).toBe(before + 1);
   });
 
-  it('a token minted for one person does not work for another', async () => {
-    const draft = await sendTool.run(mcp(ana), { workspace_id: A, to: 'martina@acme.test', text: 'hola' });
-    const { confirm_token } = draft.structuredContent as { confirm_token: string };
-    const other = await sendTool.run(mcp(martin), { workspace_id: A, to: 'martina@acme.test', text: 'hola', confirm_token });
+  it('a token that does not match the draft is spent: changed text sends nothing, then nor does the right text', async () => {
+    const before = await count();
+    const draft = await draftFor(ana, 'texto original');
+    const tampered = await sendTool.run(mcp(ana), { workspace_id: A, to: 'martina@acme.test', text: 'otra cosa', confirm_token: draft.confirm_token });
+    expect(tampered.isError).toBe(true);
+    const retry = await sendTool.run(mcp(ana), { workspace_id: A, to: 'martina@acme.test', text: 'texto original', confirm_token: draft.confirm_token });
+    expect(retry.isError).toBe(true);
+    expect(await count()).toBe(before);
+  });
+
+  it('a token works only for the person it was drafted for, and not after it expires', async () => {
+    const before = await count();
+    const draft = await draftFor(ana, 'hola');
+    const other = await sendTool.run(mcp(martin), { workspace_id: A, to: 'martina@acme.test', text: 'hola', confirm_token: draft.confirm_token });
     expect(other.isError).toBe(true);
+    // Martín's attempt did not spend Ana's draft; it expires instead.
+    await e.DB.prepare("UPDATE direct_message_drafts SET expires_at = '2000-01-01T00:00:00.000Z' WHERE id = ?").bind(draft.confirm_token).run();
+    const late = await sendTool.run(mcp(ana), { workspace_id: A, to: 'martina@acme.test', text: 'hola', confirm_token: draft.confirm_token });
+    expect(late.isError).toBe(true);
+    expect(await count()).toBe(before);
+  });
+
+  it('drafts nobody confirmed are cleared on the next draft', async () => {
+    const stale = await draftFor(ana, 'viejo');
+    await e.DB.prepare("UPDATE direct_message_drafts SET expires_at = '2000-01-01T00:00:00.000Z' WHERE id = ?").bind(stale.confirm_token).run();
+    const n = await drafts();
+    await draftFor(ana, 'nuevo');
+    expect(await drafts()).toBe(n);
+    expect(await e.DB.prepare('SELECT 1 FROM direct_message_drafts WHERE id = ?').bind(stale.confirm_token).first()).toBeNull();
   });
 
   it('refuses a workspace the caller is not in, and reads conversations', async () => {
