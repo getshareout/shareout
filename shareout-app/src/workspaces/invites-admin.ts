@@ -19,7 +19,13 @@ async function requireWsAdmin(env: Env, workspaceId: string, userId: string): Pr
   return null;
 }
 
-// GET /v1/workspaces/{id}/invites — pending (unclaimed) invites, newest claim per user.
+// GET /v1/workspaces/{id}/invites — pending invites, newest claim per user.
+//
+// Pending = still a member, code unused, and not signed in since the invite. The member
+// row is written at invite time, so anyone who signs in some other way (Google, an email
+// code, after the link expired) is in without ever redeeming the code — they used to sit
+// here as "waiting to accept" forever. Removed members keep their unused claim; they are
+// not waiting either.
 export async function handleListWorkspaceInvites(env: Env, user: AuthUser, workspaceId: string): Promise<Response> {
   const forbidden = await requireWsAdmin(env, workspaceId, user.id);
   if (forbidden) return forbidden;
@@ -29,9 +35,11 @@ export async function handleListWorkspaceInvites(env: Env, user: AuthUser, works
            (ic.expires_at < strftime('%Y-%m-%dT%H:%M:%fZ','now')) AS expired,
            inv.email AS invited_by_email, wm.role
     FROM workspace_invite_claims ic
+    JOIN workspace_members wm ON wm.workspace_id = ic.workspace_id AND wm.user_id = ic.user_id
+    JOIN users u ON u.id = ic.user_id
     LEFT JOIN users inv ON inv.id = ic.invited_by
-    LEFT JOIN workspace_members wm ON wm.workspace_id = ic.workspace_id AND wm.user_id = ic.user_id
     WHERE ic.workspace_id = ? AND ic.claimed_at IS NULL
+      AND (u.last_login_at IS NULL OR u.last_login_at < ic.created_at)
       AND NOT EXISTS (
         SELECT 1 FROM workspace_invite_claims ic2
         WHERE ic2.user_id = ic.user_id AND ic2.workspace_id = ic.workspace_id
