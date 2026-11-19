@@ -157,6 +157,7 @@ async function buildHomeBody(
     inboxDomain,
     isInstanceAdmin,
     slidesImport: !!env.SLIDES_CONVERTER,
+    whatsapp: !!(env.WHATSAPP_ACCESS_TOKEN && env.WHATSAPP_PHONE_NUMBER_ID && env.WHATSAPP_BUSINESS_NUMBER),
     openVisibilityAllowed: !!user.email && (await resolveAllowOpen(env, user.id, null)),
     fileImportProviders: importMenuProviders(env),
     platformOrigin: getPlatformOrigin(env),

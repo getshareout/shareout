@@ -74,15 +74,17 @@ const DISABLED = {
     slack: 'The Slack assistant isn’t enabled for your account right now.',
     web: 'The workspace assistant isn’t available here.',
     telegram: 'The Telegram assistant isn’t enabled for your account right now.',
+    whatsapp: 'The WhatsApp assistant isn’t turned on in this workspace. An admin can turn it on under Admin → Features.',
   },
   es: {
     slack: 'El asistente de Slack no está activado para tu cuenta por ahora.',
     web: 'El asistente del espacio no está disponible acá.',
     telegram: 'El asistente de Telegram no está activado para tu cuenta por ahora.',
+    whatsapp: 'El asistente de WhatsApp no está activado en este espacio. Un admin puede activarlo en Admin → Funciones.',
   },
 };
 
 export function botDisabledMessage(platform: PlatformId, locale: Locale = 'en'): string {
   const d = t(locale, DISABLED);
-  return platform === 'slack' ? d.slack : platform === 'web' ? d.web : d.telegram;
+  return platform === 'slack' ? d.slack : platform === 'web' ? d.web : platform === 'whatsapp' ? d.whatsapp : d.telegram;
 }

@@ -30,7 +30,9 @@ export async function deliverReply(env: Env, ticket: Ticket, body: string): Prom
 
   switch (ticket.channel) {
     case 'ui':
-    case 'skill': {
+    case 'skill':
+    // WhatsApp only lets us write within 24 hours of their last message, so a reply goes by email.
+    case 'whatsapp': {
       // In-app + API requesters answer from their thread; the email tells them a reply is there.
       if (!ticket.requester_email && !ticket.requester_user_id) return { delivered: false, via: ticket.channel, error: 'no requester' };
       const res = await dispatchLifecycleEmail(env, {

@@ -123,6 +123,7 @@ Tokens are checked against Microsoft's keys (`/discovery/v2.0/keys`): signature,
 | `OPEN_VISIBILITY_DISABLED` | var | `1` keeps every artifact private; no public links. |
 | `ADMIN_BRIDGE_SECRET` | secret | **Leave unset** unless you run a private bridge worker. Unset ⇒ `/internal/admin/*` denies all. |
 | Telegram / Slack bot tokens | secret | Only if you use those integrations. |
+| `WHATSAPP_PHONE_NUMBER_ID` / `WHATSAPP_ACCESS_TOKEN` / `WHATSAPP_APP_SECRET` / `WHATSAPP_VERIFY_TOKEN` / `WHATSAPP_BUSINESS_NUMBER` | var / secret | The WhatsApp assistant (Meta Cloud API). All five, or it stays off. See [WhatsApp assistant → For instance operators](/guides/whatsapp/#for-instance-operators). |
 | `TELEGRAM_LOGIN_LINKS` | var | `1` = page links in Telegram bot replies sign the member in with one tap. Needs `TELEGRAM_BOT_TOKEN` and BotFather `/setdomain`. See [Telegram bot](/guides/telegram-bot/). |
 | `SUPPORT_ALERT_TELEGRAM_CHAT_ID` | var | Telegram chat that gets the operator alerts: new support tickets, failed page builds, an AI provider out of credit, daily AI spend and low gateway credit. Needs `TELEGRAM_BOT_TOKEN`. See [AI provider → Alerts](/self-host/ai/#alerts). |
 | `AI_SPEND_ALERT_USD_PER_DAY` / `AI_CREDIT_ALERT_USD` / `BUILD_AGENT` / `BUILD_EFFORT` / `BUILD_MODEL` / `SCAN_MODEL` | var | AI alert lines, the page build agent and model choices. See [AI provider → All AI settings](/self-host/ai/#all-ai-settings). |

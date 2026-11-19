@@ -13,6 +13,7 @@ import { routeAuth } from './auth-router';
 import { routeApi } from './api-router';
 import { routeServe } from './serve-router';
 import { routeTelegram } from './telegram-router';
+import { routeWhatsApp } from './whatsapp-router';
 import { handleAbuseReport } from '../moderation/abuse-reports';
 import { routeSlack } from './slack-router';
 import { routeInternalAdmin } from './internal-admin';
@@ -82,7 +83,7 @@ async function proxyMarketing(request: Request, marketingOrigin: string): Promis
 // (/_astro, /brand/*, /artifacts) — falls through to the marketing Pages site.
 const RESERVED_PREFIXES = [
   '/v1/', '/api/', '/auth/', '/sdk/', '/admin', '/superadmin', '/editor',
-  '/internal/', '/telegram/', '/slack/', '/report/', '/debug', '/health',
+  '/internal/', '/telegram/', '/whatsapp/', '/slack/', '/report/', '/debug', '/health',
   '/app', '/home', '/create', '/teams', '/settings/', '/workspace', '/share-target',
   '/manifest.webmanifest', '/sw.js',
   '/a/', '/@', '/p/', '/embed/', '/t/', '/wl/', '/vg/', '/mcp', '/oauth/',
@@ -194,6 +195,12 @@ async function dispatch(request: Request, ctx: FetchContext, executionCtx?: Exec
   // authenticates via a shared secret header (see telegram-router).
   if (path.startsWith('/telegram/')) {
     return (await routeTelegram(ctx)) ?? new Response('Not Found', { status: 404 });
+  }
+
+  // WhatsApp Cloud API webhook. No session/CSRF — Meta signs every call with the app
+  // secret (see whatsapp-router).
+  if (path.startsWith('/whatsapp/')) {
+    return (await routeWhatsApp(ctx)) ?? new Response('Not Found', { status: 404 });
   }
 
   // Slack Events API, slash commands, and interactivity (signing-secret auth).

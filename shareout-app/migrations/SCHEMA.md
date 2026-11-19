@@ -432,7 +432,7 @@ Artifacts have real inboxes, and users get notified through email or a chat plat
 | `email_log` | Deduplication ledger — `(type, key)` records that a given email was already sent. Also the claim ledger for review notices: `version_notice` per version, `version_approved` per version+approver, `folder_first_open` per folder+person+day; and `invoice_reply` per invoice+message, so a reply to an invoice email delivered twice is handled once. |
 | `email_preferences` | Per-user, per-category opt-in. |
 | `email_suppressions` | Hard suppression list from bounces, complaints and unsubscribes. |
-| `messaging_links` | Chat-platform DM ↔ user binding with a selected workspace, keyed by (`platform`, `session_key`). Telegram uses the chat id as the session key; Slack uses `{team_id}:{user_id}`. |
+| `messaging_links` | Chat-platform DM ↔ user binding with a selected workspace, keyed by (`platform`, `session_key`). Telegram uses the chat id as the session key; WhatsApp the business-scoped user id (`AR.1349…`, else the phone number), with the phone number in `platform_user_id` when shared; Slack uses `{team_id}:{user_id}`. |
 
 ## 12 AI usage metering
 

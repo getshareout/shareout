@@ -12,6 +12,8 @@ const RATE_LIMITS = {
   accountCreate: { limit: 1, windowSeconds: 86400 },
   publish: { limit: 30, windowSeconds: 3600 },
   aiChat: { limit: 100, windowSeconds: 3600 },
+  // WhatsApp replies to a sender with no linked account are billed to no workspace: a few an hour, then silence.
+  whatsappUnlinked: { limit: 5, windowSeconds: 3600 },
   // Anonymous visitor chat: a single IP stays well under the owner-wide anon budget so
   // one network cannot lock every other visitor out of the owner's artifacts.
   aiChatAnonIp: { limit: 40, windowSeconds: 3600 },

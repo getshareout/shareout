@@ -126,9 +126,10 @@ describe('telegram webhook router', () => {
   it('handles linked /personal, unknown command, /unlink', async () => {
     getLinkedUserId.mockResolvedValue('usr_1');
 
+    // The chat always works in one workspace: /personal explains instead of switching.
     await routeTelegram(createFetchContext(webhookRequest(messageUpdate('/personal'), 'sek'), ENV));
-    expect(setSelectedTelegramWorkspace).toHaveBeenCalled();
-    expect(sendMessage).toHaveBeenCalledWith(ENV, 42, expect.stringMatching(/personal pages/i));
+    expect(setSelectedTelegramWorkspace).not.toHaveBeenCalled();
+    expect(sendMessage).toHaveBeenCalledWith(ENV, 42, expect.stringMatching(/one workspace at a time/i));
 
     await routeTelegram(createFetchContext(webhookRequest(messageUpdate('/notacommand'), 'sek'), ENV));
     expect(sendMessage).toHaveBeenCalledWith(ENV, 42, expect.stringMatching(/don.?t know/i));

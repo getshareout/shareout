@@ -47,13 +47,14 @@ export const workspace_client_home_views_adminAiReport_JS = `  var adAiMonth = n
         + kpi(bt('admin.airCalls'), adCompact(tot.calls), '')
         + kpi(bt('admin.airTokens'), adCompact(tot.tokens), bt('admin.airTokensInOut').replace('{in}', adCompact(tot.input_tokens)).replace('{out}', adCompact(tot.output_tokens)))
         + '</div>';
-      var cat = r.by_category || [], mod = r.by_model || [], aut = r.by_automation || [], pag = r.by_page || [], mem = r.by_member || [], kin = r.by_kind || [], day = r.by_day || [];
+      var cat = r.by_category || [], mod = r.by_model || [], aut = r.by_automation || [], pag = r.by_page || [], mem = r.by_member || [], chn = r.by_channel || [], kin = r.by_kind || [], day = r.by_day || [];
       m.innerHTML = '<div class="wsx-admin__settings-section">' + head + kpis + opNote + '</div>'
         + card('category', cat, table(cat, bt('admin.airColUse'), function (x) { return bt('admin.airCat_' + x.key) || x.key; }, ['calls', 'tokens'], op))
         + card('model', mod, table(mod, bt('admin.airColModel'), function (x) { return x.key; }, ['calls', 'input', 'output', 'tokens'], op))
         + card('automation', aut, table(aut, bt('admin.airColAutomation'), function (x) { return x.label || bt('admin.airAutomationGone'); }, ['runs', 'calls', 'tokens'], op))
         + card('page', pag, table(pag, bt('admin.airColPage'), function (x) { return x.label || bt('admin.airPageGone'); }, ['calls', 'tokens'], op))
         + card('member', mem, table(mem, bt('admin.airColMember'), function (x) { return x.label || bt('admin.billNoMember'); }, ['calls', 'tokens'], op))
+        + (chn.length ? card('channel', chn, table(chn, bt('admin.airColChannel'), function (x) { return bt('admin.airChannel_' + x.key) || x.key; }, ['calls'], op)) : '')
         + fold('kind', kin, table(kin, bt('admin.airColKind'), function (x) { return tOr('admin.aiKind_' + x.key, x.key); }, ['calls', 'input', 'output', 'tokens'], op))
         + fold('day', day, table(day, bt('admin.airColDay'), function (x) { return x.key; }, ['calls', 'tokens'], op));
       wire();

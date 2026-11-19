@@ -2,7 +2,7 @@ import type { Env } from '../types';
 import { generateId } from '../crypto-utils';
 import type { ChatMessage } from '../chat-agent/agent-loop';
 
-export type TicketChannel = 'ui' | 'skill' | 'slack' | 'telegram' | 'email';
+export type TicketChannel = 'ui' | 'skill' | 'slack' | 'telegram' | 'whatsapp' | 'email';
 export type TicketStatus = 'open' | 'pending' | 'resolved' | 'closed';
 export type TicketPriority = 'low' | 'normal' | 'high' | 'urgent';
 export type MessageAuthor = 'customer' | 'staff' | 'ai';

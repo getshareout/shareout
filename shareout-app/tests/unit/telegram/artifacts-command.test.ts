@@ -23,6 +23,8 @@ vi.mock('../../../src/chat-agent/access', () => ({
   resolveArtifactAccessForUser,
   TELEGRAM_PERSONAL_WORKSPACE: '__personal',
 }));
+const isFeatureEnabled = vi.hoisted(() => vi.fn(async () => true));
+vi.mock('../../../src/features/flags', () => ({ isFeatureEnabled }));
 vi.mock('../../../src/chat-agent/tools/media', () => ({
   sendSnapshotTool: { execute: sendSnapshotExecute },
   sendPdfTool: { execute: sendPdfExecute },
@@ -69,6 +71,7 @@ beforeEach(() => {
   resolveArtifactAccessForUser.mockReset();
   sendSnapshotExecute.mockReset();
   sendPdfExecute.mockReset();
+  isFeatureEnabled.mockReset().mockResolvedValue(true);
   getSelectedTelegramWorkspace.mockResolvedValue(null);
   listWorkspacesForUser.mockResolvedValue([]);
   resolveArtifactAccessForUser.mockResolvedValue({ role: 'viewer' });
@@ -78,8 +81,11 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('/artifacts command', () => {
-  it('lists the linked user’s pages with links', async () => {
+  it('lists the pages of the one workspace it picked, with links', async () => {
     getLinkedUserId.mockResolvedValue('user_1');
+    listWorkspacesForUser.mockResolvedValue([
+      { id: 'ws_acme', name: 'Acme', slug: 'acme', role: 'owner', artifactCount: 2 },
+    ]);
     listArtifactsForUser.mockResolvedValue([
       { id: 'art_sales', name: 'Sales', slug: 'sales', artifact_type: 'html', visibility: 'workspace', updated_at: '2026-06-15' },
       { id: 'art_ops', name: 'Ops', slug: 'ops', artifact_type: 'html', visibility: 'private', updated_at: '2026-06-14' },
@@ -89,10 +95,12 @@ describe('/artifacts command', () => {
 
     await routeTelegram(createFetchContext(update('/artifacts'), ENV));
 
-    expect(listArtifactsForUser).toHaveBeenCalledWith(ENV, 'user_1', { limit: 10, workspaceId: null });
+    // A single eligible workspace is picked for them and remembered.
+    expect(setSelectedTelegramWorkspace).toHaveBeenCalledWith(ENV, 42, 'ws_acme');
+    expect(listArtifactsForUser).toHaveBeenCalledWith(ENV, 'user_1', { limit: 10, workspaceId: 'ws_acme' });
     const body = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string) as { text: string };
     expect(String(fetchMock.mock.calls[0][0])).toContain('/sendMessage');
-    expect(body.text).toContain('Your pages in all accessible pages');
+    expect(body.text).toContain('Your pages in Acme');
     const card = JSON.parse((fetchMock.mock.calls[1][1] as RequestInit).body as string) as {
       text: string;
       reply_markup: { inline_keyboard: Array<Array<Record<string, string>>> };
@@ -127,14 +135,14 @@ describe('/artifacts command', () => {
 
     expect(setSelectedTelegramWorkspace).toHaveBeenCalledWith(ENV, 42, 'ws_acme');
     const body = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string) as { text: string };
-    expect(body.text).toContain('focus on Acme');
+    expect(body.text).toContain('work in Acme');
   });
 
   it('shows workspace picker buttons', async () => {
     getLinkedUserId.mockResolvedValue('user_1');
     listWorkspacesForUser.mockResolvedValue([
       { id: 'ws_acme', name: 'Acme', slug: 'acme', role: 'owner', artifactCount: 3 },
-      { id: 'ws_media', name: 'Acme', slug: 'acme', role: 'member', artifactCount: 2 },
+      { id: 'ws_media', name: 'Media', slug: 'media', role: 'member', artifactCount: 2 },
     ]);
     const fetchMock = vi.fn(async () => new Response('{}', { status: 200 }));
     vi.stubGlobal('fetch', fetchMock);
@@ -144,8 +152,10 @@ describe('/artifacts command', () => {
     const body = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string) as {
       reply_markup: { inline_keyboard: Array<Array<Record<string, string>>> };
     };
-    expect(body.reply_markup.inline_keyboard[0][0]).toMatchObject({ text: 'Acme (3)', callback_data: 'ws:ws_acme' });
-    expect(body.reply_markup.inline_keyboard[2][0]).toMatchObject({ text: 'All Pages', callback_data: 'ws:all' });
+    expect(body.reply_markup.inline_keyboard[0][0]).toMatchObject({ text: 'Acme', callback_data: 'ws:ws_acme' });
+    expect(body.reply_markup.inline_keyboard[1][0]).toMatchObject({ text: 'Media', callback_data: 'ws:ws_media' });
+    // Always one workspace: no "all pages" or "personal" scope to pick.
+    expect(body.reply_markup.inline_keyboard).toHaveLength(2);
   });
 
   it('runs snapshot from an artifact card callback', async () => {
@@ -169,9 +179,40 @@ describe('/artifacts command', () => {
     await routeTelegram(createFetchContext(callback('snap:art_sales'), env));
 
     expect(sendSnapshotExecute).toHaveBeenCalledWith(
-      { env, userId: 'user_1', chatId: 42 },
+      expect.objectContaining({ env, userId: 'user_1', platform: 'telegram', chatId: 42, reply: expect.any(Object) }),
       { artifact_id: 'art_sales' }
     );
     expect(fetchMock.mock.calls.some((call) => String(call[0]).includes('/answerCallbackQuery'))).toBe(true);
+  });
+
+  it('only offers workspaces that have the assistant turned on', async () => {
+    getLinkedUserId.mockResolvedValue('user_1');
+    listWorkspacesForUser.mockResolvedValue([
+      { id: 'ws_on', name: 'On', slug: 'on', role: 'member', artifactCount: 1 },
+      { id: 'ws_off', name: 'Off', slug: 'off', role: 'member', artifactCount: 1 },
+    ]);
+    isFeatureEnabled.mockImplementation(async (_env: unknown, _key: unknown, ws: unknown) => ws === 'ws_on');
+    const fetchMock = vi.fn(async () => new Response('{}', { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await routeTelegram(createFetchContext(update('/workspace off'), ENV));
+
+    expect(setSelectedTelegramWorkspace).not.toHaveBeenCalled();
+    const body = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string) as { text: string };
+    expect(body.text).toContain('Available workspaces: on');
+  });
+
+  it('says the assistant is off when no workspace has it on', async () => {
+    getLinkedUserId.mockResolvedValue('user_1');
+    listWorkspacesForUser.mockResolvedValue([{ id: 'ws_off', name: 'Off', slug: 'off', role: 'admin', artifactCount: 1 }]);
+    isFeatureEnabled.mockResolvedValue(false);
+    const fetchMock = vi.fn(async () => new Response('{}', { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await routeTelegram(createFetchContext(update('/artifacts'), ENV));
+
+    expect(listArtifactsForUser).not.toHaveBeenCalled();
+    const body = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string) as { text: string };
+    expect(body.text).toMatch(/isn’t turned on in your workspace/);
   });
 });

@@ -101,15 +101,24 @@ function systemPrompt(platform: PlatformId, caps: Capabilities, selectedWorkspac
     ? 'You are the ShareOut assistant in Slack. Use mrkdwn (single *asterisks* for bold). Keep replies short.'
     : platform === 'telegram'
       ? 'You are the ShareOut assistant in Telegram. Keep replies short and plain text — Telegram has no rich formatting.'
-      : platform === 'web'
+      : platform === 'whatsapp'
+        ? 'You are the ShareOut assistant in WhatsApp. Keep replies short: one message that answers fully. For bold use single *asterisks*; no headings, tables or Markdown links.'
+        : platform === 'web'
         ? 'You are the ShareOut workspace assistant, embedded in the workspace home. Keep replies short and clear; light Markdown is fine.'
         : 'You are the ShareOut assistant. Keep replies short and clear.';
   const linkLine = [
     'Link a page only with the `url` a tool returned for it — absolute, exactly as given. Never build, shorten or guess a URL, and never link an id.',
     platform === 'telegram'
       ? 'Telegram shows plain text: put each URL bare on its own line, right after the page name. No Markdown links, no bold.'
-      : null,
+      : platform === 'whatsapp'
+        ? 'WhatsApp only links bare URLs: put each URL on its own line, right after the page name. No Markdown links.'
+        : null,
   ].filter(Boolean).join(' ');
+  // Messaging apps carry the assistant for ShareOut only — WhatsApp's terms forbid offering a
+  // general-purpose AI assistant on its business platform.
+  const topicLine = platform === 'telegram' || platform === 'whatsapp'
+    ? 'Stay on ShareOut: this workspace’s pages, data, knowledge, sharing, schedules and alerts. For anything unrelated (general knowledge, writing, coding, chit-chat), say in one sentence that you only help with ShareOut here.'
+    : null;
   const citeLine = 'When the user asks where something is covered or how a procedure, rule or step works, call find_passages first. Answer with the page (and sub-page) name, the section heading or number, a short quoted excerpt, and that passage’s `url` so they land on the right section. Never cite a passage the tool did not return.';
   const dataLine = caps.canQueryConnections
     ? 'You can also run ad-hoc read-only SQL against the workspace’s data connectors (query_connection) — only connectors the admin has enabled for the assistant. Use list_connections first to see names and which are enabled. Write only SELECT queries; never attempt to change data. For storage connectors (Amazon S3) use browse_storage to list folders and read CSV/JSON/text files. For app connectors (`readable` in list_connections, e.g. Humand for employees, departments, time off and attendance) use read_connector: call it without endpoint to see what it can read, then read one endpoint, paging with page/limit when you need every row.'
@@ -135,6 +144,7 @@ function systemPrompt(platform: PlatformId, caps: Capabilities, selectedWorkspac
     'You help the user find, read, and summarize THEIR ShareOut pages (artifacts), and you can run a page’s live data sources to get fresh numbers. Use the tools to look things up — never guess at a page’s contents or its numbers. If you can’t find something or the user lacks access, say so plainly and suggest a next step.',
     '',
     linkLine,
+    ...(topicLine ? ['', topicLine] : []),
     '',
     citeLine,
     '',

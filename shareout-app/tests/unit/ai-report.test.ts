@@ -91,6 +91,24 @@ describe('aiReport', () => {
     expect(aiReportCsv(rep).split('\n')[0]).toContain('cost_usd');
   });
 
+  it('breaks chat usage down by channel, WhatsApp messages included', async () => {
+    const rows = [
+      r({ kind: 'assistant_chat', source: 'web', calls: 2, cost: 100_000 }),
+      r({ kind: 'assistant_chat', source: 'telegram', calls: 3, cost: 300_000 }),
+      r({ kind: 'assistant_chat', source: 'whatsapp', calls: 1, cost: 80_000 }),
+      r({ kind: 'whatsapp_message', model: 'whatsapp', source: 'whatsapp', calls: 4, cost: 104_000 }),
+      r({ kind: 'crew_run', source: 'crun_1', calls: 1, cost: 1_000 }),
+    ];
+    const rep = await aiReport(env(rows).env, 'wsp_1', '2026-10', 10_000);
+    const by = Object.fromEntries(rep.by_channel.map((x) => [x.key, x]));
+    expect(Object.keys(by).sort()).toEqual(['telegram', 'web', 'whatsapp']);
+    expect(by.whatsapp).toMatchObject({ calls: 5, price_micro_usd: 184_000 });
+    expect(by.telegram).toMatchObject({ calls: 3, price_micro_usd: 300_000 });
+    // A WhatsApp message is part of answering questions on the bill.
+    expect(categoryOf('whatsapp_message')).toBe('questions');
+    expect(aiReportCsv(rep)).toContain('2026-10,channel,whatsapp,,5,');
+  });
+
   it('writes a CSV with a row per breakdown line and no cost for the workspace', async () => {
     const csv = aiReportCsv(await aiReport(env().env, 'wsp_1', '2026-10', 15_000));
     const lines = csv.trim().split('\n');

@@ -2,6 +2,7 @@ import type { Env } from '../types';
 import type { ChatReplyPort, PlatformId } from '../chat-platforms/types';
 import { createTelegramReplyPort } from '../chat-platforms/telegram/reply-port';
 import { createSlackReplyPort } from '../chat-platforms/slack/reply-port';
+import { createWhatsAppReplyPort } from '../chat-platforms/whatsapp/reply-port';
 import { parseSlackSessionKey } from '../chat-platforms/slack/linking';
 import { resolveAgentScope } from './scope';
 import { runAgentTurn } from './agent-loop';
@@ -71,6 +72,8 @@ export interface SessionTurnBody {
   nativeChatId: number | string;
   /** Slack DM channel id when platform is slack. */
   slackChannelId?: string;
+  /** WhatsApp: the message being answered, for the read mark and "typing…". */
+  inboundMessageId?: string;
 }
 
 export interface SessionCallbackBody {
@@ -84,15 +87,35 @@ export interface SessionCallbackBody {
   updateId: number;
   nativeChatId: number | string;
   slackChannelId?: string;
+  /** The chat's workspace when the button was tapped: WhatsApp bills the result message to it. */
+  selectedWorkspaceId?: WorkspaceSelection;
+}
+
+interface ReplyContext {
+  slackChannelId?: string;
+  userId: string;
+  selectedWorkspaceId?: WorkspaceSelection;
+  inboundMessageId?: string;
+  locale?: Locale;
 }
 
 function createReplyPort(
   env: Env,
   platform: PlatformId,
   nativeChatId: number | string,
-  slackChannelId?: string
+  ctx: ReplyContext,
 ): ChatReplyPort {
+  const { slackChannelId } = ctx;
   if (platform === 'telegram') return createTelegramReplyPort(env, nativeChatId as number);
+  if (platform === 'whatsapp') {
+    const ws = ctx.selectedWorkspaceId;
+    return createWhatsAppReplyPort(env, {
+      to: String(nativeChatId),
+      meter: { workspaceId: typeof ws === 'string' && ws !== PERSONAL_SCOPE ? ws : null, userId: ctx.userId },
+      ...(ctx.inboundMessageId ? { inboundMessageId: ctx.inboundMessageId } : {}),
+      ...(ctx.locale ? { locale: ctx.locale } : {}),
+    });
+  }
   if (platform === 'slack') {
     const parsed = parseSlackSessionKey(String(nativeChatId));
     if (!parsed) throw new Error(`ChatSessionDO: invalid slack session ${nativeChatId}`);
@@ -164,9 +187,14 @@ export class ChatSessionDO implements DurableObject {
   private async processTurn(b: SessionTurnBody): Promise<void> {
     if (!this.firstSeen(b.updateId)) return;
 
-    const reply = createReplyPort(this.env, b.platform, b.nativeChatId, b.slackChannelId);
-
     const locale = await botLocale(this.env, b.userId, b.selectedWorkspaceId);
+    const reply = createReplyPort(this.env, b.platform, b.nativeChatId, {
+      slackChannelId: b.slackChannelId,
+      userId: b.userId,
+      selectedWorkspaceId: b.selectedWorkspaceId,
+      inboundMessageId: b.inboundMessageId,
+      locale,
+    });
     const rl = await checkAiChatLimit(this.env, b.userId);
     if (!rl.allowed) {
       await reply.sendText(t(locale, BOT_COPY).tooFast);
@@ -226,7 +254,11 @@ export class ChatSessionDO implements DurableObject {
   }
 
   private async processCallback(b: SessionCallbackBody): Promise<void> {
-    const reply = createReplyPort(this.env, b.platform, b.nativeChatId, b.slackChannelId);
+    const reply = createReplyPort(this.env, b.platform, b.nativeChatId, {
+      slackChannelId: b.slackChannelId,
+      userId: b.userId,
+      selectedWorkspaceId: b.selectedWorkspaceId,
+    });
 
     if (!this.firstSeen(b.updateId)) {
       await reply.answerCallback?.(b.callbackId);

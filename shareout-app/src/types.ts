@@ -254,6 +254,16 @@ export interface Env {
   ADMIN_BRIDGE_SECRET?: string;
   /** Shared secret echoed by Telegram in X-Telegram-Bot-Api-Secret-Token to authenticate webhook calls. */
   TELEGRAM_WEBHOOK_SECRET?: string;
+  /** WhatsApp Cloud API: the business phone number id the bot answers from (Meta app → WhatsApp → API setup). */
+  WHATSAPP_PHONE_NUMBER_ID?: string;
+  /** WhatsApp Cloud API: a system-user access token with whatsapp_business_messaging. */
+  WHATSAPP_ACCESS_TOKEN?: string;
+  /** Meta app secret: signs every webhook call (X-Hub-Signature-256). */
+  WHATSAPP_APP_SECRET?: string;
+  /** The verify token typed into the Meta webhook settings; echoed once when the webhook is set up. */
+  WHATSAPP_VERIFY_TOKEN?: string;
+  /** The bot's phone number in international digits (5491112345678), for the wa.me link that connects an account. */
+  WHATSAPP_BUSINESS_NUMBER?: string;
   /** Shared secret for the trusted support email-gateway ingest (AgentsEmail → /v1/support/ingest/email). */
   SUPPORT_INGEST_KEY?: string;
   /** Telegram chat id that gets a ping for every new support ticket (uses TELEGRAM_BOT_TOKEN). Optional. */
