@@ -234,6 +234,8 @@ export const WORKSPACE_AGENT_COMPOSER_STYLES = `/* ---- agent dock (inside canva
 .wsx__help-body { padding: 14px; display: flex; flex-direction: column; gap: 8px; }
 .wsx__help-body .wsx-field__in { width: 100%; box-sizing: border-box; }
 .wsx__help-body .wsx-field__ta { min-height: 96px; }
+.wsx__help-links { display: flex; flex-wrap: wrap; gap: 6px 16px; padding-bottom: 10px; border-bottom: 1px solid var(--color-border); }
+.wsx__help-links .wsx-link { text-decoration: none; }
 .wsx__help-actions { display: flex; align-items: center; gap: 10px; margin-top: 0; }
 .wsx__help-mine { margin-top: 14px; }
 .wsx__help-minetitle { font: 600 var(--text-xs) var(--font-body); color: var(--color-text-secondary); margin-bottom: 6px; }

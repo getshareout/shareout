@@ -102,6 +102,10 @@ function homeI18nSource(serverLocaleExpr: string, copyExpr: string): string {
       var key = el.getAttribute('data-i18n-tip');
       if (key) el.setAttribute('data-tip', t(key));
     });
+    r.querySelectorAll('[data-i18n-href]').forEach(function(el){
+      var v = t(el.getAttribute('data-i18n-href') || '');
+      if (/^https:\\/\\//.test(v)) el.setAttribute('href', v);
+    });
     document.querySelectorAll('.home-lang-btn').forEach(function(btn){
       var lang = btn.getAttribute('data-lang');
       btn.setAttribute('aria-selected', lang === locale ? 'true' : 'false');

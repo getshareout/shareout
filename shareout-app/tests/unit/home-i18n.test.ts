@@ -78,3 +78,28 @@ describe('connector taglines', () => {
     }
   });
 });
+
+describe('docs links in Home copy', () => {
+  it('every docs URL key exists in both languages, and the Spanish one opens the Spanish docs', () => {
+    const keys = Object.keys(HOME_COPY.en).filter((k) => /Url$/.test(k) && String(HOME_COPY.en[k]).startsWith('https://docs.shareout.site/'));
+    expect(keys).toEqual(expect.arrayContaining(['foot.docsUrl', 'foot.whatsNewUrl', 'esync.guideUrl', 'dsync.guideUrl', 'new.keepGuideUrl']));
+    for (const k of keys) {
+      expect(HOME_COPY.en[k], k).not.toMatch(/^https:\/\/docs\.shareout\.site\/es\//);
+      expect(HOME_COPY.es[k], k).toMatch(/^https:\/\/docs\.shareout\.site\/es\//);
+    }
+  });
+
+  it('the rail and Help & support link to the guides and to What\'s new in the viewer\'s language', () => {
+    const { body: html, scripts } = buildWorkspaceView(args);
+    expect(html).toContain('id="wsxWhatsNew" href="https://docs.shareout.site/whats-new/"');
+    expect(html).toMatch(/<nav class="wsx__help-links"[^>]*>.*data-i18n-href="foot\.docsUrl" data-i18n="help\.guides".*data-i18n-href="foot\.whatsNewUrl" data-i18n="foot\.whatsNew"/);
+    expect(html).toContain('data-i18n-href="foot.docsUrl" data-i18n-aria="foot.docs"');
+    expect(() => new Function(scripts)).not.toThrow();
+  });
+
+  it('copy has no escaped apostrophes left (they showed as \\\' in the UI)', () => {
+    for (const lang of ['en', 'es'] as const) {
+      for (const [k, v] of Object.entries(HOME_COPY[lang])) expect(String(v), `${lang} ${k}`).not.toContain("\\'");
+    }
+  });
+});

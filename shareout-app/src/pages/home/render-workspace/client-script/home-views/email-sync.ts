@@ -89,7 +89,7 @@ export const workspace_client_home_views_emailSync_JS = `  // ===== Update a dat
     var fixedDs = reads.length === 1 ? reads[0] : (st.suggestedDataset || (st.datasets && st.datasets[0]) || 'data');
     var ask = reads.length > 1 ? esField(t('esync.datasetAsk'), '<select class="wsx-field__in" id="es_ds"><option value="">' + esc(t('esync.datasetPick')) + '</option>'
         + reads.map(function (n) { return '<option value="' + esc(n) + '">' + esc(n) + '</option>'; }).join('') + '</select>', t('esync.datasetAskNote')) : '';
-    var b = esBody('<p class="wsx-lens__intro">' + esc(t('esync.intro')) + ' ' + esc(t('esync.noAccount')) + '</p>'
+    var b = esBody('<p class="wsx-lens__intro">' + esc(t('esync.intro')) + ' ' + esc(t('esync.noAccount')) + '</p>' + esGuide()
       + esField(t('esync.who'), '<input class="wsx-field__in" id="es_who" type="email" multiple autocomplete="email" spellcheck="false" placeholder="' + esc(t('esync.whoPh')) + '" value="' + esc((st.senders && st.senders.length ? st.senders.join(', ') : st.you) || '') + '">', t('esync.whoNote'))
       + ask
       + '<details class="wsx-adet__adv"><summary>' + esc(t('esync.more')) + '</summary>'
@@ -165,6 +165,8 @@ export const workspace_client_home_views_emailSync_JS = `  // ===== Update a dat
     var e = st.lastEmail; if (!e) return t('esync.noEmailYet');
     return esT('esync.lastEmailLine', { from: e.from || '', when: esWhen(e.receivedAt) }) + (e.files && e.files.length ? ' \\u00b7 ' + e.files.join(', ') : '');
   }
+  // The how-to on the docs site, in the viewer's language (the URL is copy, so es gets the es guide).
+  function esGuide() { return '<p class="wsx-field__note"><a class="wsx-link" href="' + esc(t('esync.guideUrl')) + '" target="_blank" rel="noopener" data-es-guide="1">' + esc(t('guide.stepByStep')) + ' \\u2192</a></p>'; }
   function esQuote(list) { return list.map(function (n) { return '\\u201c' + n + '\\u201d'; }).join(' / '); }
   function esManage(st, justOn) {
     var j = st.job, senders = st.senders || [], reads = esReads(st), lim = st.limits || {};
@@ -182,6 +184,7 @@ export const workspace_client_home_views_emailSync_JS = `  // ===== Update a dat
       + '<h4 class="wsx-adet__h">' + esc(t('esync.howTitle')) + '</h4>'
       + '<ol class="wsx-esync__steps"><li>' + esc(t('esync.step1')) + '</li><li>' + esc(esT('esync.step2', { who: senders.join(', ') })) + '</li><li>' + esc(t('esync.step3')) + '</li></ol>'
       + '<p class="wsx-field__note">' + esc(esT('esync.fine', { mb: lim.fileMb || 8, rows: Number(lim.rows || 100000).toLocaleString(locTag()) })) + ' ' + esc(t('esync.excelFirst')) + '</p>'
+      + esGuide()
       + esHowTo()
       + '<h4 class="wsx-adet__h">' + esc(t('esync.lastUpdate')) + '</h4><div id="es_status">' + esStatus(st) + '</div>'
       + '<div class="wsx-esync__row"><span class="wsx-field__lbl">' + esc(t('esync.senders')) + '</span><button class="wsx-link" type="button" data-es-edit="1">' + esc(t('esync.change')) + '</button></div>'

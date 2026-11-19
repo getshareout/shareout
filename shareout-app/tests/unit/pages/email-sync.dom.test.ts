@@ -102,6 +102,11 @@ describe('Update by email', () => {
     expect($<HTMLInputElement>('#es_ds').value).toBe('ventas');
     // No jargon on screen.
     expect(modalText()).not.toMatch(/DMARC|DKIM|cron|job|OAuth|allowlist/i);
+    // The step-by-step guide, in a new tab.
+    const guide = $<HTMLAnchorElement>('[data-es-guide]');
+    expect(guide.getAttribute('href')).toBe(copy['esync.guideUrl']);
+    expect(guide.getAttribute('target')).toBe('_blank');
+    expect(guide.textContent).toContain(copy['guide.stepByStep']);
   });
 
   it('turns on: senders first, then the job; then shows the address ready to copy', async () => {
@@ -199,6 +204,7 @@ describe('Update by email', () => {
     const steps = [...document.querySelectorAll('.wsx-esync__steps li')].map((li) => li.textContent);
     expect(steps).toEqual([copy['esync.step1'], copy['esync.step2'].replace('{who}', 'ana@acme.com'), copy['esync.step3']]);
     expect($<HTMLAnchorElement>('[data-es-mailto]').getAttribute('href')).toBe('mailto:' + ADDRESS);
+    expect($<HTMLAnchorElement>('[data-es-guide]').getAttribute('href')).toBe(copy['esync.guideUrl']);
     expect($('#es_status').textContent).toContain(copy['esync.waiting']);
     expect(modalText()).toContain('Up to 8 MB and 100,000 rows');
     // Only one break opportunity, right after the @; each half is kept whole.

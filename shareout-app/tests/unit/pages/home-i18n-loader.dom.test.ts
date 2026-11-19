@@ -75,4 +75,16 @@ describe('home i18n loader', () => {
     expect(w.__SO_HOME_T('meta.title')).toBe(HOME_COPY.en['meta.title']);
     expect(title()).toBe(HOME_COPY.en['meta.title']);
   });
+
+  it('data-i18n-href points a link at the copy URL for the locale, and ignores non-https values', () => {
+    document.body.innerHTML = '<h1 data-i18n="meta.title"></h1>'
+      + '<a id="wn" href="https://docs.shareout.site/whats-new/" data-i18n-href="foot.whatsNewUrl"></a>'
+      + '<a id="bad" href="https://docs.shareout.site/" data-i18n-href="meta.title"></a>';
+    boot('es', 'es');
+    expect(document.getElementById('wn')!.getAttribute('href')).toBe(HOME_COPY.es['foot.whatsNewUrl']);
+    expect(HOME_COPY.es['foot.whatsNewUrl']).toBe('https://docs.shareout.site/es/whats-new/');
+    expect(document.getElementById('bad')!.getAttribute('href')).toBe('https://docs.shareout.site/');
+    w.__SO_SET_HOME_LOCALE('en');
+    expect(document.getElementById('wn')!.getAttribute('href')).toBe('https://docs.shareout.site/whats-new/');
+  });
 });

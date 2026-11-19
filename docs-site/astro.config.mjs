@@ -86,12 +86,12 @@ export default defineConfig({
 					translations: { es: '✨ Empezá acá' },
 					items: [
 						{ label: 'What is ShareOut?', slug: 'everyone/what-is-shareout', translations: { es: '¿Qué es ShareOut?' } },
+						{ label: "What's new", slug: 'whats-new', translations: { es: 'Novedades' }, badge: { text: { en: 'New', es: 'Nuevo' }, variant: 'tip' } },
 						{ label: 'What can you make?', slug: 'everyone/what-you-can-make', translations: { es: '¿Qué podés hacer?' } },
 						{ label: 'Make your first page', slug: 'everyone/make-your-first-page', translations: { es: 'Hacé tu primer artefacto' } },
 						{ label: 'Your workspace (Home)', slug: 'everyone/your-workspace', translations: { es: 'Tu workspace (Home)' } },
 						{ label: 'Folder guides', slug: 'everyone/folder-guides', translations: { es: 'Guías de carpeta' } },
 						{ label: 'Files & deliverables', slug: 'everyone/assets', translations: { es: 'Archivos y entregas' } },
-						{ label: "What's new", slug: 'whats-new', translations: { es: 'Novedades' } },
 					],
 				},
 				{
@@ -137,8 +137,8 @@ export default defineConfig({
 					],
 				},
 				{
-					label: 'Start here',
-					translations: { es: 'Primeros pasos' },
+					label: 'Developers: start here',
+					translations: { es: 'Developers: primeros pasos' },
 					items: [
 						{ label: 'Introduction', slug: 'start/introduction', translations: { es: 'Introducción' } },
 						{ label: 'Quickstart', slug: 'start/quickstart', translations: { es: 'Inicio rápido' } },
@@ -146,8 +146,8 @@ export default defineConfig({
 					],
 				},
 				{
-					label: 'Self-host',
-					translations: { es: 'Self-host' },
+					label: 'Developers: self-host',
+					translations: { es: 'Developers: self-host' },
 					items: [
 						{ label: 'Overview', slug: 'self-host/overview', translations: { es: 'Overview' } },
 						{ label: 'Data plane smoke', slug: 'self-host/data-smoke', translations: { es: 'Smoke de datos' } },
@@ -160,8 +160,8 @@ export default defineConfig({
 					],
 				},
 				{
-					label: 'Guides',
-					translations: { es: 'Guías' },
+					label: 'Developer guides',
+					translations: { es: 'Guías para developers' },
 					items: [
 						{ label: 'Publishing artifacts', slug: 'guides/publishing', translations: { es: 'Publicar artefactos' } },
 						{ label: 'Multi-page artifacts', slug: 'guides/multi-page', translations: { es: 'Artefactos de varias secciones' } },

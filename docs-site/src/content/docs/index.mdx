@@ -1,51 +1,66 @@
 ---
 title: ShareOut
-description: Self-hosted workspace where agents and people publish live pages on your Cloudflare account.
+description: ShareOut turns a spreadsheet, a report or an idea into a page with its own link, and keeps it up to date. Guides in plain words, what's new, and the developer reference.
 template: splash
 hero:
-  tagline: Describe a page — it goes live on your ShareOut instance. Install once on Cloudflare; then talk, build, share.
+  tagline: Turn a spreadsheet, a report or an idea into a page with its own link — and keep it up to date by itself. These guides show you how, in plain words.
   image:
     file: ../../assets/shareout-mark.png
   actions:
-    - text: Install ShareOut
-      link: /self-host/overview/
+    - text: Start here
+      link: /everyone/what-is-shareout/
       icon: right-arrow
       variant: primary
-    - text: What is ShareOut?
-      link: /everyone/what-is-shareout/
-      icon: open-book
+    - text: What's new
+      link: /whats-new/
+      icon: rocket
       variant: minimal
 ---
 
-import { Card, CardGrid } from '@astrojs/starlight/components';
+import { Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import LatestChanges from '../../components/LatestChanges.astro';
 
-## Your idea, live on *your* instance
+## Start here — no technical knowledge needed
 
-ShareOut is **self-hosted only**. Someone deploys it to Cloudflare; then you
-describe a page, it builds it, and you get a link on your domain.
+Everything you make in ShareOut — a table, a report, a dashboard, a small website — is a **page
+with its own link** (ShareOut also calls it an *artifact*). You decide who can open it.
 
-<CardGrid stagger>
-	<Card title="Install first">
-		Clone the repo, `npm run deploy`, open `/setup`. [Install guide](/self-host/overview/).
+<CardGrid>
+	<Card title="1. What ShareOut is" icon="open-book">
+		Two minutes, no jargon. [What is ShareOut?](/everyone/what-is-shareout/)
 	</Card>
-	<Card title="Just describe it">
-		Tell ShareOut what you want — *"a page for my bakery with my menu and a contact form"* — and it builds it. [Make your first page](/everyone/make-your-first-page/).
+	<Card title="2. Make your first page" icon="pencil">
+		Upload an Excel file and get a clean table, or describe what you want.
+		[Make your first page](/everyone/make-your-first-page/)
 	</Card>
-	<Card title="Make it yours">
-		Add photos, change words and colors, drop in a form. Click or ask. [The editor](/everyone/the-editor/).
+	<Card title="3. Keep it up to date by itself" icon="random">
+		Email the Excel to the page, or link a Google spreadsheet — the page updates on its own.
+		[By email](/everyone/inbox/#update-your-pages-numbers-by-emailing-the-excel) ·
+		[From a spreadsheet](/everyone/google-sheets/)
 	</Card>
-	<Card title="Share with anyone">
-		Every page gets its own link. Whole world, or a few people. [Share it](/everyone/share-it/).
+	<Card title="4. Share it" icon="external">
+		Anyone with the link, your team, or only the people you pick.
+		[Share it](/everyone/share-it/)
 	</Card>
 </CardGrid>
 
-## New here?
+## What's new
 
-1. [**Install / self-host**](/self-host/overview/) if you do not have an instance yet.
-2. Then [**What is ShareOut?**](/everyone/what-is-shareout/) and
-   [**what you can make**](/everyone/what-you-can-make/).
+<LatestChanges lang="en" />
 
-## Building with code?
+## Where you use ShareOut
 
-REST API and browser SDK — publish pages, store data, run jobs. Start at the
-[**developer intro**](/start/introduction/) or the [**API reference**](/api/).
+- **ShareOut Cloud** at [shareout.site](https://shareout.site) — new accounts are by invitation for now.
+- **Your company's own ShareOut** — ask whoever set it up for the address. The guides work the same.
+- **Setting one up yourself?** It runs on your own Cloudflare account: [install guide](/self-host/overview/).
+
+## For developers
+
+The REST API, the browser SDK, assistants over MCP and self-hosting live in their own sections.
+
+<CardGrid>
+	<LinkCard title="Developer intro" href="/start/introduction/" description="Publish pages, store data and run jobs from code." />
+	<LinkCard title="REST API reference" href="/api/" description="Every endpoint, generated from the OpenAPI spec." />
+	<LinkCard title="Browser SDK" href="/sdk/overview/" description="Tables, JSON, files, realtime and email inside a page." />
+	<LinkCard title="Self-host" href="/self-host/overview/" description="Deploy ShareOut to your Cloudflare account." />
+</CardGrid>

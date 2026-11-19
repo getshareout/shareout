@@ -1,51 +1,66 @@
 ---
 title: ShareOut
-description: Workspace self-hosted donde agentes y personas publican artefactos en vivo en tu cuenta de Cloudflare.
+description: ShareOut convierte una planilla, un reporte o una idea en un artefacto con su propio link, y lo mantiene al día. Guías en palabras simples, novedades y la referencia para developers.
 template: splash
 hero:
-  tagline: Describí un artefacto — queda en vivo en tu instancia ShareOut. Instalá una vez en Cloudflare; después hablá, construí, compartí.
+  tagline: Convertí una planilla, un reporte o una idea en algo con su propio link — y que se mantenga al día solo. Estas guías te muestran cómo, en palabras simples.
   image:
     file: ../../../assets/shareout-mark.png
   actions:
-    - text: Instalar ShareOut
-      link: /es/self-host/overview/
+    - text: Empezá acá
+      link: /es/everyone/what-is-shareout/
       icon: right-arrow
       variant: primary
-    - text: ¿Qué es ShareOut?
-      link: /es/everyone/what-is-shareout/
-      icon: open-book
+    - text: Novedades
+      link: /es/whats-new/
+      icon: rocket
       variant: minimal
 ---
 
-import { Card, CardGrid } from '@astrojs/starlight/components';
+import { Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import LatestChanges from '../../../components/LatestChanges.astro';
 
-## Tu idea, en vivo en *tu* instancia
+## Empezá acá — sin saber nada técnico
 
-ShareOut es **solo self-hosted**. Alguien lo despliega en Cloudflare; después
-describís un artefacto, lo arma, y tenés un link en tu dominio.
+Todo lo que hacés en ShareOut — una tabla, un reporte, un tablero, un sitio chico — se llama
+**artefacto**: algo que se abre en el navegador, con su propio link. Vos decidís quién lo puede ver.
 
-<CardGrid stagger>
-	<Card title="Primero instalá">
-		Cloná el repo, `npm run deploy`, abrí `/setup`. [Guía de install](/es/self-host/overview/).
+<CardGrid>
+	<Card title="1. Qué es ShareOut" icon="open-book">
+		Dos minutos, sin palabras raras. [¿Qué es ShareOut?](/es/everyone/what-is-shareout/)
 	</Card>
-	<Card title="Solo describilo">
-		Decile a ShareOut qué querés — *"una página para mi panadería con el menú y un formulario"* — y la arma. [Hacé tu primer artefacto](/es/everyone/make-your-first-page/).
+	<Card title="2. Hacé tu primer artefacto" icon="pencil">
+		Subí un Excel y obtené una tabla prolija, o describí lo que querés.
+		[Hacé tu primer artefacto](/es/everyone/make-your-first-page/)
 	</Card>
-	<Card title="Hacela tuya">
-		Sumá fotos, cambiá textos y colores, agregá un formulario. Clic o pedilo. [El editor](/es/everyone/the-editor/).
+	<Card title="3. Que se mantenga al día solo" icon="random">
+		Mandale el Excel por email, o conectá una planilla de Google — se actualiza solo.
+		[Por email](/es/everyone/inbox/#actualizá-los-números-de-tu-artefacto-mandando-el-excel-por-email) ·
+		[Desde una planilla](/es/everyone/google-sheets/)
 	</Card>
-	<Card title="Compartilo">
-		Cada artefacto tiene su link. Al mundo, o a pocas personas. [Compartilo](/es/everyone/share-it/).
+	<Card title="4. Compartilo" icon="external">
+		Cualquiera con el link, tu equipo, o solo las personas que elijas.
+		[Compartilo](/es/everyone/share-it/)
 	</Card>
 </CardGrid>
 
-## ¿Nuevo acá?
+## Novedades
 
-1. [**Install / self-host**](/es/self-host/overview/) si todavía no hay instancia.
-2. Después [**¿Qué es ShareOut?**](/es/everyone/what-is-shareout/) y
-   [**qué podés hacer**](/es/everyone/what-you-can-make/).
+<LatestChanges lang="es" />
 
-## ¿Con código?
+## Dónde usás ShareOut
 
-API REST y SDK en el browser. Empezá en la [**intro para developers**](/es/start/introduction/)
-o la [**referencia de API**](/api/).
+- **ShareOut Cloud** en [shareout.site](https://shareout.site) — por ahora, las cuentas nuevas son por invitación.
+- **El ShareOut propio de tu empresa** — pedile la dirección a quien lo instaló. Las guías sirven igual.
+- **¿Lo vas a instalar vos?** Corre en tu propia cuenta de Cloudflare: [guía de instalación](/es/self-host/overview/).
+
+## Para developers
+
+La API REST, el SDK del navegador, los asistentes por MCP y el self-host tienen sus propias secciones.
+
+<CardGrid>
+	<LinkCard title="Intro para developers" href="/es/start/introduction/" description="Publicá artefactos, guardá datos y corré tareas desde código." />
+	<LinkCard title="Referencia de la API REST" href="/api/" description="Todos los endpoints, generados del spec OpenAPI (en inglés)." />
+	<LinkCard title="SDK del navegador" href="/es/sdk/overview/" description="Tablas, JSON, archivos, tiempo real y email dentro de un artefacto." />
+	<LinkCard title="Self-host" href="/es/self-host/overview/" description="Desplegá ShareOut en tu cuenta de Cloudflare." />
+</CardGrid>

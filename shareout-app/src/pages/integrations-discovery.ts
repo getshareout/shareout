@@ -54,7 +54,7 @@ export function serveIntegrationsJson(env: Env): Response {
       shareout_agent_token: {
         type: 'api_key',
         label: 'ShareOut workspace Agent token',
-        generateUrl: 'https://docs.shareout.site/team/agent-tokens',
+        generateUrl: 'https://docs.shareout.site/teams/api/#agent-tokens-service-accounts',
         setup:
           '**Teams / Enterprise.** A workspace owner or admin mints a scoped service token (prefix `sot_`) via `POST /v1/workspaces/{workspace_id}/agent-tokens`. Plaintext is shown once. Send as the same `Authorization: Bearer` header; scopes confine publish and data access to one workspace.',
       },

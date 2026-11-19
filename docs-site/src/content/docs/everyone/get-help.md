@@ -9,17 +9,17 @@ Stuck on something, found a bug, or just have a question?
 
 If your admin enabled in-product support, open **Home** → **Help** (**?** in the
 bottom-left). Write a short summary and **Send**. The same panel shows **Your tickets**
-and status.
+and status, and links to these guides and to [What's new](/whats-new/).
 
 Other in-product channels (when configured):
 
-- **Email** — whatever support address your admin set (not a global ShareOut cloud inbox)
+- **Email** — whatever support address your admin set (on ShareOut Cloud, use Help in Home)
 - **Slack** — `/shareout support <what went wrong>` if the Slack bot is linked
 - **Telegram** — `/support <what went wrong>` if the Telegram bot is linked
 
 ## Open-source project
 
-This product is self-hosted. For bugs and docs issues in the public codebase:
+ShareOut's code is open source. For bugs and docs issues in the public codebase:
 
 - [GitHub Issues](https://github.com/getshareout/shareout/issues)
 - [SUPPORT.md](https://github.com/getshareout/shareout/blob/main/SUPPORT.md)

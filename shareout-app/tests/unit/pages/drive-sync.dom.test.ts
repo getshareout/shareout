@@ -118,6 +118,7 @@ describe('Drive sync modal', () => {
     const done = vi.fn();
     load().openDriveSync({ id: 'art_1', name: 'Sales board' }, done);
     await flush();
+    expect(document.querySelector('[data-ds-guide]')!.getAttribute('href')).toBe(copy['dsync.guideUrl']);
     await toForm();
     expect($<HTMLInputElement>('#ds_name').value).toBe('sales_2026');
     expect($('#ds_hint').textContent).toBe("The page reads it with sdk.dataset('sales_2026').get().");

@@ -76,7 +76,7 @@ export const ADMIN_COPY: HomeLocaleCopy = {
     'admin.artifactsPublic': 'artifacts visible to anyone',
     'admin.auditLog': 'Audit Log',
     'admin.autoConnectors': 'Connectors',
-    'admin.autoConnectorsIntro': 'Data connections available to this workspace\\\'s artifacts.',
+    'admin.autoConnectorsIntro': 'Data connections available to this workspace\'s artifacts.',
     'admin.autoCrewAutomations': 'Crew automations',
     'admin.autoCrewIntro': 'AI crews that run on a schedule or trigger.',
     'admin.autoPaused': 'Paused',

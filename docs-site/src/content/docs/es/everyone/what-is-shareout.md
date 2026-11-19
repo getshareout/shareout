@@ -1,15 +1,15 @@
 ---
 title: ¿Qué es ShareOut?
-description: En tu ShareOut self-hosted, describí un artefacto y queda en vivo — para tu equipo, en tu cuenta de Cloudflare.
+description: ShareOut convierte una planilla, un reporte o una idea en un artefacto con su propio link, y lo mantiene al día — en ShareOut Cloud o en el ShareOut de tu empresa.
 ---
 
-ShareOut convierte una idea en una página web de verdad en **tu** instancia. Vos
-(o un agente) describís lo que querés y la arma — en vivo, con su propio link. No
-hace falta código para *usar* el producto una vez que alguien
-[instaló ShareOut](/es/self-host/overview/).
+ShareOut convierte una idea, una planilla o un reporte en un **artefacto**: algo
+que se abre en el navegador, con su propio link. Vos (o un asistente como Claude o
+ChatGPT) describís lo que querés y lo arma. No hace falta código.
 
-No hay un cloud de ShareOut para registrarse. Alguien de tu equipo despliega el
-Worker en Cloudflare; después la gente abre **tu** URL y trabaja.
+Lo usás en **ShareOut Cloud**, en [shareout.site](https://shareout.site) (por ahora,
+las cuentas nuevas son por invitación), o en el ShareOut propio de tu empresa, que
+alguien [instala en su cuenta de Cloudflare](/es/self-host/overview/).
 
 Pensalo como mandarle un mensaje a un amigo que sabe un montón de hacer páginas web. Le decís:
 
@@ -24,8 +24,7 @@ entero o solo a unas pocas personas.
 - **Vos hablás, ella construye.** Describí tu artefacto con tus palabras (**Nuevo →
   Describilo a la IA** necesita una clave de IA en la instancia — preguntale al admin si esa opción
   no hace nada).
-- **Está en vivo en tu link.** Cada artefacto tiene una dirección real en *tu*
-  dominio o URL workers.dev.
+- **Está en vivo en su propio link.** Cada artefacto tiene una dirección web real para mandar.
 - **Vos tenés el control.** ¿No te gusta el color? ¿El texto? Pedilo, o hacé clic
   y cambialo vos.
 - **Crece con vos.** Empezá simple. Sumá fotos, un formulario o datos en vivo
@@ -33,14 +32,27 @@ entero o solo a unas pocas personas.
 
 ## Lo que *no* es
 
-No es un constructor de webs lleno de menús. No es “no instales nada y usá
-nuestro cloud” — el producto es **self-hosted**. Y no necesitás ser desarrollador
-para *usarlo* después de que está arriba.
+No es un constructor de webs lleno de menús. Y no necesitás ser desarrollador
+para usarlo.
 
 Si lo podés describir, lo podés hacer.
 
-## ¿Nuevo en esta instancia?
+## Palabras que vas a ver
 
-- **¿Todavía no desplegaron?** Empezá en [Install / self-host](/es/self-host/overview/).
-- **¿Ya tenés URL?** Mirá [**qué podés hacer**](/es/everyone/what-you-can-make/),
-  después [**hacé tu primer artefacto**](/es/everyone/make-your-first-page/).
+- **Artefacto** — todo lo que hacés en ShareOut: una tabla, un reporte, un tablero,
+  un sitio chico. Se abre en el navegador y tiene su propio link.
+- **Workspace** — el espacio de tu equipo en ShareOut, con sus carpetas, personas y
+  artefactos.
+- **Datos** (o **dataset**) — las filas que muestra un artefacto, como la tabla de tu
+  Excel. Cuando cambia el archivo, el artefacto se puede actualizar solo.
+- **Conector** — una conexión con una herramienta que ya usás (Google Sheets, tu
+  tienda, Claude o ChatGPT) para que ShareOut lea de ahí o trabaje con ella.
+- **Compartir** — elegir quién puede abrir un artefacto: cualquiera con el link, tu
+  equipo, o solo las personas que elijas.
+
+## Por dónde seguir
+
+- [**Qué podés hacer**](/es/everyone/what-you-can-make/), después
+  [**hacé tu primer artefacto**](/es/everyone/make-your-first-page/).
+- [**Novedades**](/es/whats-new/) — qué cambió últimamente, en palabras simples.
+- ¿Vas a instalar tu propio ShareOut? [Install / self-host](/es/self-host/overview/).
