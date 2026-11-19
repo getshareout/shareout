@@ -19,7 +19,6 @@ import { routeInternalAdmin } from './internal-admin';
 import { routeEmail } from '../email/routes';
 import { notFoundResponse } from '../pages/not-found';
 import { blockDisabledMarketingPages } from '../marketing-us-gate';
-import { whatsNewRedirect } from '../marketing-whats-new';
 import { asGetForHead, stripBodyForHead, wrongMethodOnKnownPath } from './method-policy';
 import { routeMcp } from '../mcp';
 import { validateToken } from '../api-auth';
@@ -229,7 +228,7 @@ async function dispatch(request: Request, ctx: FetchContext, executionCtx?: Exec
     // everything else unclaimed falls through to the worker's 404.
     ((req.method === 'GET' && !subCtx.isSubdomain && !isReservedProductPath(path))
       ? (env.MARKETING_ORIGIN
-          ? (blockDisabledMarketingPages(env, ctx.hostname, path) ?? whatsNewRedirect(path, req.headers.get('Accept-Language')) ?? await proxyMarketing(req, env.MARKETING_ORIGIN))
+          ? (blockDisabledMarketingPages(env, ctx.hostname, path) ?? await proxyMarketing(req, env.MARKETING_ORIGIN))
           : (path === '/' || path === ''
               ? Response.redirect(new URL('/auth/login', ctx.url.origin).toString(), 302)
               : null))
