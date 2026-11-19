@@ -31,6 +31,7 @@ import { PERSONAL_SCOPE, type WorkspaceSelection } from '../chat-platforms/types
 import { localeForRecipient, type Locale } from '../i18n/locale';
 import { t } from '../i18n';
 import { createLogger } from '../logging';
+import { checkSlidingWindowRateLimit } from '../rate-limit';
 import { getPlatformOrigin } from '../config/origins';
 
 // WhatsApp's side of the shared bot (chat-platforms/bot/router.ts): verify Meta's webhook,
@@ -190,15 +191,44 @@ export function whatsappChannel(env: Env, opts: { sessionKey: string; phone: str
   };
 }
 
+const SEEN_TTL_SECONDS = 2 * 86400;
+
+/**
+ * Meta can deliver one message twice (a retry, a double delivery). Every reply is billed, so
+ * a message id is handled once: the first delivery claims it for two days. KV has no
+ * set-if-absent, so two deliveries landing in the same instant can still both pass — rare,
+ * and agent turns are deduplicated again in the session Durable Object.
+ */
+async function firstDelivery(env: Env, messageId: string): Promise<boolean> {
+  const kv = env.RATE_LIMIT_KV;
+  if (!kv) return true;
+  const key = `wa:seen:${messageId}`;
+  if (await kv.get(key).catch(() => null)) return false;
+  await kv.put(key, '1', { expirationTtl: SEEN_TTL_SECONDS }).catch(() => {});
+  return true;
+}
+
+/**
+ * Someone without a linked account is answered (how to connect, an expired code…) at no
+ * workspace's expense, so a stranger who finds the number gets a few replies an hour, then
+ * silence. No KV means no limit to enforce — and no linking either — so they get none.
+ */
+async function mayAnswerStranger(env: Env, sessionKey: string): Promise<boolean> {
+  if (!env.RATE_LIMIT_KV) return false;
+  return (await checkSlidingWindowRateLimit(env.RATE_LIMIT_KV, `wa:${sessionKey}`, 'whatsappUnlinked')).allowed;
+}
+
 async function handleInbound(env: Env, message: WhatsAppInbound): Promise<void> {
   const sessionKey = message.from_user_id || message.from;
   if (!sessionKey || !message.id) return;
+  if (!(await firstDelivery(env, message.id))) return;
   const channel = whatsappChannel(env, {
     sessionKey,
     phone: message.from ?? null,
     eventId: await whatsappEventId(message.id),
     messageId: message.id,
   });
+  if (!(await channel.getLinkedUserId()) && !(await mayAnswerStranger(env, sessionKey))) return;
 
   if (message.type === 'text' && message.text?.body) {
     await handleBotText(env, channel, message.text.body);

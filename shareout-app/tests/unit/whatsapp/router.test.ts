@@ -70,8 +70,18 @@ async function post(payload: unknown, signature?: string): Promise<Response> {
   return (await routeWhatsApp(createFetchContext(req, ENV)))!;
 }
 
+function fakeKv(): KVNamespace {
+  const store = new Map<string, string>();
+  return {
+    get: vi.fn(async (k: string) => store.get(k) ?? null),
+    put: vi.fn(async (k: string, v: string) => { store.set(k, v); }),
+    delete: vi.fn(async (k: string) => { store.delete(k); }),
+  } as unknown as KVNamespace;
+}
+
 let sent: Array<Record<string, any>> = [];
 beforeEach(() => {
+  (ENV as { RATE_LIMIT_KV?: KVNamespace }).RATE_LIMIT_KV = fakeKv();
   Object.values(h).forEach((m) => m.mockClear());
   h.getBotLinkedUserId.mockResolvedValue(null);
   h.consumeBotLinkCode.mockResolvedValue(null);
@@ -175,12 +185,7 @@ describe('WhatsApp webhook', () => {
       { id: 'wsp_a', name: 'Acme', slug: 'acme', role: 'member', artifactCount: 4 },
       { id: 'wsp_b', name: 'Beta', slug: 'beta', role: 'admin', artifactCount: 2 },
     ]);
-    const kv = new Map<string, string>();
-    const env = { ...ENV, RATE_LIMIT_KV: {
-      get: vi.fn(async (k: string) => kv.get(k) ?? null),
-      put: vi.fn(async (k: string, v: string) => { kv.set(k, v); }),
-      delete: vi.fn(async (k: string) => { kv.delete(k); }),
-    } } as unknown as Env;
+    const env = { ...ENV, RATE_LIMIT_KV: fakeKv() } as unknown as Env;
     const postEnv = async (payload: unknown) => {
       const body = JSON.stringify(payload);
       return routeWhatsApp(createFetchContext(new Request('https://shareout.site/whatsapp/webhook', {
@@ -212,5 +217,36 @@ describe('WhatsApp webhook', () => {
     h.getBotSelectedWorkspace.mockResolvedValue('wsp_a');
     await post(inbound({ id: 'wamid.IN4', from_user_id: 'AR.1349', type: 'interactive', interactive: { type: 'button_reply', button_reply: { id: 'ok:pa_1' } } }));
     expect(h.enqueueCallback).toHaveBeenCalledWith(ENV, expect.objectContaining({ platform: 'whatsapp', nativeChatId: 'AR.1349', data: 'ok:pa_1', selectedWorkspaceId: 'wsp_a' }));
+  });
+
+  it('handles a message Meta delivers twice only once', async () => {
+    h.getBotLinkedUserId.mockResolvedValue('usr_ana');
+    h.getBotSelectedWorkspace.mockResolvedValue('wsp_acme');
+    h.listWorkspacesForUser.mockResolvedValue([{ id: 'wsp_acme', name: 'Acme', slug: 'acme', role: 'member', artifactCount: 4 }]);
+
+    await post(inbound(text('/status')));
+    await post(inbound(text('/status')));
+    expect(sent).toHaveLength(1);
+
+    await post(inbound(text('¿cómo vienen las ventas?')));
+    expect(h.enqueueAgentTurn).not.toHaveBeenCalled(); // same message id: already handled
+    await post(inbound({ ...text('¿cómo vienen las ventas?'), id: 'wamid.IN9' }));
+    expect(h.enqueueAgentTurn).toHaveBeenCalledTimes(1);
+  });
+
+  it('answers a stranger at most five times an hour, then stays silent', async () => {
+    for (let i = 0; i < 8; i++) await post(inbound({ ...text(`hola ${i}`), id: `wamid.S${i}` }));
+    expect(sent).toHaveLength(5);
+    expect(h.recordAiUsage).toHaveBeenCalledTimes(5);
+    // A linked member is not limited by it.
+    h.getBotLinkedUserId.mockResolvedValue('usr_ana');
+    await post(inbound({ ...text('/status'), id: 'wamid.S9' }));
+    expect(sent).toHaveLength(6);
+  });
+
+  it('does not answer strangers when there is no KV to limit them', async () => {
+    (ENV as { RATE_LIMIT_KV?: KVNamespace }).RATE_LIMIT_KV = undefined;
+    await post(inbound(text('hola')));
+    expect(sent).toHaveLength(0);
   });
 });
