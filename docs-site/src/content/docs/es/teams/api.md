@@ -133,8 +133,13 @@ Biblioteca de assets por alcance — un bucket oculto por workspace (compartido)
 | `POST` | `/v1/workspaces/{id}/assets/collections/{id}/send` | `{ to, expiresAt?, gate?, password?, domains? }` → email con link. Member+. |
 | `GET` | `/v1/workspaces/{id}/assets/links` | Listar links de entrega enviados (gate, expiry, `viewCount`, revoked). Member+. |
 | `POST` | `/v1/workspaces/{id}/assets/links/{linkId}/revoke` | Revocar link (página + bytes 404). Member+. |
+| `POST` | `/v1/workspaces/{id}/assets/to-artifacts` | `{ dryRun?, limit?, retry? }` → los Archivos se vuelven páginas (`converted`, `kept`, `inProgress`, `remaining`); repetir hasta que `remaining` sea 0. Owner/admin. |
+| `GET` | `/v1/workspaces/{id}/assets/duplicates` | Páginas hechas del mismo archivo, comparando el contenido (`groups[]` con `sha256`, `pages[]`). Solo lectura. Owner/admin. |
+| `POST` | `/v1/workspaces/{id}/assets/duplicates/remove` | `{ keep, remove[], confirm: true }` → manda a la papelera las copias de `keep` (30 días). Solo el owner. |
 
 `gate`: `none` (default), `password` + `password`, o `domain` + `domains[]`. Las entregas protegidas sirven bytes por `/d/<token>/file/<blobId>` tras pasar el gate. La primera apertura envía email al creador del link (`asset_delivery_opened`).
+
+**Archivos → páginas y copias.** `to-artifacts` se puede volver a llamar mientras una tanda sigue en curso (un corte y un reintento): cada archivo se reserva antes de leerlo, `inProgress` cuenta los que otra llamada todavía está convirtiendo, y un archivo nunca da dos páginas. `duplicates` compara el archivo del que salió cada página (el original que guarda una importación, o si no el archivo de la página) por su sha256, nunca por el nombre, así dos documentos distintos con el mismo nombre nunca se agrupan; las páginas HTML escritas a mano nunca se agrupan y una página privada solo la ve su dueño. `duplicates/remove` rechaza todo el pedido (`409 NOT_A_DUPLICATE`) si alguna página no es copia de `keep`, y nunca se borra nada sin ese pedido.
 
 Límites: 500 MB/archivo · 10 GB/bucket · 10 000 archivos. Ver [Archivos y entregas](/es/everyone/assets/).
 

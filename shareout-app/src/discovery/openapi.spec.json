@@ -9408,6 +9408,292 @@
         }
       }
     },
+    "/v1/workspaces/{workspaceId}/assets/to-artifacts": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/WorkspaceId"
+        }
+      ],
+      "post": {
+        "tags": [
+          "Assets"
+        ],
+        "summary": "Turn workspace Files into pages",
+        "description": "Owners/admins. Each convertible file becomes a page by its owner, in its folder, and the file is soft-deleted; a file a page embeds is kept (`IN_USE`). Bounded per call: repeat until `remaining` is 0. Safe to repeat while a call is still running: a file is claimed before it is transcribed, a claimed file is left to that call (`inProgress`), and a claim left by a call that died is taken over after 15 minutes without making a second page. `dryRun: true` lists what would be converted and writes nothing.",
+        "operationId": "workspaceFilesToArtifacts",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "dryRun": {
+                    "type": "boolean"
+                  },
+                  "limit": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 10,
+                    "default": 3
+                  },
+                  "retry": {
+                    "type": "boolean",
+                    "description": "Clear the marks on files kept for an error and try them again."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The batch (`converted`, `kept`, `inProgress`, `remaining`), or with `dryRun` the plan (`files[]` with `convertible` and `inUse`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "converted": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "artifactId": {
+                            "type": "string"
+                          },
+                          "slug": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "kept": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "code": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "inProgress": {
+                      "type": "integer",
+                      "description": "Files another call is converting right now; they finish there."
+                    },
+                    "remaining": {
+                      "type": "integer"
+                    },
+                    "files": {
+                      "type": "array",
+                      "description": "Only with `dryRun`.",
+                      "items": {
+                        "type": "object"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}/assets/duplicates": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/WorkspaceId"
+        }
+      ],
+      "get": {
+        "tags": [
+          "Assets"
+        ],
+        "summary": "List duplicate pages",
+        "description": "Owners/admins, read-only. Groups the workspace's live pages whose source file is byte-identical (sha256): the original an import keeps, else the page's own file (markdown, csv, pdf, image…). Names are never compared; hand-written HTML pages are never grouped; a private page appears only to its owner. Oldest page first.",
+        "operationId": "listDuplicatePages",
+        "responses": {
+          "200": {
+            "description": "Groups of two or more pages",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "groups": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "sha256": {
+                            "type": "string"
+                          },
+                          "sizeBytes": {
+                            "type": "integer"
+                          },
+                          "pages": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string"
+                                },
+                                "name": {
+                                  "type": "string"
+                                },
+                                "slug": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ]
+                                },
+                                "ownerId": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ]
+                                },
+                                "folderId": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ]
+                                },
+                                "createdAt": {
+                                  "type": "string"
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}/assets/duplicates/remove": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/WorkspaceId"
+        }
+      ],
+      "post": {
+        "tags": [
+          "Assets"
+        ],
+        "summary": "Trash copies of a page",
+        "description": "Workspace owner only, never automatic. Moves the `remove` pages to the trash (recoverable for 30 days) and keeps `keep`. Every page in `remove` must be a copy of `keep` in this workspace that the caller can see, or nothing is removed (`409 NOT_A_DUPLICATE`). Files that had become a removed page now point at the kept one.",
+        "operationId": "removeDuplicatePages",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "keep",
+                  "remove",
+                  "confirm"
+                ],
+                "properties": {
+                  "keep": {
+                    "type": "string",
+                    "description": "The page to keep."
+                  },
+                  "remove": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "confirm": {
+                    "type": "boolean",
+                    "enum": [
+                      true
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Removed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "kept": {
+                      "type": "string"
+                    },
+                    "removed": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "recoverableUntil": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        }
+                      }
+                    },
+                    "retentionDays": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing ids (`BAD_REQUEST`), no page to remove (`NOTHING_TO_REMOVE`) or no `confirm` (`CONFIRM_REQUIRED`)."
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "409": {
+            "description": "A page in `remove` is not a copy of `keep` (`NOT_A_DUPLICATE`); nothing was removed."
+          }
+        }
+      }
+    },
     "/v1/workspaces/{workspaceId}/assets/collections/{collectionId}/share": {
       "parameters": [
         {

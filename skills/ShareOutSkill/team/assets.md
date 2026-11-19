@@ -79,6 +79,16 @@ GET    /v1/files/{deliverableId}/content               # latest version bytes �
 
 **Manage:** `GET .../assets/links` → every link from the scope (gate, expiry, `viewCount`, revoked/expired). `POST .../assets/links/{linkId}/revoke` kills a link (page + bytes 404).
 
+**Files → pages, and copies** (owner/admin; removal owner only):
+
+```
+POST   .../assets/to-artifacts                 { dryRun?, limit?, retry? } → { converted[], kept[], inProgress, remaining }
+GET    .../assets/duplicates                   → { groups:[{ sha256, sizeBytes, pages[] }] }   # read-only
+POST   .../assets/duplicates/remove            { keep, remove[], confirm: true } → { kept, removed[], retentionDays }
+```
+
+Repeat `to-artifacts` until `remaining` is 0; calling it again mid-batch (after a timeout) is safe — a file never becomes two pages, and `inProgress` counts files another call is still converting. `duplicates` matches pages by the content of the file they came from, never by name (two documents can share one), skips hand-written HTML pages and shows a private page only to its owner. Never remove copies on your own: list the groups, ask the workspace owner which page to keep, then call `remove` with `confirm: true` — the copies go to the 30-day trash, and anything that is not a copy of `keep` refuses the whole request (`409 NOT_A_DUPLICATE`).
+
 **Open notify:** the first time a delivery link is opened, the sender gets an email ("…opened your delivery"); deduped on the 0→1 view transition. For a domain-gated link the viewer's email is included.
 
 - **Upload** is two steps: request → `PUT` the bytes to the returned `uploadUrl`. The blob persists on `PUT` (no confirm step).

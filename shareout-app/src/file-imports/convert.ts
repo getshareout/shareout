@@ -42,6 +42,13 @@ export interface PageInput {
   slug: string | null;
 }
 
+const pageName = (displayName: string) => displayName.replace(/\.[^.]+$/, '').trim().slice(0, 120) || displayName;
+
+/** A fresh slug for the page a file becomes; pass it back as `slug` to publish onto the same page. */
+export function newPageSlug(displayName: string): string {
+  return `${generateSlug(pageName(displayName).normalize('NFD').replace(/[̀-ͯ]/g, ''))}-${crypto.randomUUID().slice(0, 6)}`;
+}
+
 export type PageResult = { ok: true; artifactId: string; slug: string } | { ok: false; code: string; message: string };
 
 export async function convertToPage(env: Env, input: PageInput): Promise<PageResult> {
@@ -84,8 +91,8 @@ export async function convertToPage(env: Env, input: PageInput): Promise<PageRes
   const quota = await checkStorageQuota(env, input.user.id, files);
   if (!quota.allowed) return { ok: false, code: 'STORAGE_QUOTA_EXCEEDED', message: 'Storage limit reached; kept as a file only.' };
 
-  const name = input.displayName.replace(/\.[^.]+$/, '').trim().slice(0, 120) || input.displayName;
-  const slug = input.slug || `${generateSlug(name.normalize('NFD').replace(/[̀-ͯ]/g, ''))}-${crypto.randomUUID().slice(0, 6)}`;
+  const name = pageName(input.displayName);
+  const slug = input.slug || newPageSlug(input.displayName);
   // Bulk paths (Drive import workflow, Files → artifacts) have no request context, and
   // publishArtifact skips every post-publish task without one: Knowledge, search index,
   // file-usage graph. Collect them here and wait for them, nested ones included.
