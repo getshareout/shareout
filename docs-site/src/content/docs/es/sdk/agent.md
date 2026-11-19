@@ -156,9 +156,14 @@ for await (const chunk of sdk.agent.chat({
 
 ## Límites de uso
 
-| Límite | Por defecto |
-|--------|-------------|
-| Requests/min | 10 por artefacto |
-| Tokens/día | 100.000 por artefacto |
+Los límites dependen de quién chatea:
+
+| Quién | Límites |
+|-------|---------|
+| Visitante anónimo | 10 requests/min y 100.000 tokens/día **por artefacto** |
+| Miembro del workspace con sesión | 20 requests/min y 300.000 tokens/día **por persona**, más el presupuesto mensual de IA del workspace si hay uno |
+| Token de API o de agente (el `so_…` de un miembro, el `sot_…` del workspace) | Se cobra al **workspace**: su presupuesto mensual de IA si hay uno, más 1.000.000 tokens/día por workspace |
 
 Si se supera, retorna HTTP 429 con header `Retry-After` y código `RATE_LIMIT_EXCEEDED`.
+Para miembros y tokens, el cuerpo además dice qué `limit` se alcanzó (`member_rate`,
+`member_daily`, `workspace_budget`, `workspace_automation_daily`) y `resets_at` (hora ISO).

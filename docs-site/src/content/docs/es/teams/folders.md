@@ -6,11 +6,12 @@ description: Organizá los artefactos del workspace en carpetas compartidas visi
 import { Aside } from '@astrojs/starlight/components';
 
 Las **carpetas del Team Space** son carpetas compartidas dentro de un workspace
-de Teams. Todos los miembros pueden verlas y mover artefactos. `owner` y `admin`
-crean, renombran y eliminan cualquier carpeta. Los miembros crean carpetas y
+de Teams. Todos los miembros pueden verlas; el owner o los editores de un artefacto
+(o un admin del workspace) pueden moverlo a una. `owner` y `admin` crean, renombran y
+eliminan cualquier carpeta. Los miembros crean carpetas y
 renombran o eliminan las que crearon, salvo que un admin haya desactivado
-**Los miembros pueden crear carpetas** (Admin → Settings, o
-`members_can_create_folders` en `PATCH /v1/workspaces/{id}`).
+**Los miembros pueden crear carpetas** (Admin → General → **Carpetas del espacio de
+equipo**, o `members_can_create_folders` en `PATCH /v1/workspaces/{id}`).
 
 <Aside>
 Las carpetas personales (fuera de cualquier workspace) usan `/v1/folders`.
@@ -126,7 +127,8 @@ Los slugs son únicos por nivel de carpeta dentro del workspace.
 
 ## Mover un artefacto a una carpeta
 
-Cualquier miembro del workspace puede archivar un artefacto del workspace:
+Lo puede archivar el owner del artefacto, uno de sus editores o un `admin`/`owner` del
+workspace. Cualquier otra persona recibe `403 FORBIDDEN`:
 
 ```http
 POST /v1/workspaces/{workspaceId}/artifacts/{artifactId}/move

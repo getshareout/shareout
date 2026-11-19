@@ -26,9 +26,12 @@ create folders (*Settings → members can create folders*). External members can
    site → library → folder.
 4. **Choose where it goes** — the top level of Files, or inside a Team Space folder.
    The picked folder becomes a ShareOut folder there, with the same subfolders.
-5. Every Word, Excel, PDF, Markdown, CSV, image and video file becomes an artifact (and
-   slide decks, when the instance has the slides converter). The original is kept
-   inside it for download.
+5. Every Word, Excel, PDF, PowerPoint (`.pptx`), Markdown, CSV, image and video file
+   becomes an artifact. The original is kept inside it for download. A `.pptx` becomes a
+   PDF where the instance has the slides converter, otherwise its text, one section per
+   slide; older decks (`.ppt`, `.odp`) convert only with the converter. A converted PDF
+   opens with **Text** | **Original** tabs: **Original** shows the PDF itself, right in
+   the page (`?show=original`).
 6. **Start import** and watch the progress: found, imported, pages, unchanged,
    skipped and failed, plus the files that need a look and why.
 

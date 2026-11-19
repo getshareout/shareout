@@ -95,8 +95,9 @@ Para una **investigación** en lenguaje natural cuando se dispara una alerta, ag
 ## Metric watches
 
 Los **metric watches** son un hermano más liviano de las alertas de métricas — sin
-configurar destinos, solo campana. Desde el Inspector → **Watches** de un artefacto
-abierta, elegí una tabla y un tipo de métrica:
+configurar destinos, solo campana. Desde el Inspector de un artefacto abierto →
+**Automatizar** → **Monitoreo** (lo ven quienes pueden editarlo), elegí una tabla y un
+tipo de métrica:
 
 | Tipo | Vigila |
 | --- | --- |

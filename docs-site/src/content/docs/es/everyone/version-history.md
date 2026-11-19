@@ -4,13 +4,17 @@ description: Mirá quién cambió tu artefacto, cómo y qué cambió, compará d
 ---
 
 Cada publicación crea una **versión** nueva de tu artefacto: v1, v2, v3… Nunca se pisa
-nada. La pestaña **Historial** las muestra todas, y podés volver a poner en vivo
+nada. La lista **Versiones** las muestra todas, y podés volver a poner en vivo
 cualquier versión anterior con un clic.
 
-## Abrí el Historial
+## Abrí Versiones
 
-Abrí el artefacto en [Home](/es/everyone/your-workspace/) y elegí **Historial** en el
-Inspector. Cada versión muestra:
+1. Abrí el artefacto en [Home](/es/everyone/your-workspace/).
+2. En el panel lateral (el Inspector), quedate en **Detalles**. En un teléfono o una
+   tablet, tocá primero **Opciones** para abrir ese panel.
+3. Abrí **Más**, abajo de todo, y elegí **Versiones**. **← Detalles** te lleva de vuelta.
+
+Cada versión muestra:
 
 - **Quién** la publicó (o "Alguien" si no se sabe).
 - **Cómo** se hizo: **Publicación** (API), **Agente**, **Editor** o **Restauración**.
@@ -19,7 +23,7 @@ Inspector. Cada versión muestra:
 - Cuántos **comentarios** y **aprobaciones** tuvo esa versión
   (mirá [Revisión y aprobaciones](/es/everyone/review/)).
 
-El Historial lista las 50 versiones más recientes. Lo ven las personas con las que se
+La lista muestra las 50 versiones más recientes. La ven las personas con las que se
 compartió el artefacto.
 
 ## Mirá qué cambió
@@ -43,7 +47,7 @@ hoy.
 ## Restaurá una versión
 
 **Restaurar vN** publica una versión **nueva** con el contenido de vN. No se borra nada:
-todas las versiones, incluidas las posteriores a vN, quedan en el Historial, y la nueva
+todas las versiones, incluidas las posteriores a vN, quedan en la lista, y la nueva
 queda marcada "Restaurada desde vN". Si te arrepentís, restaurá la versión de la que
 venías.
 
@@ -60,11 +64,11 @@ historial. Mirá la [referencia de la API](/api/).
 ## Notas de cambios
 
 Cuando publicás desde la API o desde una app de IA conectada a ShareOut, podés mandar un
-`message` opcional que diga qué cambiaste. Aparece junto a esa versión en el Historial.
+`message` opcional que diga qué cambiaste. Aparece junto a esa versión en Versiones.
 
 Cuando una versión se publica sin nota, ShareOut escribe por vos una nota de una línea
 sobre "qué cambió", a partir de las diferencias con la versión anterior. Esas notas
-llevan la marca **IA** en el Historial, para distinguirlas de las que escribió una
+llevan la marca **IA** en Versiones, para distinguirlas de las que escribió una
 persona. Las primeras versiones, las restauraciones y las publicaciones que no cambiaron
 el artefacto no reciben nota de IA.
 

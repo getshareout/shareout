@@ -307,6 +307,12 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: "`FORBIDDEN` — no access to the artifact, or its row policy limits which rows this caller sees (whole-table metrics can't be watched)."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
   /v1/metric-watch/{id}:
     parameters:
       - name: id
@@ -1549,6 +1555,9 @@ paths:
                     (an emailed code, no password). Counts toward the daily share-email
                     limit; when it is reached the share still happens and the response
                     says who was not emailed.
+                message:
+                  type: string
+                  description: Optional note added to the invite email (only with `notify`). Cut at 1,000 characters.
       responses:
         "200":
           description: Added. With notify, `notified` lists `sent`, `failed` and `rate_limited`.
@@ -1836,13 +1845,47 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+  /v1/artifacts/{id}/sources:
+    parameters:
+      - $ref: "#/components/parameters/ArtifactId"
+    get:
+      tags: [Artifacts]
+      summary: Where a page's data comes from
+      description: >-
+        The data sources of the page's live version — what the viewer's *Data* pill shows. Open
+        to anyone who can view the page, through the page's own gate (everyone else gets `404`);
+        anonymous callers are rate-limited. Editors get `access: full`, others a `summary`;
+        `scoped` is true when a row policy limits what this caller sees.
+      operationId: getArtifactSources
+      parameters:
+        - name: page
+          in: query
+          description: A page path of a multi-page site; default the entry page.
+          schema: { type: string }
+        - name: version
+          in: query
+          description: Another version's id (editors only, else `403 FORBIDDEN`).
+          schema: { type: string }
+      responses:
+        "200":
+          description: "`{ artifact_id, version: { id?, number, page }, access: full | summary, scoped, sources: [...] }`"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          description: "`NOT_FOUND`, `VERSION_NOT_FOUND` (no published version) or `PAGE_NOT_FOUND` (no page with that path)."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
   /v1/access-requests:
     post:
       tags: [Access requests]
       summary: Request access to a private page
       description: >-
-        Signed-in user asks the artifact owner for viewer access (Google Drive style).
-        Requires an email identity. Idempotent while a pending request exists.
+        Signed-in user asks the artifact owner for view or edit access (Google Docs style); the
+        owner is emailed every time. Requires an email identity. Idempotent while a pending request
+        exists; a pending view request upgrades to edit in place. A viewer collaborator may still
+        ask to edit; anyone who already has that access gets `400 HAS_ACCESS`, the owner `400 IS_OWNER`.
       operationId: createAccessRequest
       requestBody:
         required: true
@@ -1855,6 +1898,10 @@ paths:
                 slug:
                   type: string
                   description: Production slug of the private artifact.
+                role:
+                  type: string
+                  enum: [viewer, editor]
+                  default: viewer
       responses:
         "200":
           description: Request created or already pending
@@ -1901,7 +1948,7 @@ paths:
     post:
       tags: [Access requests]
       summary: Approve or deny an access request
-      description: Owner only. Approving adds the requester as a viewer collaborator.
+      description: Owner only. Approving adds the requester as a collaborator with the role they asked for (`viewer` or `editor`).
       operationId: decideAccessRequest
       requestBody:
         required: true
@@ -3232,6 +3279,7 @@ paths:
                   address: { type: string, description: "`email_sheet_sync` only: the page's address to send the file to." }
                   senders: { type: array, items: { type: string }, description: "`email_sheet_sync` only: who may send it." }
                   warning: { type: string, description: "`email_sheet_sync` only: the live page does not read this dataset, so the file would not show on it." }
+                  notice: { type: string, description: "Cron jobs whose minute isn't 0: schedules are checked once an hour, at the top of the hour, so the job runs at the next :00 after it is due." }
         "400":
           description: >-
             Invalid request. For `email_sheet_sync`: `NO_SENDERS` — nobody may send the file yet (call
@@ -3674,7 +3722,9 @@ paths:
     post:
       tags: [Folders]
       summary: Move a workspace artifact into a Team Space folder
-      description: "Pass `folder_id: null` to unfile it."
+      description: >-
+        Pass `folder_id: null` to unfile it. Folder placement changes who can reach the
+        artifact, so only its owner, an editor or a workspace admin may move it (else `403 FORBIDDEN`).
       operationId: moveWorkspaceArtifact
       requestBody:
         required: true
@@ -3689,6 +3739,8 @@ paths:
       responses:
         "200":
           description: Moved
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
   /v1/workspaces/{workspaceId}/knowledge:
@@ -3969,6 +4021,12 @@ paths:
           in: query
           schema:
             type: integer
+        - name: full
+          in: query
+          description: "`1` returns each passage whole instead of a ~700-character snippet."
+          schema:
+            type: string
+            enum: ["1"]
         - name: format
           in: query
           description: "`md` returns text/markdown."
@@ -3982,6 +4040,43 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "409":
           description: Knowledge is off (KNOWLEDGE_DISABLED)
+  /v1/data/{artifactId}/knowledge/search:
+    parameters:
+      - name: artifactId
+        in: path
+        required: true
+        schema: { type: string }
+    get:
+      tags: [Knowledge]
+      summary: Search workspace Knowledge from a published page
+      description: >-
+        What `sdk.knowledge.search(q, { limit, full })` calls from inside a page. Only a signed-in
+        internal member of the page's own workspace gets results, and each passage is re-checked
+        against what that person may see. Same result shape as the workspace search.
+      operationId: searchKnowledgeFromArtifact
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema: { type: string }
+        - name: limit
+          in: query
+          schema: { type: integer }
+        - name: full
+          in: query
+          description: "`1` returns each passage whole instead of a ~700-character snippet."
+          schema: { type: string, enum: ["1"] }
+      responses:
+        "200":
+          description: "`{ query, ... }` cited passages"
+        "400":
+          description: "`q` missing, or not a GET."
+        "401":
+          description: Not signed in.
+        "403":
+          description: Not an internal member of the page's workspace, or the page is not in a workspace.
+        "404":
+          description: Knowledge is not enabled for this workspace.
   /v1/workspaces/{workspaceId}/knowledge/entities:
     parameters:
       - $ref: "#/components/parameters/WorkspaceId"
@@ -5353,7 +5448,7 @@ paths:
                 ref: { type: string, description: A selectable ref from browse. }
                 name: { type: string }
                 targetFolderId: { type: string, nullable: true }
-                convert: { type: boolean, default: true, description: "Turn Word/Excel/PDF/Markdown/CSV (and slides, when the converter is bound) into pages." }
+                convert: { type: boolean, default: true, description: "Kept for compatibility and ignored: every file that can become a page does (Word, Excel, PDF, Markdown, CSV, text, images, video, .pptx; .ppt/.odp only with the slides converter), up to 300 per run." }
                 dailySync: { type: boolean, default: false }
                 access: { type: string, enum: [share], description: "Google Drive by sharing: read with this workspace's service account; `ref` comes from an `access=share` browse." }
       responses:
@@ -5387,7 +5482,7 @@ paths:
               type: object
               properties:
                 dailySync: { type: boolean }
-                convert: { type: boolean }
+                convert: { type: boolean, description: "Kept for compatibility and ignored (see the import call)." }
                 access:
                   type: string
                   enum: [share]
@@ -6132,6 +6227,15 @@ paths:
           description: Created
         "400":
           $ref: "#/components/responses/BadRequest"
+        "403":
+          description: >-
+            `FORBIDDEN` — no access to the artifact, or its row policy (`access_policy`) limits
+            which rows this caller sees, so whole-table metrics aren't available to them. A
+            row-scoped caller may still pause or resume an existing rule.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
   /v1/metric-alerts/{id}:
     parameters:
       - name: id
@@ -7197,12 +7301,15 @@ paths:
         One-step import from the Studio Home. Publishes a document (HTML, CSV, Markdown,
         JSON, text, PDF, Word .docx/.doc/.odt, or a spreadsheet .xlsx/.xls/.ods), pasted HTML,
         or a Claude / ChatGPT / Gemini share link (best-effort fetch) as a private
-        artifact in the current workspace and folder. Word files become Markdown and
-        spreadsheets one CSV per sheet. Slide decks (.pptx/.ppt/.odp) become a PDF on
-        instances with the optional LibreOffice converter (`SLIDES_CONVERTER`); without
-        it they answer 422 `CONVERT_UNAVAILABLE`. All of these keep the original file for
-        download and must be sent base64-encoded. Images, video and other files belong in Assets
-        (`/v1/assets`). Inside a
+        artifact in the current workspace and folder. Everything uploaded becomes an artifact:
+        Word files become Markdown, spreadsheets one CSV per sheet, a PDF an editable Markdown
+        page (a scan is transcribed; with no text it stays a PDF), images (png, jpg, gif, webp,
+        avif, svg) and video (mp4, webm, mov) artifacts of their own. Slide decks
+        (.pptx/.ppt/.odp) become a PDF on instances with the optional LibreOffice converter
+        (`SLIDES_CONVERTER`); without it a .pptx becomes a Markdown page of its slide text and
+        .ppt/.odp answer 422 `CONVERT_UNAVAILABLE`. Types with no viewer (audio, fonts,
+        archives) are refused. Converted files keep the original for download; binary files
+        are sent base64-encoded, up to 25 MB. Inside a
         workspace the caller must be an internal member. Counts toward the daily
         publish limit and the storage cap. Agent (`sot_`) tokens are refused.
       operationId: importHomeArtifact
@@ -7451,9 +7558,6 @@ paths:
                 resend_invites:
                   type: boolean
                   default: false
-                templates:
-                  type: string
-                  description: Template set to install. `pending` until the instance has templates.
                 custom_domain:
                   type: string
                   description: Hostname to attach. `pending` until the instance has custom domains.
@@ -7931,7 +8035,14 @@ paths:
         "200":
           description: Saved
         "400":
-          $ref: "#/components/responses/BadRequest"
+          description: >-
+            `BAD_REQUEST` — `path` or `content` missing; `INVALID_PATH` — the path breaks the rule
+            above (`hint` says it); `INVALID_METRIC_SPEC` — a `kind: metric` file is not a valid
+            executable metric (unknown keys are refused; `param` and `hint` say what to fix).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
         "413":
           description: Content larger than 128 KB (`FILE_TOO_LARGE`).
           content:
@@ -9127,7 +9238,7 @@ components:
           items:
             type: object
             properties:
-              step: { type: string, description: "workspace, branding, policy, folders, admins, connector:<name>, templates, custom_domain" }
+              step: { type: string, description: "workspace, branding, policy, folders, admins, connector:<name>, custom_domain" }
               status: { type: string, enum: [created, updated, unchanged, skipped, pending, failed] }
               detail: { type: object }
               error: { type: string }
@@ -9617,6 +9728,17 @@ components:
           format: uri
         workspace_id:
           type: [string, "null"]
+        workspace_name:
+          type: [string, "null"]
+          description: The workspace's display name — only for its members, else null (detail endpoint only).
+        owner:
+          type: [object, "null"]
+          description: >-
+            Who owns the artifact; null when there is no owner name or email to show. `email` is
+            set only for workspace members and the owner (detail endpoint only).
+          properties:
+            name: { type: [string, "null"] }
+            email: { type: [string, "null"] }
         artifact_type:
           type: string
         paused:
@@ -9643,6 +9765,11 @@ components:
         can_manage_comments:
           type: boolean
           description: Caller may change the artifact's comment settings, such as guest comments (owner; detail endpoint only).
+        can_open_public:
+          type: boolean
+          description: >-
+            Editors only: whether "Anyone with the link" can take effect for this artifact (the
+            workspace or instance may forbid public links). Absent for callers who can't edit.
         pages:
           type: array
           items:
@@ -9750,6 +9877,12 @@ components:
           format: email
         role:
           $ref: "#/components/schemas/Role"
+        added_at:
+          type: string
+          format: date-time
+        pending:
+          type: boolean
+          description: Invited but has never signed in ("Invited · hasn't signed in yet" in the share dialog).
     AccessRequest:
       type: object
       properties:
@@ -9766,6 +9899,9 @@ components:
           format: email
         requester_name:
           type: string
+        role:
+          type: string
+          enum: [viewer, editor]
         created_at:
           type: string
           format: date-time

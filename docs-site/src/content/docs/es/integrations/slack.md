@@ -35,8 +35,8 @@ entrega de DM falla con `missing_scope` en una conexión más vieja, reconectá 
 
 ## Entrega de una sola vez
 
-Desde **Home**, abrí una pestaña de artefacto y usá la sección **Deliver** del
-Inspector — elegí email, Slack o Telegram, seleccioná un canal de Slack desde el
+Desde **Inicio**, abrí una pestaña de artefacto y andá a **Automatizar → Enviar
+ahora** — elegí email, Slack o Telegram, seleccioná un canal de Slack desde el
 picker buscable y enviá al instante (`POST /v1/artifacts/{id}/deliver`). Si Slack
 no está conectado, **Connect** inicia OAuth desde el mismo panel.
 

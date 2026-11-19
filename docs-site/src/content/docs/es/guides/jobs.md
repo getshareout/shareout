@@ -50,9 +50,35 @@ curl -X POST https://shareout.site/v1/jobs \
   }'
 ```
 
-Siempre definí `title` y `description` al crear un schedule — aparecen en **Mis
-schedules** y en **Admin → Schedules** del workspace. `PATCH /v1/jobs/{id}` también
-acepta `title` / `description` (mandá `null` para borrar).
+Siempre definí `title` y `description` al crear un schedule — aparecen en
+**Automatizaciones** (barra lateral del workspace) y en **Admin → Automatizaciones**.
+`PATCH /v1/jobs/{id}` también acepta `title` / `description` (mandá `null` para borrar).
+
+### Email: adjuntar el artefacto como PDF
+
+En un job `email`, `renderPdf: true` renderiza el artefacto en vivo en el servidor y lo adjunta
+(`pdfFilename` le pone nombre al archivo; por defecto `<slug>.pdf`). Por defecto el PDF es una
+sola página continua con el layout de pantalla. Sumá `pdfFormat` (`"A4"`, `"Letter"` o `"Legal"`)
+para paginarlo con el CSS de impresión del propio artefacto (`@media print`; una regla
+`@page { size }` gana sobre `pdfFormat`), y `pdfLandscape: true` para páginas apaisadas (por
+defecto vertical). Cualquier otro valor de `pdfFormat`, o un `pdfLandscape` que no sea booleano,
+da `400` al crear o actualizar el job.
+
+```json
+"config": {
+  "recipients": ["ana@acme.com"],
+  "subject": "Reporte semanal",
+  "html": "<p>Va el reporte adjunto.</p>",
+  "renderPdf": true,
+  "pdfFormat": "A4",
+  "pdfLandscape": true
+}
+```
+
+Cada email de un artefacto lleva un link de baja de un clic para ese artefacto. Quien se dio de
+baja se saltea en los envíos siguientes; si se dieron de baja todos, la corrida falla con *All
+recipients opted out of this artifact's emails*. El owner los lista con
+`GET /v1/data/{artifactId}/email/optouts`. Ver [Email](/es/sdk/email/).
 
 ### Formato cron
 
@@ -65,8 +91,13 @@ acepta `title` / `description` (mandá `null` para borrar).
 * * * * *
 ```
 
-`0 9 * * 1` → lunes 9am · `*/15 * * * *` → cada 15 min · `0 9-17 * * 1-5` →
-cada hora, horario laboral.
+`0 9 * * 1` → lunes 9am · `0 9-17 * * 1-5` → cada hora, horario laboral · `0 6 1 * *` →
+el 1 de cada mes, 6am. Los horarios son UTC.
+
+Los schedules se revisan **una vez por hora, en punto**, así que la cadencia más fina es cada
+hora. Un minuto distinto de `0` (`30 9 * * *`, `*/15 * * * *`) corre en el próximo `:00` después
+de que vence, no en ese minuto; la respuesta de creación trae entonces un `notice` que lo avisa.
+Usá el minuto `0` para una hora exacta.
 
 ### `query_snapshot` — refresh determinístico de datos
 

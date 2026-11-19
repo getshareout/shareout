@@ -13,7 +13,7 @@ Share work **outside your team** — with a client, supplier, partner, or invest
 
 1. **Create a client.** Home → **Admin** → **Sharing** → **Add client or partner** — an inline form on the page (company name + relationship). No modal; the empty state walks through the steps and the same form appears under the header once you have clients.
 2. **Invite their people.** Add emails — they get an invite and log in like any ShareOut user. They stay external (never on your member list, never billed).
-3. **Share a folder or file.** Pick a folder and a level — **View**, **Comment**, **Can create**, or **Can edit**. A folder shares everything inside it — **pages and files**. From Assets you can also **Share with a person** on a single file (email + view/comment, no client org required).
+3. **Share a folder or file.** Pick a folder and a level — **View**, **Comment**, **Can create**, or **Can edit**. A folder shares everything inside it — **pages and files**. To give one outside person access without a client org, use the folder's **Who has access** panel (see [Share with one person](#share-with-one-person-no-client-org)).
 4. **They open `/shared`.** Each external person has a "shared with you" page showing only what you gave them — pages and downloadable files — branded by their client org when grouped under a client. First-time visitors see a short orientation card. Shared **files** with **comment** access include an inline comments thread on the portal card; shared pages open in the normal viewer.
 
 ## Access levels
@@ -25,7 +25,7 @@ Share work **outside your team** — with a client, supplier, partner, or invest
 | Can create | Author new pages **inside** the shared folder (kept private to that folder). |
 | Can edit | Edit the shared artifacts. |
 
-A higher level includes the ones below it. You can share a whole folder with a client, a single artifact, or a single **file** from Assets.
+A higher level includes the ones below it. You can share a whole folder with a client or a single artifact. Files uploaded in Home are artifacts now (the Assets tab is retired), so you share them the same way; an older workspace **file** can still be shared on its own through `share-person` (below).
 
 ### Share with one person (no client org)
 

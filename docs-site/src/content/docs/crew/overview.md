@@ -120,12 +120,31 @@ Stream live with `sdk.crew.run()` or replay from run history.
 | `maxTokensPerCall` | Max output tokens per model call: default 4096, max 16384 |
 | `runBudgetMicroUsd` | Optional per-run spend cap |
 | `maxRuntimeMs` | Wall-clock cap for scheduled (cron/condition) runs: default 25000, max 300000 (5 min). Manual, event and chat runs stay at 25 s |
+| Workspace monthly AI budget | Optional ceiling for all metered AI in the workspace, set by an admin in **Admin → Billing → Monthly AI budget**. Once it is reached, a crew run ends with `workspace_budget` until the budget is raised or the next UTC month |
+| Concurrent runs | Capped **per owner**, across all their crews: 1 at a time unless the instance sets plan limits (`plan_crew_limits`) |
 
 A value outside its range is rejected with `400 INVALID_REQUEST` (not clamped) on `POST /crew/define` and `PATCH /crew`.
-| Workspace AI balance | Runs halt when credits are exhausted |
-| Concurrent runs | Capped server-side per artifact |
+
+When the owner already has a run going:
+
+- **Manual run** (`POST /crew/run`) → `429 CONCURRENCY_LIMIT`; try again when it finishes.
+- **Event trigger** → the run is queued, not dropped (up to 20 per owner, kept 24 h), and
+  starts oldest first at the next hourly tick.
+- **Cron or condition trigger** → stays due and is retried every hour for up to 6 h, then
+  skipped until its next occurrence.
 
 Check usage: `sdk.crew.usage(workspaceId)`.
+
+## Emails a crew sends
+
+`email_send` and `notify_send` emails go out one message per recipient, each with a footer
+saying it was *Sent automatically by the AI agent* (with the crew's name) and linking the
+artifact, plus a one-click unsubscribe link for that artifact. On top of that:
+
+- **Repeat guard** — the same subject to the same person from the same artifact is sent at
+  most once in 12 hours. Repeats are skipped (`email_send` lists them in
+  `skipped_already_sent`); if every recipient was a repeat, the tool returns an error.
+- **Unsubscribed** recipients are skipped (`email_send` lists them in `skipped_opted_out`).
 
 ## What's next
 

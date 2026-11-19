@@ -29,6 +29,12 @@ await sdk.crew.define({
 | `table_schema` | Inspecciona columnas |
 | `connection_query` | Consulta una [conexión del workspace](/es/teams/connections/) |
 | `web_search` | Búsqueda web (si está habilitada) |
+| `file_list` | Lista la biblioteca de archivos del workspace (nombre, tipo, tamaño, resumen IA y etiquetas) |
+| `file_read` | Lee un archivo de la biblioteca por id (de `file_list`): resumen, etiquetas y texto extraído |
+| `workspace_artifacts` | Lista los artefactos del workspace del crew que su owner puede abrir (`name_contains`, `updated_since`; hasta 200 por llamada) |
+| `workspace_data_read` | Lee una clave JSON (`json_key`) o consulta una tabla (`table`) de **otro** artefacto del mismo workspace que el owner puede abrir — pasá su `artifact_id` |
+| `knowledge_search` | Busca en el [Conocimiento](/es/teams/knowledge/) del workspace y devuelve pasajes citados (fuente + link), solo de lo que el owner puede ver |
+| `action_item_list` | Lista los action items (comentarios asignados) del artefacto |
 
 ### `connection_query`
 
@@ -49,6 +55,8 @@ Corre como el **owner del artefacto**, incluyendo conectores per-user.
 | `email_send` | Envía email |
 | `notify_send` | Entrega one-shot a Slack, email, Discord, webhook |
 | `scheduled_job_create` | Crea [job programado](/es/guides/jobs/) |
+| `action_item_create` | Crea un action item — un comentario asignado a un miembro o colaborador del workspace, que recibe un aviso |
+| `pilot_verify` | Abre el artefacto publicado en un navegador headless y corre [Page Pilot](/es/sdk/pilot/) para chequear un comportamiento de la UI (1–8 pasos, 6 por defecto) |
 
 ### `json_set`
 

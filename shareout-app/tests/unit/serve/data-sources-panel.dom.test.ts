@@ -210,8 +210,8 @@ describe('Data sources panel', () => {
   it('says so when the page uses no connected data', async () => {
     boot({ locale: 'es' });
     await openPanel({ ...RESPONSE, sources: [] });
-    expect(document.getElementById('so-ds-body')!.textContent).toBe('Esta página no usa datos conectados.');
-    expect(document.getElementById('so-ds-status')!.textContent).toBe('Esta página no usa datos conectados.');
+    expect(document.getElementById('so-ds-body')!.textContent).toBe('Este artefacto no usa datos conectados.');
+    expect(document.getElementById('so-ds-status')!.textContent).toBe('Este artefacto no usa datos conectados.');
     expect(document.getElementById('so-ds-foot')!.hidden).toBe(true);
   });
 

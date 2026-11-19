@@ -24,14 +24,14 @@ export const AGENT_PROGRESS_COPY: LocaleCopy<{
     finishing: 'Making it live…',
   },
   es: {
-    planning: 'Planeando tu página…',
+    planning: 'Planeando tu artefacto…',
     writing: (path) => (/\.html?$/i.test(path) ? 'Escribiendo la estructura…' : /\.css$/i.test(path) ? 'Escribiendo estilos…' : /\.m?js$/i.test(path) ? 'Escribiendo la lógica…' : `Escribiendo ${path}…`),
     editing: (path) => `Ajustando ${path}…`,
     checking: 'Revisando el código…',
     fixing: (n) => `Corrigiendo ${n} ${n === 1 ? 'error' : 'errores'}…`,
-    publishing: 'Publicándola…',
-    testing: 'Probando la página…',
+    publishing: 'Publicándolo…',
+    testing: 'Probando el artefacto…',
     fixingLive: (n) => `Corrigiendo ${n} ${n === 1 ? 'problema' : 'problemas'} que aparecieron al probar…`,
-    finishing: 'Dejándola en vivo…',
+    finishing: 'Dejándolo en vivo…',
   },
 };

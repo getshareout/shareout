@@ -90,13 +90,25 @@ Dos formas; usá una o ambas.
 `source` es una ref `kind:key` — `connection:warehouse`, `json:revenue`,
 `table:rooms`.
 
-## 3. Mostrar el drawer a los visitantes
+## 3. Lo que ven los visitantes
 
-Una línea de JavaScript:
+No hace falta agregar nada. En el visor de ShareOut, **todos los visitantes** de un
+artefacto que muestra datos — con sesión, invitados o con un link público — ven un botón
+**Datos**. Abre un panel **Fuentes de datos**: una entrada por fuente con su
+descripción, cuándo se actualizó, cada cuánto se refresca y si puede estar desactualizada.
+Al elegir una fuente se resaltan los elementos que alimenta (tus etiquetas
+`data-shareout-source` y `feeds`). Las consultas y las credenciales solo las ve quien
+puede editar el artefacto.
+
+El botón aparece cuando el artefacto lee datos (o declara conexiones en vivo), y respeta
+la decisión del dueño de ocultar la barra del visor.
+
+¿Querés badges **ⓘ source** en los elementos mismos, o un drawer cuando el artefacto se
+muestra fuera del visor de ShareOut? Una línea de JavaScript:
 
 ```javascript
 const sdk = await ShareOut.create();
-sdk.sources.mount(); // botón flotante "Data sources" + drawer + badges por elemento
+sdk.sources.mount(); // badges por elemento + drawer "Data sources"
 ```
 
 O cero líneas — agregá el atributo y el SDK monta al cargar el DOM:
@@ -105,13 +117,12 @@ O cero líneas — agregá el atributo y el SDK monta al cargar el DOM:
 <body data-shareout-sources>
 ```
 
-Lo que ven los visitantes:
-
-- Un drawer **Data sources**: una tarjeta por dataset con descripción, tablas,
-  refresh, as-of, **View query** colapsable y bloque **Replicate**
-  (build/publish/credentials).
 - Un badge **ⓘ source** en cada elemento que etiquetaste (o mapeaste vía `feeds`);
   al hacer clic abre el drawer en ese dataset.
+- Un drawer **Data sources**: una tarjeta por dataset con descripción, tablas,
+  refresh, as-of, **View query** colapsable y bloque **Replicate**
+  (build/publish/credentials). Dentro del visor de ShareOut su botón flotante queda
+  oculto, porque el botón **Datos** ya lo cubre.
 
 Ver [SDK Sources](/es/sdk/sources/) para la API completa.
 

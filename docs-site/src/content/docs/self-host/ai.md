@@ -41,8 +41,11 @@ Models: on the gateway, the assistant, crews and page builds all use the same mo
 `anthropic/claude-sonnet-5.5` by default (see [Pick a model](#pick-a-model) to change
 it without touching code — a workspace or instance choice there takes priority). On
 Anthropic direct, everything uses Claude Sonnet 5.5 (`claude-sonnet-5-5`); on OpenAI direct,
-`gpt-4o`. `BUILD_MODEL` is a build-agent-only fallback below that. Model ids live in
-`src/data/agent/models.ts`.
+`gpt-4o`. `BUILD_MODEL` is a build-agent-only fallback below that. Reading a scanned
+document (a PDF with no text layer) is the exception: it uses Claude Haiku 5.5
+(`anthropic/claude-haiku-5.5` on the gateway, `claude-haiku-5-5` on Anthropic direct)
+unless `SCAN_MODEL` names another model; the workspace's model choice does not apply to
+it, and OpenAI direct keeps `gpt-4o`. Model ids live in `src/data/agent/models.ts`.
 
 ## Build agent (optional)
 
@@ -54,14 +57,19 @@ syntax, manifest, missing files, undeclared tables, ShareOut's publishing rules)
 what the check finds, and only then publishes. With a `BROWSER` binding it also tests the
 published page and fixes up to two rounds of problems; without one, it publishes after the
 static check. If it still can't produce a passing page, nothing is announced as done: the
-user is told, and the operator gets an alert when Telegram alerts are configured. Default
-off. It works on every route above; on direct Anthropic it also uses server-side
+user is told, and the operator gets an alert when [Telegram alerts](#alerts) are
+configured. Default off. It works on every route above; on direct Anthropic it also uses server-side
 compaction, context editing and a task budget.
 
 All AI page builds (agent or not) think at `BUILD_EFFORT` (`low`, `medium` or `high`;
 default `medium`), use the workspace's model choice (then the instance's, then
 `BUILD_MODEL`), and are given the workspace's brand accent, logo, language and house-style
 context file. The agent can also look up ShareOut's artifact guide while it builds.
+
+Every build, agent or one-shot, is listed in `/admin?view=health` → **Page builds** (the
+latest 25, kept 90 days): when, outcome (`published`, `previewed`, `gave_up`, `failed`,
+`truncated`), workspace, path, duration, tokens in and out, cost, and each step behind
+**steps** — model calls, tool calls, static checks, the page test and the publish.
 
 The same switch moves the assistant's page edits onto the agent: it changes an HTML page's
 existing files in small steps, checks that the change broke nothing the page did not
@@ -150,8 +158,8 @@ curl -sS -X PUT "$ORIGIN/v1/admin/ai-settings" \
 
 Precedence: a workspace's own model wins, then the instance default, then the hardcoded
 `anthropic/claude-sonnet-5.5`. `DELETE .../llm/model` (or `defaultGatewayModel: null`)
-clears an override back to the next fallback. Both also have a dropdown — Settings → AI
-in a workspace, and `/admin?view=instance` → **Default AI model** for the instance.
+clears an override back to the next fallback. Both also have a dropdown — **Admin → AI &
+models** in a workspace, and `/admin?view=instance` → **AI defaults** for the instance.
 This only applies to the `vercel-gateway` provider entry; the Anthropic- and
 OpenAI-direct entries keep their own fixed model, since they cannot serve an arbitrary
 gateway catalog id.
@@ -164,6 +172,66 @@ to a whole company:
 - `/admin?view=tokens` shows LLM token use and cost over time
 - `/admin?view=costs` puts it next to the rest of the instance spend
 - per-workspace keys move the bill to the workspace that generates it
+
+### What a workspace is charged: cost × markup
+
+Every AI amount a workspace sees — its Admin → Billing (spend, monthly AI budget, AI
+report), its Summary, crew and Knowledge costs, and the AI usage line on an invoice — is
+its **price**: the metered cost × a markup. Storage, serving, email and browser time are
+not marked up. The markup in force is the first of:
+
+1. the workspace's own markup;
+2. the instance default;
+3. none — the workspace is billed at cost (1×).
+
+Set the instance default in `/admin?view=instance` → **AI defaults** (*AI resale
+markup*), or:
+
+```bash
+curl -sS -X PUT "$ORIGIN/v1/admin/ai-settings" \
+  -H "Authorization: Bearer $SHAREOUT_TOKEN" -H 'Content-Type: application/json' \
+  -d '{"defaultMarkup":1.5}'
+```
+
+One workspace's markup is set from its Admin → Billing (a block only instance admins
+see) or with `PUT /v1/workspaces/$WORKSPACE_ID/ai-markup` `{"markup": 1.5}`; `null`
+falls back to the instance default. Both take a multiplier from 1 (at cost) to 10;
+anything else is `400 VALIDATION_ERROR`. Workspace admins never see the cost, the markup
+or the margin, and a workspace markup change is not written to that workspace's audit
+log, which its admins can read.
+
+A workspace's **monthly AI budget** (set by its own admins in Admin → Billing) is
+measured at its price, so the budget, the AI report and an invoice's usage line agree.
+
+### Alerts
+
+Set `SUPPORT_ALERT_TELEGRAM_CHAT_ID` (a Telegram chat id) and `TELEGRAM_BOT_TOKEN` and
+the operator gets a Telegram message, each throttled so a bad day sends one, not
+hundreds:
+
+| When | Throttle | Knob |
+|------|----------|------|
+| An instance provider refuses calls for lack of credit or a spend limit (a workspace's own key never alerts) | once an hour per provider | — |
+| The instance's AI spend for the UTC day crosses a line. Costs are priced hourly, so this can trail by up to an hour | once a day | `AI_SPEND_ALERT_USD_PER_DAY` — off when unset |
+| The Vercel AI Gateway credit falls below a floor (checked hourly; also written to the Worker log as an error) | once a day | `AI_CREDIT_ALERT_USD` — default `20` |
+| A page build failed or the build agent gave up | every time | — |
+| A new support ticket opens | every time | — |
+
+Without the chat id and bot token nothing is sent; the checks still run.
+
+## All AI settings
+
+| Name | Kind | Default | What it does |
+|------|------|---------|--------------|
+| `VERCEL_AI_GATEWAY` / `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` | secret | — | The providers ([above](#three-providers)) |
+| `AI_PROVIDER_ORDER` | var | `vercel-gateway,anthropic,openai` | Failover order over the configured providers |
+| `BUILD_AGENT` | var | unset (follows the **Page build agent** flag) | `on` forces the [build agent](#build-agent-optional) everywhere; `off` turns it off everywhere |
+| `BUILD_EFFORT` | var | `medium` | How hard page builds think: `low`, `medium`, `high`. Anything else falls back to `medium` |
+| `BUILD_MODEL` | var | unset | Page builds only, when no workspace or instance model is picked: a gateway slug on the gateway, a first-party id (no `/`) on Anthropic direct |
+| `SCAN_MODEL` | var | Claude Haiku 5.5 | Model that transcribes scanned documents: a gateway slug, or a first-party id on Anthropic direct |
+| `AI_SPEND_ALERT_USD_PER_DAY` | var | off | Daily spend line for the Telegram [alert](#alerts) |
+| `AI_CREDIT_ALERT_USD` | var | `20` | Gateway credit floor for the Telegram [alert](#alerts) |
+| `CREDENTIALS_KEY` | secret | — | Needed for [per-workspace keys](#per-workspace-keys) |
 
 ## Feature flags that stay off by default
 

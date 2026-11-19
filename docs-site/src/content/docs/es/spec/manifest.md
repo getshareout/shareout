@@ -146,7 +146,10 @@ datos del artefacto). Las lecturas nunca se restringen.
 | `"collaborator"` | Solo el owner del artefacto + colaboradores con rol editor |
 | `"owner"` | Solo el owner del artefacto |
 
-Los viewers que mutan una tabla restringida reciben `403 TABLE_WRITE_FORBIDDEN`.
+Los viewers que mutan una tabla restringida reciben `403 TABLE_WRITE_FORBIDDEN`. Dos reglas
+cierran por defecto: un manifest que no se puede leer, o un valor de `write` que no es uno de los
+tres de arriba, deja la tabla solo para el owner; y cuando el artefacto tiene una página de entrada
+aparte para celular, gana la más estricta de las dos declaraciones.
 
 ```json
 "tables": {

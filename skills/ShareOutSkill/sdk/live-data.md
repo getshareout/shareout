@@ -160,6 +160,11 @@ and each provider doc. `sdk.platform.provider(id).execute(endpointId, opts)` alw
 `/platform/{providerId}/{endpointId}/execute` under the hood; `sdk.platform.execute(providerId, endpointId, opts)`
 is the one-call shortcut for the same thing.
 
+Under an `access_policy` (row-level scope), a scoped viewer can only run a query the author
+declared in `access_policy.queries`, by name: `execute(endpointId, { query: '<name>' })`.
+`connectionId` is optional then (the declaration names the connection) and `params` is ignored.
+See [../core/access-policy.md](../core/access-policy.md).
+
 ### BigQuery pagination
 
 `jobs.query` caps the synchronous response by **payload size**, not only `maxResults`.

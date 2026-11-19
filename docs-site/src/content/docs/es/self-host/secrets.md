@@ -37,6 +37,7 @@ provisiona nombres; reemplazá IDs placeholder después del create si hace falta
 | — | — | **El login con contraseña no necesita configuración.** Está siempre disponible y es como `/setup` crea el primer admin. |
 | Binding `EMAIL` | binding | Habilita los códigos de un solo uso por email. Sin él, esos códigos solo llegan al log del worker. |
 | `EMAIL_DEFAULT_FROM` | var | From cuando Email está bound. |
+| `EMAIL_WEBHOOK_SECRET` | secret | Activa el webhook de rebotes y quejas (`/v1/webhooks/email-events`). Sin setear = responde `404` y los rebotes nunca se suprimen. Ver [Email → Entregabilidad](/es/self-host/email/#entregabilidad). |
 
 ## Google Drive compartiendo
 
@@ -123,6 +124,13 @@ audiencia (el client ID), vencimiento y el nonce de la cookie de estado firmada 
 | `OPEN_VISIBILITY_DISABLED` | var | `1` mantiene todo privado; sin enlaces públicos. |
 | `ADMIN_BRIDGE_SECRET` | secret | **Dejalo unset** salvo que corras un bridge worker privado. Unset ⇒ `/internal/admin/*` deniega todo. |
 | Tokens Telegram / Slack | secret | Solo si usás esas integraciones. |
+| `TELEGRAM_LOGIN_LINKS` | var | `1` = los links de artefactos en las respuestas del bot de Telegram inician la sesión del miembro con un toque. Necesita `TELEGRAM_BOT_TOKEN` y `/setdomain` en BotFather. Ver [Bot de Telegram](/es/guides/telegram-bot/). |
+| `SUPPORT_ALERT_TELEGRAM_CHAT_ID` | var | Chat de Telegram que recibe las alertas del operador: tickets de soporte nuevos, builds que fallan, un proveedor de IA sin crédito, gasto diario de IA y crédito bajo del gateway. Necesita `TELEGRAM_BOT_TOKEN`. Ver [Proveedor de IA → Alertas](/es/self-host/ai/#alertas). |
+| `AI_SPEND_ALERT_USD_PER_DAY` / `AI_CREDIT_ALERT_USD` / `BUILD_AGENT` / `BUILD_EFFORT` / `BUILD_MODEL` / `SCAN_MODEL` | var | Líneas de alerta de IA, el agente de build y la elección de modelos. Ver [Proveedor de IA → Todas las opciones de IA](/es/self-host/ai/#todas-las-opciones-de-ia). |
+| `VERIFY_RUNS_PER_HOUR` | var | Verificaciones por usuario por hora UTC (`POST /v1/artifacts/{id}/verify`, MCP `verify_artifact`). Sin setear = 30. |
+| `CUSTOM_DOMAINS_CNAME_TARGET` | var | Activa los dominios propios de los workspaces: el host al que los clientes apuntan su dominio con un CNAME. Solo = modo manual (ShareOut verifica un registro TXT `_shareout-verify`; vos ruteás cada host al Worker). Ver [Dominio propio → Para quien opera la instancia](/es/teams/custom-domain/#para-quien-opera-la-instancia). |
+| `CF_CUSTOM_HOSTNAMES_TOKEN` / `CF_CUSTOM_HOSTNAMES_ZONE_ID` | secret / var | Opcional, junto con el destino del CNAME: Cloudflare for SaaS da de alta cada dominio propio y su certificado. Permiso del token: Zone → SSL and Certificates: Edit, en la zona SaaS. |
+| `D1_READ_REPLICAS` | var | `1` = las queries de cada pedido pasan por una sesión de la API D1 Sessions, así una réplica de lectura cercana puede servir las lecturas (pedidos `GET`, `HEAD` y `OPTIONS`; cualquier otro arranca en la primaria). Activá antes la replicación de lectura de la base en Cloudflare. Un pedido que escribió devuelve un header `x-d1-bookmark` y una cookie `__d1b` para que la próxima lectura de quien llama sea al menos así de fresca. Sin setear = todas las queries van a la primaria. |
 | `OPENAI_API_KEY` / `VERCEL_AI_GATEWAY` | secret | **La AI está apagada hasta setear una** — Crew, asistentes, editor AI, knowledge. Ver [Ops → Proveedores de AI](/es/self-host/ops/#proveedores-de-ai). |
 | `CREDENTIALS_KEY` | secret | `openssl rand -hex 32`. Cifra las keys de AI por workspace y las credenciales de conectores; esos endpoints se niegan sin esto. |
 

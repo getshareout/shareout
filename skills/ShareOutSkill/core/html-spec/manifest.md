@@ -169,7 +169,7 @@ Structured records with schema:
 | `"collaborator"` | Artifact owner + editor collaborators only |
 | `"owner"` | Artifact owner only |
 
-Viewers who POST/PATCH/DELETE against a restricted table get `403 TABLE_WRITE_FORBIDDEN`. Reads (`query` / `count` / `GET`) are never gated by `write`.
+Viewers who POST/PATCH/DELETE against a restricted table get `403 TABLE_WRITE_FORBIDDEN`. Reads (`query` / `count` / `GET`) are never gated by `write`. Fail-closed: a manifest that doesn't parse, or an unknown `write` value, makes the table owner-only; with a separate mobile entry page the stricter declaration of the two wins.
 
 ```json
 "tables": {

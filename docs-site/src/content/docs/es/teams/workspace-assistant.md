@@ -25,9 +25,8 @@ alternándolo por workspace vía la API de [Features](/es/teams/admin/#features)
 la UI de admin.
 
 Cuando está desactivado, el dock del agente en Home queda oculto y la API devuelve
-`404`. Cuando está activo pero el [crédito de IA](/es/teams/api/#llm-del-workspace-y-crédito-de-ia)
-mensual está agotado, las sesiones nuevas de chat devuelven HTTP **402**
-(`AI_CREDIT_EXHAUSTED`).
+`404`. El chat corre con la key de proveedor propia del workspace — ver
+[API de Teams → LLM del workspace](/es/teams/api/#llm-del-workspace-y-crédito-de-ia).
 
 ## Qué puede hacer
 
@@ -39,11 +38,12 @@ mensual está agotado, las sesiones nuevas de chat devuelven HTTP **402**
 | **Construir desde un archivo** | Pasá `source_file_id` en `create_artifact` después de `read_file` — hojas de cálculo, decks y CSV se convierten en artefactos vivos |
 | **Biblioteca de archivos** | `list_files` / `read_file` — explorá uploads, adjuntos de chat, archivos por email y shares desde el teléfono; ves procedencia y artefactos previos hechos con el mismo archivo |
 | Editar artefactos existentes | `edit_page` para cambios de texto/layout en un artefacto que ya existe |
+| **Compartir un artefacto** | `share_artifact` / `unshare_artifact` — compartir por email como lector o editor (les llega un mail con el link y cómo entrar), o dejar de compartir; `set_page_visibility` — privado o todo el workspace (los links públicos no se configuran acá). Owner o editor; te pide confirmar antes |
 | Consultas de solo lectura | `SELECT` ad-hoc en conectores con **consulta IA** habilitada |
 | Proponer schedules | Sugiere un cron (ej. enviar un artefacto por email) — requiere confirmación |
 | Hilos nombrados (web) | Drawer de historial estilo ChatGPT — crear, renombrar, eliminar hilos; título automático del primer mensaje |
 | Widgets inline (web) | Tarjetas ricas en el hilo (previews de artefactos, resultados de conectores) — no se envían a Telegram/Slack |
-| Historial | Últimos 20 turnos por hilo, almacenados en el servidor |
+| Historial | Se guarda en el servidor; cada turno carga hasta los últimos 200 mensajes del hilo, y cuando ese historial se hace largo la parte más vieja se resume en un texto corto mientras los mensajes más nuevos quedan textuales |
 | Brief proactivo diario | Una vez por día al abrir Home — resumen corto con IA vía `GET /v1/home/agent/brief` |
 | **Present this** | `present_artifact` — generar un deck de slides desde un artefacto publicado |
 | **Metric watch** | `watch_metric` — watch de tabla de un clic (alertas de anomalía solo en campana) |

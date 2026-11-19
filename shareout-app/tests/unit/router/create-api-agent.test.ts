@@ -72,7 +72,7 @@ describe('/v1/create/generate build phase with BUILD_AGENT=on', () => {
   it('builds through tools, streams steps in Spanish, publishes all the files once, and sends done', async () => {
     getCrewProvider.mockReturnValue(scriptedProvider([good, publish]).provider);
     const evs = await events(await post({ BUILD_AGENT: 'on' }, { phase: 'build', prompt: 'una página' }, { 'Accept-Language': 'es-AR,es;q=0.9' }));
-    expect(evs.filter((e) => e.type === 'step').map((e) => e.label)).toEqual(expect.arrayContaining(['Escribiendo estilos…', 'Publicándola…']));
+    expect(evs.filter((e) => e.type === 'step').map((e) => e.label)).toEqual(expect.arrayContaining(['Escribiendo estilos…', 'Publicándolo…']));
     expect(evs.some((e) => e.type === 'delta')).toBe(false);
     expect(evs.at(-1)).toMatchObject({ type: 'done', mode: 'build', url: 'https://shareout.site/a/s/', slug: 's', artifactId: 'art1', visibility: 'private' });
     expect(publishGeneratedFiles).toHaveBeenCalledTimes(1);
@@ -100,7 +100,7 @@ describe('/v1/create/generate build phase with BUILD_AGENT=on', () => {
     getCrewProvider.mockReturnValue(scriptedProvider([broken, publish]).provider);
     const evs = await events(await post({ BUILD_AGENT: 'on' }, { phase: 'build', prompt: 'una página' }, { 'Accept-Language': 'es' }));
     expect(evs.at(-1)).toMatchObject({ type: 'error' });
-    expect(evs.at(-1).error).toMatch(/no la publiqué/);
+    expect(evs.at(-1).error).toMatch(/no lo publiqué/);
     expect(evs.some((e) => e.type === 'done')).toBe(false);
     expect(publishGeneratedFiles).not.toHaveBeenCalled();
     expect(alertOps).toHaveBeenCalledTimes(1);

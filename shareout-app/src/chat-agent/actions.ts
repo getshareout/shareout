@@ -254,10 +254,10 @@ const BUILD_ACTION_COPY: LocaleCopy<{ noAccount: string; designing: string; publ
     published: (url) => `Built and published ✅ ${url}`,
   },
   es: {
-    noAccount: 'No encontré tu cuenta para publicar la página.',
-    designing: 'Diseñando tu página…',
-    publishing: 'Publicándola…',
-    published: (url) => `Lista y publicada ✅ ${url}`,
+    noAccount: 'No encontré tu cuenta para publicar el artefacto.',
+    designing: 'Diseñando tu artefacto…',
+    publishing: 'Publicándolo…',
+    published: (url) => `Listo y publicado ✅ ${url}`,
   },
 };
 

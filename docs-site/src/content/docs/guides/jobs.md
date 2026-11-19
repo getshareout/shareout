@@ -51,8 +51,33 @@ curl -X POST https://shareout.site/v1/jobs \
 ```
 
 Always set `title` and `description` when creating a schedule — they appear in
-**My schedules** and the workspace **Admin → Schedules** tab. `PATCH /v1/jobs/{id}`
+**Automations** (workspace sidebar) and in **Admin → Automations**. `PATCH /v1/jobs/{id}`
 accepts `title` / `description` too (send `null` to clear).
+
+### Email: attach the page as a PDF
+
+On an `email` job, `renderPdf: true` renders the live page on the server and attaches it
+(`pdfFilename` names the file; default `<slug>.pdf`). By default the PDF is one continuous
+page of the screen layout. Add `pdfFormat` (`"A4"`, `"Letter"` or `"Legal"`) to paginate it
+with the page's own print CSS (`@media print`; a `@page { size }` rule wins over
+`pdfFormat`), and `pdfLandscape: true` for landscape pages (default portrait). Any other
+`pdfFormat` value, or a non-boolean `pdfLandscape`, is a `400` when the job is created or updated.
+
+```json
+"config": {
+  "recipients": ["ana@acme.com"],
+  "subject": "Weekly report",
+  "html": "<p>Report attached.</p>",
+  "renderPdf": true,
+  "pdfFormat": "A4",
+  "pdfLandscape": true
+}
+```
+
+Every artifact email carries a one-click unsubscribe link for that artifact. People who
+unsubscribed are skipped on later sends; when all of them did, the run fails with *All
+recipients opted out of this artifact's emails*. The owner lists them with
+`GET /v1/data/{artifactId}/email/optouts`. See [Email](/sdk/email/).
 
 ### Cron format
 
@@ -65,8 +90,13 @@ accepts `title` / `description` too (send `null` to clear).
 * * * * *
 ```
 
-`0 9 * * 1` → Mondays 9am · `*/15 * * * *` → every 15 min · `0 9-17 * * 1-5` →
-hourly, business hours.
+`0 9 * * 1` → Mondays 9am · `0 9-17 * * 1-5` → hourly, business hours · `0 6 1 * *` →
+the 1st of the month, 6am. Times are UTC.
+
+Schedules are checked **once an hour, at the top of the hour**, so the finest cadence is
+hourly. A minute other than `0` (`30 9 * * *`, `*/15 * * * *`) runs at the next `:00`
+after it is due, not at that minute; the create response then carries a `notice` saying
+so. Use minute `0` for an exact time.
 
 ### `query_snapshot` — deterministic data refresh
 

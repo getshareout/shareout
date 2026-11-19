@@ -49,7 +49,6 @@ El spec (YAML o JSON):
 | `policy` | `allowed_domains`, `allowed_emails`, `external_sharing`, `guest_comments` (en las carpetas iniciales), `knowledge`, `features` (cualquier clave de `GET /v1/admin/features`). |
 | `folders` | Carpetas iniciales, p. ej. `[Clientes, Proveedores, Reportes]`. |
 | `connectors` | El mismo body que `POST /v1/workspaces/{id}/connections`. Escribí los secretos como `${ENV_VAR}`; la CLI los completa desde el entorno, así nunca quedan en el archivo. |
-| `templates` | Instala una vez cada plantilla de la biblioteca de la instancia con esa etiqueta (al volver a correr, saltea las que el workspace ya tiene). `pending` si ninguna la lleva. |
 | `custom_domain` | Asocia el dominio al workspace y lo deja como principal cuando está activo. `pending` con los registros DNS hasta que se verifique, o mientras la instancia no tenga dominios propios activados; volvé a correr el spec para chequear. |
 | `if_exists` | `match` (default) adopta un slug existente solo si coincide el nombre; `update` lo adopta y renombra; `fail` lo rechaza. |
 
@@ -112,6 +111,33 @@ curl -sS "$ORIGIN/v1/admin/instance" -H "Cookie: $ADMIN_SESSION" | jq .gaps
 No devuelve secretos, solo si cada uno está presente. Un array `gaps` vacío es la
 señal de que la instancia está completa.
 
+### Responder pedidos de soporte
+
+Cada pedido de ayuda — el panel **Ayuda y soporte** de la app, el asistente de Home, la API,
+Telegram, Slack, el email `support@` — cae en una sola cola en `/admin?view=support`, donde
+vos (o tus agentes) la trabajan. Abrí un ticket para ver su contexto (categoría, gravedad,
+artefacto, request id, navegador), el hilo y una respuesta redactada por IA; después
+respondé y cambiá su estado. La respuesta le llega a quien pidió por el canal que usó, por
+email para los pedidos desde la app y la API, y en su campana de notificaciones.
+
+Con `SUPPORT_ALERT_TELEGRAM_CHAT_ID` y `TELEGRAM_BOT_TOKEN` configurados, cada ticket nuevo
+también avisa en tu chat de Telegram (el mismo chat recibe las
+[alertas de IA y de builds](/es/self-host/ai/#alertas)).
+
+Un agente puede trabajar la misma cola con un token personal de API creado por un admin de
+la instancia:
+
+```bash
+curl -sS "$ORIGIN/v1/support/tickets?scope=all&status=open&since=2026-10-09T00:00:00Z" \
+  -H "Authorization: Bearer $SHAREOUT_ADMIN_TOKEN"
+
+curl -sS -X POST "$ORIGIN/v1/support/tickets/$TICKET_ID/reply" \
+  -H "Authorization: Bearer $SHAREOUT_ADMIN_TOKEN" -H 'Content-Type: application/json' \
+  -d '{"body":"Lo arreglamos de nuestro lado — probá de nuevo."}'
+```
+
+Referencia completa: el `api/support.md` del skill (sección *Triage as super-admin*).
+
 ### Proveedores de AI
 
 La AI está **apagada hasta que pongas una key**. Todas las superficies de AI degradan
@@ -144,7 +170,7 @@ Se activa por pasos, y cada paso se puede deshacer:
    ```
 
 2. **Conectalo** (descomentá `KNOWLEDGE_VECTORS_V2` en `wrangler.toml`) y deployá. Desde ahí
-   los pasajes, notas y páginas nuevos o cambiados se escriben en los dos índices; las
+   los pasajes, notas y artefactos nuevos o cambiados se escriben en los dos índices; las
    búsquedas siguen leyendo los viejos.
 3. **Backfill** de lo que ya existe, desde el texto guardado (no se vuelve a bajar nada). Un
    Workflow con pausas por workspace; repetí con `after=<next>` hasta que `next` sea `null`:
@@ -196,8 +222,15 @@ Probá un restore en un worker de staging antes de necesitarlo.
 ## Observabilidad
 
 - Logs del worker: `npx wrangler tail`
-- En producto: Admin → Health (si estás firmado como admin), si tu build lo tiene
-- No hay canal de notificación de super-admin — usá `/admin?view=health` y los logs del Worker
+- En producto: `/admin?view=health` (admins de la instancia) — requests, errores y latencia
+  de las últimas 48 horas, los errores recientes del servidor, y **Page builds**: cada build
+  de artefacto con IA (los últimos 25, guardados 90 días) con su resultado, workspace,
+  duración, tokens, costo y cada paso
+- Avisos que te llegan: un chat de Telegram, una vez configurados
+  `SUPPORT_ALERT_TELEGRAM_CHAT_ID` y `TELEGRAM_BOT_TOKEN` — tickets de soporte nuevos, builds
+  que fallan, un proveedor de IA sin crédito, gasto diario de IA por encima de
+  `AI_SPEND_ALERT_USD_PER_DAY`, crédito del gateway por debajo de `AI_CREDIT_ALERT_USD`. Ver
+  [Proveedor de IA → Alertas](/es/self-host/ai/#alertas)
 
 ### Server-Timing
 

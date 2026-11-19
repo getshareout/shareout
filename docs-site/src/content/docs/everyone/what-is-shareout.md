@@ -20,8 +20,8 @@ world or just a few people.
 
 ## Why people love it
 
-- **You talk, it builds.** Describe your page in plain words (Create with AI needs
-  an AI key on the instance — ask your admin if that button does nothing).
+- **You talk, it builds.** Describe your page in plain words (**New → Describe it to AI**
+  needs an AI key on the instance — ask your admin if that option does nothing).
 - **It's live on your link.** Every page gets a real address on *your* domain or
   workers.dev URL.
 - **You're in control.** Don't like the color? The wording? Move something? Just

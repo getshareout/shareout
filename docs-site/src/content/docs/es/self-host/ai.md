@@ -42,34 +42,44 @@ modelo — `anthropic/claude-sonnet-5.5` por defecto (ver [Elegir un modelo](#el
 para cambiarlo sin tocar código; una elección de workspace o instancia tiene prioridad).
 En Anthropic directo todo usa Claude Sonnet 5.5 (`claude-sonnet-5-5`); en OpenAI directo,
 `gpt-4o`. `BUILD_MODEL` sigue siendo un fallback solo para el agente de build, por debajo
-de eso. Los ids de modelo viven en `src/data/agent/models.ts`.
+de eso. Leer un documento escaneado (un PDF sin capa de texto) es la excepción: usa Claude
+Haiku 5.5 (`anthropic/claude-haiku-5.5` en el gateway, `claude-haiku-5-5` en Anthropic
+directo) salvo que `SCAN_MODEL` nombre otro modelo; la elección de modelo del workspace no
+aplica, y OpenAI directo sigue con `gpt-4o`. Los ids de modelo viven en
+`src/data/agent/models.ts`.
 
 ## Agente de build (opcional)
 
 Activá **Page build agent** en Admin → Features (por workspace, o para toda la instancia)
-y los builds de páginas con IA corren como un agente con herramientas en vez de una sola
-respuesta larga. `BUILD_AGENT=on` lo fuerza en todos los workspaces; `BUILD_AGENT=off` es un
-interruptor de emergencia que gana sobre el flag. Escribe la página como archivos en pasos chicos,
+y los builds de artefactos con IA corren como un agente con herramientas en vez de una
+sola respuesta larga. `BUILD_AGENT=on` lo fuerza en todos los workspaces; `BUILD_AGENT=off` es un
+interruptor de emergencia que gana sobre el flag. Escribe el artefacto como archivos en pasos chicos,
 revisa su propio trabajo (sintaxis de JavaScript, manifiesto, archivos faltantes, tablas
 sin declarar, reglas de publicación de ShareOut), corrige lo que encuentra y recién ahí
-publica. Con un binding `BROWSER` también prueba la página publicada y corrige hasta dos
+publica. Con un binding `BROWSER` también prueba el artefacto publicado y corrige hasta dos
 rondas de problemas; sin él, publica después de la revisión estática. Si aun así no logra
-una página que pase, no se anuncia nada como terminado: se le avisa al usuario y, si hay
-alertas por Telegram configuradas, al operador. Apagado por defecto. Funciona en todas las
+un artefacto que pase, no se anuncia nada como terminado: se le avisa al usuario y, si hay
+[alertas por Telegram](#alertas) configuradas, al operador. Apagado por defecto. Funciona en todas las
 rutas de arriba; en Anthropic directo usa además compactación del lado del servidor,
 edición de contexto y presupuesto de tarea.
 
-Todos los builds de páginas con IA (con agente o sin él) razonan con `BUILD_EFFORT` (`low`,
+Todos los builds de artefactos con IA (con agente o sin él) razonan con `BUILD_EFFORT` (`low`,
 `medium` o `high`; por defecto `medium`), usan el modelo elegido para el workspace (luego el
 de la instancia, luego `BUILD_MODEL`) y reciben el color de marca, el logo, el idioma y el
 archivo de contexto de estilo del workspace. El agente también puede consultar la guía de
 artefactos de ShareOut mientras construye.
 
-El mismo interruptor pasa al agente los cambios de páginas que hace el asistente: modifica los
-archivos que ya tiene una página HTML en pasos chicos, revisa que el cambio no rompa nada
-que la página no tuviera roto antes, y le muestra el cambio al usuario para que lo confirme
-antes de publicar nada. Los otros tipos de página, y los workspaces donde está apagado,
-siguen con el editor de una sola respuesta.
+Cada build, con agente o de una sola respuesta, aparece en `/admin?view=health` → **Page
+builds** (los últimos 25, guardados 90 días): cuándo, resultado (`published`, `previewed`,
+`gave_up`, `failed`, `truncated`), workspace, camino, duración, tokens de entrada y salida,
+costo, y cada paso detrás de **steps** — llamadas al modelo, herramientas, revisiones
+estáticas, la prueba del artefacto y la publicación.
+
+El mismo interruptor pasa al agente los cambios de artefactos que hace el asistente:
+modifica los archivos que ya tiene un artefacto HTML en pasos chicos, revisa que el cambio
+no rompa nada que el artefacto no tuviera roto antes, y le muestra el cambio al usuario para
+que lo confirme antes de publicar nada. Los otros tipos de artefacto, y los workspaces donde
+está apagado, siguen con el editor de una sola respuesta.
 
 ### Builds que sobreviven a la pestaña
 
@@ -77,7 +87,7 @@ Con el Durable Object `BUILD_JOBS` (viene en el `wrangler.toml` por defecto), un
 Create o un build confirmado en el asistente corre como un trabajo en el servidor y no dentro
 del pedido del navegador. Cerrar la pestaña no lo frena: el artefacto se publica igual, el
 resultado del asistente queda en su conversación, y si termina sin nadie mirando aparece en la
-campana y en Home ("Needs you"), en el idioma del usuario. Un cliente que pierde la conexión
+campana y en Home ("Te necesita"), en el idioma del usuario. Un cliente que pierde la conexión
 se vuelve a enganchar con `GET /v1/builds/{id}/events` y recibe los pasos hechos hasta ahí.
 Cada usuario corre un build a la vez (un doble clic se suma al que ya corre) y un trabajo que
 sigue corriendo a los 12 minutos se frena. Sin el binding, los builds corren en línea como
@@ -155,8 +165,8 @@ curl -sS -X PUT "$ORIGIN/v1/admin/ai-settings" \
 Prioridad: el modelo propio de un workspace gana, después el default de la instancia,
 después el fijo `anthropic/claude-sonnet-5.5`. `DELETE .../llm/model` (o
 `defaultGatewayModel: null`) borra un override y cae al siguiente. Ambos también tienen
-un desplegable — Configuración → IA en un workspace, y `/admin?view=instance` →
-**Modelo de IA por defecto** para la instancia. Esto solo aplica a la entrada del
+un desplegable — **Admin → IA y modelos** en un workspace, y `/admin?view=instance` →
+**AI defaults** para la instancia. Esto solo aplica a la entrada del
 proveedor `vercel-gateway`; las entradas directas de Anthropic y OpenAI mantienen su
 propio modelo fijo, porque no pueden servir un id arbitrario del catálogo del gateway.
 
@@ -168,6 +178,68 @@ instancia a toda una empresa:
 - `/admin?view=tokens` muestra uso y costo de tokens en el tiempo
 - `/admin?view=costs` lo pone al lado del resto del gasto
 - las claves por espacio mueven la cuenta al espacio que la genera
+
+### Lo que se le cobra a un espacio: costo × recargo
+
+Cada monto de IA que ve un espacio — su Admin → Facturación (gasto, presupuesto mensual de
+IA, reporte de IA), su Resumen, los costos de crews y de Knowledge, y la línea de uso de IA
+de una factura — es su **precio**: el costo medido × un recargo (markup). El almacenamiento,
+las visitas, el email y el tiempo de navegador no llevan recargo. El recargo vigente es el
+primero de:
+
+1. el recargo propio del espacio;
+2. el default de la instancia;
+3. ninguno — al espacio se le cobra al costo (1×).
+
+Fijá el default de la instancia en `/admin?view=instance` → **AI defaults** (*AI resale
+markup*), o:
+
+```bash
+curl -sS -X PUT "$ORIGIN/v1/admin/ai-settings" \
+  -H "Authorization: Bearer $SHAREOUT_TOKEN" -H 'Content-Type: application/json' \
+  -d '{"defaultMarkup":1.5}'
+```
+
+El recargo de un espacio se fija desde su Admin → Facturación (un bloque que solo ven los
+admins de la instancia) o con `PUT /v1/workspaces/$WORKSPACE_ID/ai-markup`
+`{"markup": 1.5}`; `null` vuelve al default de la instancia. Los dos aceptan un
+multiplicador de 1 (al costo) a 10; cualquier otro valor es `400 VALIDATION_ERROR`. Los
+admins del espacio nunca ven el costo, el recargo ni el margen, y un cambio de recargo no
+se escribe en el registro de auditoría del espacio, que sus admins pueden leer.
+
+El **presupuesto mensual de IA** de un espacio (lo fijan sus propios admins en
+Admin → Facturación) se mide a su precio, así el presupuesto, el reporte de IA y la línea de
+uso de una factura coinciden.
+
+### Alertas
+
+Configurá `SUPPORT_ALERT_TELEGRAM_CHAT_ID` (el id de un chat de Telegram) y
+`TELEGRAM_BOT_TOKEN` y el operador recibe un mensaje de Telegram, cada uno con un límite
+para que un mal día mande uno y no cientos:
+
+| Cuándo | Límite | Variable |
+|--------|--------|----------|
+| Un proveedor de la instancia rechaza llamadas por falta de crédito o un tope de gasto (la clave propia de un espacio nunca alerta) | una vez por hora por proveedor | — |
+| El gasto de IA de la instancia en el día UTC pasa una línea. Los costos se calculan cada hora, así que puede atrasarse hasta una hora | una vez por día | `AI_SPEND_ALERT_USD_PER_DAY` — apagada si no se define |
+| El crédito de Vercel AI Gateway baja de un piso (se revisa cada hora; también queda como error en el log del Worker) | una vez por día | `AI_CREDIT_ALERT_USD` — por defecto `20` |
+| Un build de artefacto falló o el agente de build se rindió | cada vez | — |
+| Se abre un ticket de soporte nuevo | cada vez | — |
+
+Sin el id del chat y el token del bot no se manda nada; los chequeos corren igual.
+
+## Todas las opciones de IA
+
+| Nombre | Tipo | Por defecto | Qué hace |
+|--------|------|-------------|----------|
+| `VERCEL_AI_GATEWAY` / `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` | secreto | — | Los proveedores ([arriba](#tres-proveedores)) |
+| `AI_PROVIDER_ORDER` | var | `vercel-gateway,anthropic,openai` | Orden de respaldo entre los proveedores configurados |
+| `BUILD_AGENT` | var | sin definir (sigue el flag **Page build agent**) | `on` fuerza el [agente de build](#agente-de-build-opcional) en todos lados; `off` lo apaga en todos lados |
+| `BUILD_EFFORT` | var | `medium` | Cuánto razonan los builds: `low`, `medium`, `high`. Cualquier otro valor vuelve a `medium` |
+| `BUILD_MODEL` | var | sin definir | Solo builds, cuando no hay modelo elegido por el espacio ni por la instancia: un slug del gateway en el gateway, un id propio (sin `/`) en Anthropic directo |
+| `SCAN_MODEL` | var | Claude Haiku 5.5 | Modelo que transcribe documentos escaneados: un slug del gateway, o un id propio en Anthropic directo |
+| `AI_SPEND_ALERT_USD_PER_DAY` | var | apagada | Línea de gasto diario para la [alerta](#alertas) de Telegram |
+| `AI_CREDIT_ALERT_USD` | var | `20` | Piso de crédito del gateway para la [alerta](#alertas) de Telegram |
+| `CREDENTIALS_KEY` | secreto | — | Hace falta para las [claves por espacio](#claves-por-espacio-de-trabajo) |
 
 ## Flags que quedan apagados por defecto
 

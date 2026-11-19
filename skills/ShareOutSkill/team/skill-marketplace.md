@@ -16,7 +16,7 @@ In the ShareOut app, skills live in the **Library** lens, which opens on its **S
 
 A skill is a `.md` file published with `artifact_type: "skill"`. It is stored as markdown internally but served with a dedicated skill viewer when listed in the marketplace.
 
-Skills are always `workspace`-visible so every member can browse the catalog.
+Skills are `workspace`-visible by default so every member can browse the catalog. An author may keep one `private` (a draft): it is hidden from the catalog (`GET …/skills`) for everyone but its owner, other members' agents never load it (even when attached before it went private), and only the owner and the skill's explicit collaborators can open it.
 
 ### Frontmatter
 
@@ -70,7 +70,7 @@ Content-Type: application/json
 }
 ```
 
-`workspace_id` is required. Visibility is forced to `workspace`.
+`workspace_id` is required. Visibility is `workspace` unless you send `"visibility": "private"` (a draft); any other value becomes `workspace` (`skillPublishVisibility`).
 
 Simpler, when all you have is a name and a body — no files array, no artifact type,
 and the workspace in the path:
@@ -83,7 +83,7 @@ Content-Type: application/json
 { "name": "Deploy checklist", "markdown": "# Deploy checklist\n\n…", "category": "Engineering" }
 ```
 
-→ `201 { artifact_id, version_no, slug, url }`, or `409 SLUG_TAKEN`.
+→ `201 { artifact_id, version_no, slug, url }`, or `409 SLUG_TAKEN`. Add `"visibility": "private"` to keep it a draft.
 
 In chat, the assistant does this with **`save_skill`** (see [Agent tools](#agent-tools)).
 
@@ -174,6 +174,18 @@ Re-pins an attached skill to the skill's current version. An attachment stores t
 version it was made at, so without this the member's agent keeps loading the body from
 the day they attached. `GET …/agent-skills` returns `version_no`, `latest_version_no`
 and `outdated` so the Library can show an **Update to vN** button.
+
+### Workspace default skills
+
+A workspace owner/admin can attach up to **5** skills to **every member's** assistant in that workspace. Defaults load first, then the member's own attached skills (a skill in both loads once); never in `__personal` scope.
+
+```http
+GET    /v1/workspaces/{workspaceId}/default-skills              ← member+ → { skills: [{ skill_artifact_id, skill_version_no, name, slug }] }
+POST   /v1/workspaces/{workspaceId}/default-skills              ← admin+ · { "skill_artifact_id": "art_skill" }
+DELETE /v1/workspaces/{workspaceId}/default-skills/{skillId}    ← admin+
+```
+
+`POST` pins the skill's latest version (re-`POST` to move it forward) → `{ success, skill_artifact_id, version_no }`. Errors: `CROSS_WORKSPACE` (not official and not this workspace's), `SKILL_PRIVATE` (make it workspace-visible first), `LIMIT_REACHED` (6th default).
 
 `GET /v1/skills/{skillId}/markdown` returns the body plus `html`, `version_no`,
 `edit_policy` and the caller's `can_edit` / `can_propose` / `can_review` /

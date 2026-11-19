@@ -35,7 +35,7 @@ delivery fails with `missing_scope` on an older connection, reconnect Slack.
 
 ## One-shot delivery
 
-From **Home**, open a page tab and use the Inspector **Deliver** section — pick
+From **Home**, open a page tab and go to **Automate → Send now** — pick
 email, Slack, or Telegram, choose a Slack channel from the searchable picker, and
 send immediately (`POST /v1/artifacts/{id}/deliver`). If Slack is not connected
 yet, **Connect** starts OAuth from the same panel.

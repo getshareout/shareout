@@ -96,7 +96,8 @@ Content-Type: application/json
 { "folder_id": "fld_abc" }
 ```
 
-Any workspace member can move a workspace artifact. Pass `"folder_id": null` to unfile.
+Only the artifact's owner, an editor or a workspace admin can move it (folder placement changes
+who can reach it); anyone else gets `403 FORBIDDEN`. Pass `"folder_id": null` to unfile.
 
 ## URL paths
 

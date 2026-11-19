@@ -48,7 +48,7 @@ el portal sin registrarse:
   **Iniciar sesión**, en la misma tarjeta, es para quien sí tiene cuenta en ShareOut.
 
 El portal de un invitado lleva la marca de tu **workspace** (logo, color y nombre). Puede
-abrir cada página y archivo de la carpeta y sus subcarpetas. Con **Puede comentar** comenta
+abrir cada artefacto y archivo de la carpeta y sus subcarpetas. Con **Puede comentar** comenta
 como la persona que verificó, sin un segundo código. Nunca ve nada más del workspace.
 
 El acceso se revisa en cada pedido: si quitás al invitado, si pasa la fecha de fin o si
@@ -82,7 +82,7 @@ aparecen.
 
 Los owners y admins del workspace gestionan cualquier carpeta. Quien **creó** la carpeta
 también puede, mientras **Los miembros pueden crear carpetas** esté activado
-(Admin → Settings). El resto ve **Quién tiene acceso** en modo solo lectura. Mirá
+(Admin → General). El resto ve **Quién tiene acceso** en modo solo lectura. Mirá
 [Carpetas del Team Space](/es/teams/folders/#enlaces-y-acceso).
 
 ## API

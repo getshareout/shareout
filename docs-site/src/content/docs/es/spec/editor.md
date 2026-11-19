@@ -105,8 +105,27 @@ En la práctica:
 | Un colaborador recarga | Carga **su** draft — no el tuyo |
 | Publicás | El HTML de **tu** canvas queda live; se limpia **tu** fila de draft; los demás conservan el suyo |
 | Dos pestañas tuyas guardan | Concurrencia optimista: `POST /editor/draft` con `baseUpdatedAt` devuelve **409 `DRAFT_CONFLICT`** si otra sesión tuya guardó primero |
+| Alguien publica mientras editás | `POST /editor/publish` con `baseLiveAt` devuelve **409 `STALE_BASE`** si el artefacto en vivo cambió después de que empezaste a editar — publicar revertiría su cambio sin avisar |
 
 La concurrencia es por usuario (tus pestañas / dispositivos / agente actuando como vos), no un draft compartido único.
+
+`baseLiveAt` es la hora de publicación del artefacto en vivo del que partió tu edición
+(`GET /editor` lo devuelve). Si un compañero, un agente o un crew publicó después, el
+publish se rechaza con **409 `STALE_BASE`**:
+
+```json
+{
+  "success": false,
+  "code": "STALE_BASE",
+  "error": "The live page changed since this edit started.",
+  "live": { "versionNo": 7, "updatedAt": "…", "by": "Ana", "byYou": false, "source": "agent" },
+  "baseVersionNo": 5
+}
+```
+
+Mandá el publish de nuevo **sin** `baseLiveAt` para publicar igual. El Edit rápido de
+Home lo muestra como **Cambió desde que empezaste**, con **Ver qué cambió** y
+**Publicar igual**; un `DRAFT_CONFLICT` ahí ofrece **Mantener el mío** o **Cargar el nuevo**.
 
 ## Colaboración
 
@@ -128,11 +147,11 @@ Los agentes normalmente crean o actualizan artefactos via `POST /v1/publish`. El
 
 | Ruta | Propósito |
 |------|-----------|
-| `GET /editor` | Cargar estado del editor (`html`, `draftUpdatedAt`, colaboradores, assets, …) |
+| `GET /editor` | Cargar estado del editor (`html`, `draftUpdatedAt`, `baseLiveAt`, colaboradores, assets, …) |
 | `GET /editor/draft` | Obtener el draft actual |
 | `POST /editor/draft` | Guardar draft (acepta `baseUpdatedAt` para concurrencia optimista) |
 | `DELETE /editor/draft` | Descartar draft |
-| `POST /editor/publish` | Publicar desde el estudio |
+| `POST /editor/publish` | Publicar desde el estudio (acepta `baseUpdatedAt` y `baseLiveAt`; 409 `DRAFT_CONFLICT` o `STALE_BASE`) |
 | `GET /editor/history` | Lista de historial de versiones |
 | `POST /editor/rollback` | Revertir a una versión anterior |
 | `POST /editor/upload` | Subir asset |

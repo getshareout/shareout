@@ -35,11 +35,12 @@ on the workspace's own provider key — see [Teams API → AI](/teams/api/).
 | **Build from a file** | Pass `source_file_id` on `create_artifact` after `read_file` — spreadsheets, decks, and CSVs become live pages |
 | **File library** | `list_files` / `read_file` — browse uploads, chat attachments, emailed-in files, and phone shares; see provenance and prior artifacts built from the same file |
 | Edit existing pages | `edit_page` for copy/layout changes on a page that already exists |
+| **Share a page** | `share_artifact` / `unshare_artifact` — share with people by email as viewer or editor (they get an email with the link and how to sign in), or stop sharing; `set_page_visibility` — private or the whole workspace (public links are not set here). Owner or editor; asks you to confirm first |
 | Read-only connector queries | Ad-hoc `SELECT` against connectors with **AI query** enabled (off by default) |
 | Propose schedules | Suggests a cron job (e.g. email a page weekly) — requires explicit confirmation |
 | Named threads (web) | ChatGPT-style history drawer — create, rename, delete threads; auto-titled from first message |
 | Inline widgets (web) | Rich cards in the thread (artifact previews, connector results) — not sent to Telegram/Slack |
-| Conversation history | Last 20 turns per thread, stored server-side |
+| Conversation history | Stored server-side; each turn loads up to the last 200 messages of the thread, and once that history gets long the older part is folded into a short summary while the newest messages stay word for word |
 | Proactive daily brief | Once per day on Home open — short AI catch-up via `GET /v1/home/agent/brief` |
 | **Present this** | `present_artifact` — AI-generate a slides deck from an existing published page |
 | **Metric watch** | `watch_metric` — one-click table watch (bell-only anomaly alerts) |

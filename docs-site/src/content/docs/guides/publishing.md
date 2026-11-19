@@ -248,8 +248,9 @@ Regenerate the preview thumbnail any time with
 
 ## Auto-summary & tags
 
-After each successful HTML publish, ShareOut runs a **background** AI pass over the
-production entrypoint. It writes a 1–2 sentence **description** (only when you left
+After each successful publish of an HTML page, a Markdown document, a CSV or a PDF
+(including documents converted on import, such as PDF → Markdown or a spreadsheet → CSV),
+ShareOut runs a **background** AI pass over the production entrypoint. It writes a 1–2 sentence **description** (only when you left
 the field empty) and **3–6 tags** into the existing `artifact_tags` table. Publish
 never waits on this job — if AI is unavailable, the page still goes live.
 
@@ -281,6 +282,65 @@ but is deprecated in favour of restore. The UI, diffs and previews are covered i
 
 To publish several HTML pages as one artifact, see
 [Multi-page artifacts](/guides/multi-page/).
+
+## Edit in pieces
+
+To change a word, a color or one file, you don't have to re-publish every file:
+
+1. **Read what you change.** `GET /v1/artifacts/{id}/files?manifest=1` lists every file
+   (path, mime, size, sha256 — no content) and `newest_version`, the version an edit must
+   start from. `GET /v1/artifacts/{id}/files?paths=index.html,styles.css` reads only the
+   files you name.
+2. **Send the change.** `POST /v1/artifacts/{id}/edits` with `base_version` and a list of
+   `ops`: `replace` (`old` → `new`, add `all` for every match), `write`, `delete` or
+   `rename` — up to 100, run in order. `dry_run: true` shows the result without saving.
+
+```json
+{
+  "base_version": 3,
+  "message": "Blue headings",
+  "ops": [{ "op": "replace", "path": "styles.css", "old": "h1 { color: red; }", "new": "h1 { color: blue; }" }]
+}
+```
+
+If any op fails, nothing is written: `EDIT_NO_MATCH` gives the closest line,
+`EDIT_AMBIGUOUS` the lines that match. If someone saved a newer version since
+`base_version`, the answer is `409 VERSION_CONFLICT` with `current_version` — read again
+and retry. The result is published as the next version through the same pipeline as a
+publish (moderation, tests, readiness), and untouched files are carried over. Works on
+html, markdown, csv, txt and json artifacts; needs the editor role.
+
+From an AI agent over MCP, the same flow is **`read_artifact`** (the file list and version,
+or one file in chunks — nothing cut silently) then **`edit_artifact`**. To rewrite a whole
+page instead, **`get_artifact`** with `include_files` reads every file and
+**`update_artifact`** saves it with `base_version`. `update_artifact` refuses a write that
+would lose work: `VERSION_CONFLICT` when someone saved a newer version, and
+`WOULD_REMOVE_FILES` when the files sent leave out files of the current version (unless
+`replace_all_files: true`).
+
+## Check what viewers see (Verify)
+
+After a publish or an edit, check the page the way the people it's shared with get it:
+
+```bash
+curl -X POST https://shareout.site/v1/artifacts/art_abc123/verify \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{}'
+```
+
+Verify opens the page in a fresh browser with no ShareOut session, on a desktop
+(1280×800) and a phone (390×844), and reports script errors with file and line, files
+that fail to load, blocked libraries, accessibility problems, content wider than the
+phone screen, small tap targets, slow loading and common source mistakes — with a
+screenshot of each. `status` is `pass`, `warn`, `fail` or `partial` (source checks only,
+when the instance has no browser rendering).
+
+- Body (all optional): `version` (defaults to the live one), `viewports`
+  (`["desktop"]`, `["mobile"]` or both), `full_page`.
+- `GET /v1/artifacts/{id}/verify/latest` returns the last result.
+- MCP: **`verify_artifact`**.
+- Owners and editors only. Each person can run it 30 times an hour unless the instance sets
+  `VERIFY_RUNS_PER_HOUR`; past that, `429` with `Retry-After`.
 
 ## Deleting & restoring
 

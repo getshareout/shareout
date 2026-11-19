@@ -79,7 +79,7 @@ within an hour count once. Views by your own members aren't listed.
 ## Who can manage a portal
 
 Workspace admins and owners can manage any folder. The person who **created** the folder
-can manage it too, while **Members can create folders** is on (Admin → Settings). Everyone
+can manage it too, while **Members can create folders** is on (Admin → General). Everyone
 else sees **Who has access** read-only. See [Team Space folders](/teams/folders/#links-and-access).
 
 ## API

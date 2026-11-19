@@ -44,8 +44,9 @@ older per-bucket blob URL also refuses private file bytes — always use
 `sdk.files.getUrl()` for workspace files.
 
 <Aside type="tip">
-Upload and manage files from Home → **Assets**, or via
-[`/v1/workspaces/{id}/assets`](/teams/api/#assets-deliverables). See
-[Files & deliverables](/everyone/assets/) for folders, versions, comments, and
-client delivery.
+The **Assets** tab in Home is retired: a file uploaded in Home (**New** → **Upload
+files**, or drag and drop) now becomes an artifact, not a `dlv_` file. Manage workspace
+files through [`/v1/workspaces/{id}/assets`](/teams/api/#assets-deliverables); existing
+`dlv_` URLs keep working. [Files & deliverables](/everyone/assets/) covers folders,
+versions, comments, and client delivery.
 </Aside>

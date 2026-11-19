@@ -1,39 +1,43 @@
 ---
 title: Your workspace (Home)
-description: The redesigned ShareOut Home — lenses, tabbed pages, the Inspector, quick Edit mode, and the agent dock.
+description: The ShareOut Home — the left rail, tabbed pages, the Inspector, quick Edit mode, and the agent dock.
 ---
 
-ShareOut **Home** is where you manage pages, see what needs attention, and open artifacts without leaving one surface. The redesigned workspace has three regions:
+ShareOut **Home** is where you manage pages, see what needs attention, and open artifacts without leaving one surface. The workspace has these regions:
 
 | Region | What it does |
 | --- | --- |
-| **Left rail** | Brand, **Create with AI**, lenses (Brief, All Artifacts, Assets, Schedules, Alerts, Analytics, Datasets, **Catalog**, **Knowledge**, Crew AI, Library, Connectors), **Admin** (owners/admins), Following, account menu |
-| **Canvas** | Tab strip (Home + open pages); Brief widgets and artifact views; bottom **agent dock** |
-| **Top bar** | **Notifications** bell (left of avatar), account menu, space switcher |
-| **Right rail** | Context **Inspector** — Activity on Home; Details / Deliver / Comments / History / Automate / Editing on artifact tabs |
+| **Left rail** | Brand, **New**, **Search** (⌘K), then **Home**, **Artifacts**, **AI skills**, **Automations**, **AI tasks** (owners/admins), **Data**, **Knowledge**, **Catalog**, and **Admin** (owners/admins). **Help & support** and **Documentation** sit at the bottom |
+| **Canvas** | Home, the lens you picked, or an open artifact; bottom **agent dock** |
+| **Top bar** | Open-artifact tabs, the **Notifications** bell, and the account menu (where you switch spaces) |
+| **Right rail** | The **Inspector** for the open artifact — **Details**, **Comments**, **Automate** (and **Editing** while you edit). Hidden on Home |
+
+In your **Personal** space the rail shows only Home, Artifacts, AI skills and Automations;
+AI tasks, Data, Knowledge, Catalog and Admin appear inside a team workspace.
 
 Rails and panes are resizable; widths are remembered in your browser.
 
-## Brief — Needs You and Pulse
+## Home — Needs you, For you, Recent
 
-On **Home**, the canvas shows your **Brief** as draggable widgets and the right
-rail shows **Activity**:
+**Home** is a calm, fixed page. A line at the top sums up what happened since you were
+away (or says you're all caught up). Under it, up to three lists:
 
-| Widget | What it shows |
+| List | What it shows |
 | --- | --- |
-| **Recently viewed** | Pages you opened lately |
-| **Needs you** | Actionable rows (comments, shares, access requests, alerts, failed runs) |
-| **Runs** | Recent schedule and crew executions |
-| **Activity** | Live Pulse counts (publishes, views, creates, favorites, connections, skills…) |
-| **For you** | Personalized recommendations |
+| **Needs you** | Rows that need action: unresolved comments or replies (not yours), shares to you, access requests, metric alerts and watches, failed tests, failed job or AI task runs, and more. **×** dismisses a row |
+| **For you** | Pages picked for you |
+| **Recent** | Pages you opened and recent activity (publishes, comments, runs) in one list, newest first |
 
-Drag the grip on any widget to **reorder**; resize from the corner handle. Layout
-is saved in your browser.
+A list with nothing in it is hidden — **Needs you** only shows up when something is
+waiting on you. When all three are empty, Home shows **Create your first page** instead.
 
-- **Needs You** — individual rows that need action: unresolved comments or replies (not yours), shares to you, access requests, metric alerts, failed tests, failed job or crew runs.
-- **Pulse** — aggregated ambient counts inside the Activity widget. Pick **Today**, **7 days**, or **30 days**.
+The **More** menu (**⋯**, top right of Home) holds the rest:
 
-Workspace owners and admins can tune who sees each event kind under **Activity → settings** (see [Workspace admin → Activity visibility](/teams/admin/#activity-visibility)).
+- **Customize** — drag the lists to reorder them and resize them from the corner, then
+  **Done**. The layout is saved in your browser.
+- **Today**, **7d**, **30d** — how far back the activity in **Recent** goes.
+- **Activity visibility** (owners and admins) — who sees each event kind (see
+  [Workspace admin → Activity visibility](/teams/admin/#activity-visibility)).
 
 ## Pro search (⌘K)
 
@@ -41,12 +45,20 @@ One ranked, typo-tolerant search engine powers every jump surface in Home:
 
 | Surface | How to open |
 | --- | --- |
-| **Command palette** | **⌘K** / **Ctrl+K** anywhere in Home — searches pages, folders, datasets, connectors, people, schedules, crew, and alerts |
-| **Inline quick-jump** | Type in the search box above artifact cards in **All Artifacts** — same results, opens as an in-studio tab |
+| **Command palette** | **⌘K** / **Ctrl+K** anywhere in Home, or **Search** in the left rail — searches pages, folders, people and actions, plus page text, Knowledge, datasets, connectors, schedules, AI tasks, alerts and AI skills |
+| **Quick search in Artifacts** | Type in the **Quick search…** box above the list in **Artifacts** — it narrows the list as you type |
 
-Empty search shows **recents**. Results are grouped (Pages, Folders, Data, People, Schedules, Crew, Alerts, Actions) with thumbnails, owner avatars, view counts, and status pills. **↑↓** navigate, **Enter** opens, **Esc** closes.
+An empty palette shows your **Recent searches** (**×** removes one, **Clear** empties the
+list) and **Recently opened** pages. A search is remembered when you open a result or
+press **Enter**. Results come in two parts: pages, folders, people and actions appear as
+you type, with no wait; matches **In page text**, **In Knowledge**, and the other groups
+fill in a moment later below them. **↑↓** navigate, **Enter** opens, **Esc** closes.
 
-**Answer mode:** end your query with **`?`** to ask a one-shot question over your workspace pages — e.g. `revenue last quarter?`. The palette shows an **Ask** row; **Enter** calls `POST /v1/ask` and renders the answer inline with **Sources** links to the cited pages. This is read-only (no tools, no publish) — distinct from the bottom **Ask your workspace…** dock, which runs the full [workspace assistant](/teams/workspace-assistant/).
+**Ask AI:** the last row is always **Ask AI: “your query”**. Pick it to ask a one-shot
+question over your workspace pages — e.g. `revenue last quarter`. It calls
+`POST /v1/ask` and shows the answer inline with **Sources** links to the cited pages. This
+is read-only (no tools, no publish) — distinct from the bottom **Ask your workspace…**
+dock, which runs the full [workspace assistant](/teams/workspace-assistant/).
 
 The same search engine backs `GET /v1/search` and the workspace assistant's **`search_workspace`** tool — see [Teams API → Search](/teams/api/#search).
 
@@ -54,16 +66,24 @@ The same search engine backs `GET /v1/search` and the workspace assistant's **`s
 
 A **bell** in the top bar (left of your avatar) opens a right-docked panel — same glass-sheet language as account and help panels. A red badge counts items that need you.
 
-**Unread** and **Seen** tabs split the feed: **Unread** holds approvals and activity still waiting on you; **Seen** lists notifications you opened or dismissed within the current window (muted, read-only).
+**Unread** and **Seen** tabs split the feed. **Unread** groups what is still waiting on
+you: **Needs your approval**, **Action items**, and **Recent** (the activity from
+**Needs you**). **Seen** lists notifications you opened or dismissed within the current
+window (muted, read-only).
 
 | Card type | What it shows |
 | --- | --- |
 | **Approval** | Publish-approval requests — **Approve** / **Reject** when you are a pending voter; otherwise an awaiting-review status |
-| **Activity** | Comments, replies, shares, access requests, **action items** assigned to you, files emailed to the workspace inbox, failed runs, **metric alerts**, **metric watches**, **stale data** (Sheets not synced in 7+ days), and **unused pages** (monthly janitor) from **Needs you** — dismiss individually or **Mark all read** |
+| **Action item** | Action items assigned to you, with a due date (**Overdue**, **Due today**…) — **Done** / **Reopen** |
+| **Activity** | Comments, replies, shares, access requests, files emailed to the workspace inbox, failed runs, **metric alerts**, **metric watches**, **stale data** (Sheets not synced in 7+ days), **unused pages** (monthly janitor), and AI page builds that ended while you weren't watching — **×** dismisses one |
 
-Opening an activity card navigates to the target and marks it **seen** (leaving the unread count). Dismiss or **Mark all read** also moves items to **Seen**.
+**Opening the bell marks its activity as read.** The badge drops those items at once,
+and next time they are under **Seen** (they also leave **Needs you** on Home). There is no
+separate "mark all read" step. Approvals stay until someone decides them, and action
+items stay until you mark them **Done**. Opening an activity card navigates to the
+target.
 
-Badge count = pending approvals you can decide + undismissed activity items. The panel is primed on page load from the activity feed and publish-approval queue.
+Badge count = pending approvals you can decide + unread activity + open action items. The panel is primed on page load from the activity feed and publish-approval queue.
 
 ### Weekly workspace digest
 
@@ -75,22 +95,25 @@ preferences (**product** category). Distinct from the personal marketing weekly 
 
 ## Workspace lenses
 
-Beyond Brief, the left rail opens full-page lenses inside Home — no separate admin
+Beyond Home, the left rail opens full-page lenses inside Home — no separate admin
 app required:
 
 | Lens | Who | What you do there |
 | --- | --- | --- |
-| **Datasets** | Workspace members | Browse and create workspace datasets |
-| **Catalog** | Everyone | Browse the optional [data catalog](/teams/catalog/) — sources, lineage, glossary |
+| **Artifacts** | Everyone | Every page and uploaded file, in folders — see below |
+| **AI skills** | Everyone | **Skills** — official skills **recommended by ShareOut** and workspace skills — and **Modules**, with **New module** for JS libraries |
+| **Automations** | Everyone | Your scheduled sends; the **Alerts** chip switches to metric alerts |
+| **AI tasks** | Owners/admins | Manage AI tasks (crew automations) |
+| **Data** | Workspace members | **Data sources** — list, create, and OAuth-install connectors — and **Tables**, the workspace datasets |
 | **Knowledge** | Members (admins enable) | Browse the optional [workspace knowledge](/teams/knowledge/) — notes learned from your pages |
-| **Crew AI** | Owners/admins | Manage crew automations |
-| **Library** | Everyone | **Recommended by ShareOut** official skills, browse workspace skills, and **+ New module** for JS libraries |
-| **Assets** | Everyone | Upload reusable files, version deliverables, bundle and send client download links — see [Files & deliverables](/everyone/assets/) |
-| **Connectors** | Workspace members | List, create, and OAuth-install data connectors |
-| **Admin** | Owners/admins | Control panel — Overview, Artifacts, Members, **Sharing**, Automation, AI, Security, Support, Settings |
+| **Catalog** | Workspace members | Browse the optional [data catalog](/teams/catalog/) — sources, lineage, glossary |
+| **Admin** | Owners/admins | Control panel — one page per topic in a sidebar, grouped as People, Content, AI & billing, Security and Workspace |
 
 Each lens has native create flows — you stay in Home instead of handing off to chat.
-Admin also links to Connectors, Schedules, Alerts, and Crew for cross-cutting tasks.
+
+There is no **Assets** lens any more. Files you upload (**New** → **Upload files**, or
+drop them on Home) become artifacts — documents, images and video — and live in
+**Artifacts** like any page. Links to older files keep working.
 
 See [Workspace admin](/teams/admin/) for the full Admin lens reference.
 
@@ -100,22 +123,22 @@ Home URLs are bookmarkable:
 
 | Hash | Opens |
 | --- | --- |
-| `#l/brief` | Brief lens (default Home) |
-| `#l/artifacts` | All Artifacts |
-| `#l/assets` | Assets (files & deliverables) |
+| `#l/brief` | Home (default) |
+| `#l/artifacts` | Artifacts |
 | `#l/catalog` | Data Catalog list |
 | `#l/catalog/{entryId}` | A specific catalog entry |
 | `#l/admin` | Admin lens |
 | `#a/{slug}` | Artifact tab for that page |
 
+A link to a lens that isn't in your rail (an old `#l/assets` link, say) opens Home.
 Browser back/forward navigates between lenses and tabs. On phones the left rail
 becomes a **hamburger drawer** instead of a fixed sidebar.
 
-In **All Artifacts**, folders appear above your page cards — click a folder to
+In **Artifacts**, folders appear above your page cards — click a folder to
 drill in (Drive-style) with a **breadcrumb** to climb back. Create, rename, or
 delete folders from the header (team folders: `owner`/`admin` for any folder,
 members for the ones they created unless an admin turned that off; personal
-folders are yours). Deleting a folder orphans its pages back to All Artifacts —
+folders are yours). Deleting a folder orphans its pages back to Artifacts —
 it never deletes the pages themselves. Recent, Favorites, Shared, and Mine
 filters still show everything; folders are navigation, not a filter that hides pages.
 
@@ -124,9 +147,10 @@ can restore).
 
 ## Open pages in tabs
 
-Click a page card to open it in a **tab** beside Home — like an IDE. Many pages can stay open; a **dirty dot** on a tab means unsaved edits in quick Edit mode.
+Click a page card to open it in a **tab** beside Home — like an IDE. New tabs open first, right after Home. Many pages can stay open; a **dirty dot** on a tab means unsaved edits in quick Edit mode.
 
 - **Drag to reorder** — grab any open page tab (Home stays pinned) and drag it left or right.
+- **All open tabs** — when the tabs no longer fit, a list button at the end of the row names every open tab; with more than eight open it adds a **Find a tab** box.
 - **Open in new tab** — the ↗ icon on a card opens the live page in a separate browser tab.
 - **Device preview** — on an open HTML page tab, toggle the phone icon to frame the canvas as a mobile viewport.
 - **Full screen** — the expand icon beside the device toggle requests native fullscreen on the live preview iframe; press **Esc** to exit.
@@ -142,34 +166,54 @@ Each HTML page tab has a **View / Edit** toggle:
 
 In **Edit** you can:
 
-- Click text to rewrite it inline; change color, size, links, images (URL or upload)
-- Insert, reorder, duplicate, or delete blocks (text, heading, image, button, divider)
-- Use **AI on selection** (rewrite, shorten, grammar, translate, or a custom prompt)
-- **Undo / redo**, autosave drafts, and **Publish** when ready
+- Point at any element to outline it and click to select it — text, an image, a link or a whole block. The **Elements** list in the side panel shows the page as a tree: hover highlights an element, click selects it and scrolls to it
+- Rewrite text inline; make it bold, italic or a link, change its color and size, or **Convert to…** a heading or paragraph
+- Change images (URL or upload) and links; give a block a background, padding and alignment
+- Move an element up or down, **Duplicate** it, or **Delete** it
+- **Ask AI** about what you selected — or, with nothing selected, about the whole page (*What should change on this page?*). The quick asks fit what you picked: text gets **Rewrite**, **Shorten**, **Fix grammar** and **Translate**; a block gets **Tidy spacing** and **Make it a card**; an image gets **Write alt text**. Or type your own request
+- See the AI's change in place as an **AI proposal**: switch **Before** / **After** to compare, then **Keep change**, **Try again** or **Discard** (**Esc** discards). The rest of the page is locked until you pick one
+- **Undo / redo**, autosave to your private draft, and **Publish** when ready
 - Open **full editor ↗** (`/a/{slug}/edit`) for bindings, data model, collab, and advanced Inspect tools
 
 Edit mode is for owners, named editor collaborators, and workspace **owners/admins**. Plain workspace members need an explicit **Can edit** invite.
 
-Keyboard shortcuts in Edit: **⌘/Ctrl+S** publish, **⌘/Ctrl+Z** undo, **Esc** deselect.
+Keyboard shortcuts in Edit: **⌘/Ctrl+S** saves your draft now (only the **Publish** button publishes), **⌘/Ctrl+Z** undo, **⌘/Ctrl+Shift+Z** or **⌘/Ctrl+Y** redo, **Esc** deselect.
+
+**When the draft changed somewhere else** — in another tab, on another device, or by
+the agent — saving pauses and a bar says **This draft changed somewhere else.** Pick
+**Keep mine** to save your version, or **Load newer** to drop your unsaved changes and
+open the newer draft.
+
+**When someone published while you were editing**, **Publish** stops with
+**Changed since you started (…)**, naming the version, who published it and when.
+**See what changed** opens the difference; **Publish anyway** puts your version live
+over theirs.
 
 ## Inspector (right rail)
 
-On an artifact tab the Inspector is a stack of collapsible sections (drag to
-reorder — your layout is remembered per browser):
+On an artifact tab the Inspector has three tabs: **Details**, **Comments** and
+**Automate**. In Edit mode it shows one tab instead, **Editing**: the selected element's
+properties, the **Elements** tree and **Ask AI**.
 
-| Section | Purpose |
+On phones and tablets (screens up to 1100px wide) there is no right rail: tap
+**Options** in the artifact bar to open the same panel as a sheet from the bottom.
+
+| Tab | What's there |
 | --- | --- |
-| **Details** | Star, title, visibility (segmented control), folder tree, compact meta pills, **Shared with** card (inline invite + per-viewer breakdown), tags, tests. Also: the live version's change note ("Updated …"), **Approve this version**, **Pages (N)** for [multi-page artifacts](/guides/multi-page/), and **Knowledge from this artifact** when [Knowledge](/teams/knowledge/) learned notes from it |
-| **Deliver** | One-shot send to **email**, **Slack**, or **Telegram** — runs immediately, no agent turn. Pick a Slack channel from a searchable picker (no pasting channel IDs). **Schedule** opens Automate to create a recurring job. If Telegram or Slack is not connected yet, **Connect** walks you through linking; **Check again** refreshes status after OAuth. |
-| **Watches** | One-click **metric watches** on this page's tables — row count, column sum, or last value. Alerts in the bell when the value moves ±20% from its baseline (hourly check). See [Metric alerts → Watches](/guides/metric-alerts/#metric-watches). |
+| **Details** | Title and description (click to edit), star, an owner · version · date line with status pills, and the live version's change note ("Updated …"). Buttons: **Open**, **Edit**, **Copy link**, **Download original** (converted PDFs) and **Delete**. Then who can see it, in one line, with a **Share** button; **Pages (N)** for [multi-page artifacts](/guides/multi-page/); and **Organize** (folder and tags) for editors. **More** folds away **Approvals** (**Approve this version**), **Analytics** and **Tests** (editors), **Knowledge from this artifact** when [Knowledge](/teams/knowledge/) learned notes from it, and two rows that open their own view: **Data** (HTML pages) and **Versions** — see [Version history](/everyone/version-history/) |
 | **Comments** | Full thread, replies, @mentions, composer. **Open / All** filter, **Resolve / Reopen**, **Assign**, and an "on vN" hint for comments on older versions — see [Review & approvals](/everyone/review/) |
-| **History** | Every version with who, how and what changed; line diff, compare any two, preview, and non-destructive **Restore** — see [Version history](/everyone/version-history/) |
-| **Automate** | Schedules and crew triggers for this artifact only. Owners and editors see the shared schedules plus their own personal deliveries; other people's personal subscriptions stay private to them |
-| **Editing** | Property panel when Edit mode is on (formatting, blocks, AI) |
+| **Automate** | **Update the data** (Drive, a link or an emailed Excel — editors in a workspace), **Send now** (editors), this page's **Schedules** and **Alerts**, **Monitoring** (editors), and **Quick actions**: **Schedule a send**, **Set an alert**, **Set up an AI task**, or describe something custom in chat. Owners and editors see the shared schedules plus their own personal deliveries; other people's personal subscriptions stay private to them |
 
-On **Home**, the Inspector shows **Activity** (Needs You + Pulse) instead.
+**Send now** is a one-shot send to **email**, **Slack**, or **Telegram** — it runs
+immediately, no agent turn. Pick a Slack channel from a list (no pasting channel IDs).
+**Schedule** turns it into a recurring job. If Telegram or Slack is not connected yet,
+**Connect** walks you through linking; **Check again** refreshes status after OAuth.
 
-Deliver uses the same destination layer as [scheduled jobs](/guides/jobs/) —
+**Monitoring** holds one-click **metric watches** on this page's tables — row count,
+column sum, or last value. Alerts in the bell when the value moves ±20% from its
+baseline (hourly check). See [Metric alerts → Watches](/guides/metric-alerts/#metric-watches).
+
+Send now uses the same destination layer as [scheduled jobs](/guides/jobs/) —
 `POST /v1/artifacts/{id}/deliver` with `action` `email`, `slack`, or `telegram`.
 See [Teams API → Artifact delivery](/teams/api/#artifact-delivery-one-shot).
 
@@ -196,22 +240,32 @@ and docks it in the chat thread (without taking over the screen on mobile).
 
 ### Setup checklist (new members)
 
-When you join a workspace in the last **14 days**, the dock auto-opens with a
-localized **setup checklist** — no model call, just a warm greeting and a progress
-ring. Tasks are live-derived from real state (publish, connect data, Telegram,
-Slack, alert, skill for admins; explore, comment, Telegram, skill+publish for
-internal members). External sharees get no checklist.
+When you joined a workspace in the last **14 days** (counted from when you accepted the
+invite) — or your account is that new, on your Personal space — the chat prepares a
+localized **setup checklist** for you. No model call, and it doesn't pop open: the
+**Ask your workspace…** pill shows an unread dot. Until you have a first page, the
+greeting offers a few starter ideas you can send with one click. After that a
+**Get set up** card shows a progress ring and **only the next step**, with a button that
+does it:
 
-- Each item has an inline action button (connect, publish, open Connectors, etc.).
-- **Slack** is skippable and excluded from the percentage so 100% stays reachable.
+| Who | Steps, in order |
+| --- | --- |
+| Owners and admins | Publish your first page · Connect a data source · Invite your team · Set up an alert |
+| Internal members | Publish your first page · Connect your agent · Explore a shared page · Leave a comment |
+| Personal space | Publish your first page · Try the assistant · Share a page |
+
+External sharees get no checklist.
+
+- **Invite your team** and **Connect your agent** have a **Skip** button and don't count
+  toward the percentage, so 100% stays reachable.
+- Steps cross themselves off from what you actually do — come back to the tab after
+  connecting something and the card updates.
 - Ask *"how do I get started?"* anytime and the agent can surface the same checklist
   via its `show_onboarding` tool.
-- Returning to the tab after connecting Telegram (or finishing a connector OAuth)
-  automatically crosses items off.
 - At **100%**, a one-shot blue ring moment fires once (`POST /v1/home/onboarding/celebrate`);
   established workspaces are backfilled so it never retro-triggers.
 
-Dismiss with the checklist's dismiss control (`POST /v1/home/onboarding/dismiss`).
+Dismiss with the card's **Hide** button (`POST /v1/home/onboarding/dismiss`).
 Status: `GET /v1/home/onboarding?workspace=`.
 
 ## Account menu
@@ -222,7 +276,19 @@ deep-link straight to the bot), or sign out.
 
 ## Create with AI
 
-**Create with AI** in the left rail starts an in-studio generation flow (`/v1/create/generate`) so new pages land in your workspace without leaving Home.
+Open **New** at the top of the left rail and pick **Describe it to AI** (shown when
+AI creation is on for the instance). Say what you need; the AI may ask a question or
+two, then shows **Ready to build this?** with **Who can see it?** — **Private** (the
+default), **Team** (in a team workspace), or **Anyone with the link** (where public
+links are allowed). Pick **Build it**.
+
+A **Building · {name}** tab opens and you watch the page come together; when it's done,
+the real artifact replaces it. If the build fails, the tab offers **Try again**.
+Closing that tab stops the build. Closing the browser doesn't on a standard install
+(see [builds that outlive the tab](/self-host/ai/#builds-that-outlive-the-tab)): the
+build keeps running on the server, and a notice in the bell (and in **Needs you**) tells
+you when your page is ready. You can run one build at a time. Under the hood this is
+`POST /v1/create/generate`.
 
 ## Related
 

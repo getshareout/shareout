@@ -357,10 +357,14 @@ Endpoints: `GET|DELETE …/comments/_guest`, `POST …/comments/_guest/code`,
 
 | Place | Behavior |
 | --- | --- |
-| **Home → Assets** | Modal thread on a deliverable (`file:<id>`) |
 | **`/shared` portal** | External sharees with comment grant can read/post on shared files |
 
-These UIs use the same REST API; they do not open a WebSocket.
+This UI uses the same REST API; it does not open a WebSocket.
+
+The Home **Assets** tab, which opened a thread on a deliverable, is retired. A file
+uploaded in Home now becomes an artifact and takes comments in its own **Comments** tab
+like any page. `file:<id>` threads on existing files stay reachable through the API and
+the `/shared` portal.
 
 ## Ask the AI from a comment
 

@@ -11,7 +11,16 @@ files keep working. The rest of this page describes the retired tab.
 
 The **Assets** tab in your Home is a place to keep files — images, video, PDFs, spreadsheets, decks, zips, anything — store them once, reuse them across your pages, and hand a client a clean download link.
 
-Open it from the left rail in your Home: **Assets**.
+The **Assets** tab is no longer in your Home's left rail, and an old link to it opens
+your Home instead. To add a file now:
+
+1. In your Home, click **New → Upload files** (or drag the file onto your Home).
+2. Pick one or more files. Documents, spreadsheets, images and video (up to 25&nbsp;MB
+   each) each become an artifact, with the original file kept inside it.
+3. Find them under **Artifacts**, in the folder you had open.
+
+If a file is refused, it is a type ShareOut can't show (audio, fonts, zip files) or it is
+bigger than 25&nbsp;MB.
 
 ## Add files
 
@@ -27,7 +36,7 @@ Files can land in your library from three other places — each records **where 
 | **Chat attach** | Paperclip in the Home **Ask your workspace…** composer | You (uploads to your scope's asset bucket) |
 | **Share from phone** | Install ShareOut as a PWA, then **Share → ShareOut** from any app | You — opens Home with the file ready to attach in chat |
 
-The workspace inbox address is in **Admin → Settings → File inbox** (copy with one click). Admins get a bell notification and optional Telegram ping when a member emails files in. Spreadsheets (`.xlsx`, `.csv`), decks (`.pptx`), PDFs, and images are the typical payloads.
+The workspace inbox address is in **Admin → General → File inbox** (copy with one click). Admins get a bell notification and optional Telegram ping when a member emails files in. Spreadsheets (`.xlsx`, `.csv`), decks (`.pptx`), PDFs, and images are the typical payloads.
 
 :::note[Not the same as a page inbox]
 A **page inbox** (`expenses.k7m4p2@inbox.YOUR_DOMAIN`) captures mail *into one artifact* for automations — see [Receive email](/everyone/inbox/). The **workspace file inbox** feeds the shared **Assets** library and the AI assistant instead.

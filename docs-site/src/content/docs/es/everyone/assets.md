@@ -11,7 +11,17 @@ existentes siguen funcionando. El resto de esta página describe la pestaña ret
 
 La pestaña **Assets** en tu Home es un lugar para guardar archivos — imágenes, video, PDFs, hojas de cálculo, decks, zips, lo que sea — guardalos una vez, reutilizalos en tus artefactos y entregale al cliente un link de descarga limpio.
 
-Abrilo desde el rail izquierdo de Home: **Assets**.
+La pestaña **Recursos** ya no está en el rail izquierdo de Home, y un link viejo a ella
+abre tu Home. Para agregar un archivo ahora:
+
+1. En tu Home, tocá **Nuevo → Subir archivos** (o arrastrá el archivo a tu Home).
+2. Elegí uno o varios archivos. Documentos, hojas de cálculo, imágenes y video (hasta
+   25&nbsp;MB cada uno) se convierten cada uno en un artefacto, con el archivo original
+   adentro.
+3. Los encontrás en **Artefactos**, en la carpeta que tenías abierta.
+
+Si se rechaza un archivo, es de un tipo que ShareOut no puede mostrar (audio, fuentes,
+archivos zip) o pesa más de 25&nbsp;MB.
 
 ## Agregar archivos
 
@@ -27,7 +37,7 @@ Los archivos también pueden entrar a tu biblioteca desde tres lugares más — 
 | **Adjunto en el chat** | Clip en el compositor **Ask your workspace…** de Home | Vos (sube al bucket de assets de tu scope) |
 | **Compartir desde el teléfono** | Instalá ShareOut como PWA y **Compartir → ShareOut** desde cualquier app | Vos — abre Home con el archivo listo para adjuntar en el chat |
 
-La dirección del inbox del workspace está en **Admin → Settings → File inbox** (copiá con un clic). Los admins reciben notificación en la campana y opcionalmente por Telegram cuando un miembro manda archivos por email. Hojas de cálculo (`.xlsx`, `.csv`), decks (`.pptx`), PDFs e imágenes son los casos típicos.
+La dirección del inbox del workspace está en **Admin → General → Bandeja de archivos** (copiá con un clic). Los admins reciben notificación en la campana y opcionalmente por Telegram cuando un miembro manda archivos por email. Hojas de cálculo (`.xlsx`, `.csv`), decks (`.pptx`), PDFs e imágenes son los casos típicos.
 
 :::note[No es lo mismo que el inbox de un artefacto]
 El **inbox de un artefacto** (`gastos.k7m4p2@inbox.YOUR_DOMAIN`) captura mail *dentro de un artefacto* para automatizaciones — ver [Recibí emails](/es/everyone/inbox/). El **inbox de archivos del workspace** alimenta la biblioteca **Assets** compartida y al asistente con IA.

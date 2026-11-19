@@ -45,8 +45,10 @@ URL blob antigua por bucket también rechaza bytes de archivos privados — usá
 `sdk.files.getUrl()` para archivos del workspace.
 
 <Aside type="tip">
-Subí y gestioná archivos desde Home → **Assets**, o vía
-[`/v1/workspaces/{id}/assets`](/es/teams/api/#assets-deliverables). Ver
-[Archivos y entregas](/es/everyone/assets/) para carpetas, versiones, comentarios y
-entregas a clientes.
+La pestaña **Recursos** de Home se retiró: un archivo que subís en Home (**Nuevo** →
+**Subir archivos**, o arrastrándolo) ahora se convierte en un artefacto, no en un archivo
+`dlv_`. Gestioná los archivos del workspace vía
+[`/v1/workspaces/{id}/assets`](/es/teams/api/#assets-deliverables); las URLs `dlv_`
+existentes siguen funcionando. [Archivos y entregas](/es/everyone/assets/) cubre carpetas,
+versiones, comentarios y entregas a clientes.
 </Aside>

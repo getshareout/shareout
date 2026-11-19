@@ -56,6 +56,12 @@ one workspace. Action scopes: `artifacts:read`, `artifacts:publish`, `data:read`
 
 A token without a scope gets `403 INSUFFICIENT_SCOPE`; a revoked/expired token gets `401`.
 
+A `sot_` token is **not** a personal token: on the REST API only the artifact
+(`/v1/artifacts/…`), publish (`/v1/publish`), data (`/v1/data/…`) and support
+(`/v1/support/…`) routes accept it, inside its workspace and scopes. Every other route —
+including the workspace, members, jobs and admin endpoints on this page — answers
+`403 INSUFFICIENT_SCOPE` (*Agent tokens cannot perform this action*).
+
 ## Membership policy
 
 ```http
@@ -294,12 +300,12 @@ Opt-in learned library. **Paid plan** required for `enable` and `backfill`. See 
 | `GET` | `/v1/workspaces/{id}/schedules` | List schedules. Admin+. |
 | `GET` | `/v1/workspaces/{id}/schedules/{jobId}/logs` | Recent logs. Admin+. |
 | `POST` | `/v1/workspaces/{id}/schedules/{jobId}/run` | Run now. Admin+. |
-| `PATCH` | `/v1/workspaces/{id}/schedules/{jobId}` | Enable/disable. Admin+. |
+| `PATCH` | `/v1/workspaces/{id}/schedules/{jobId}` | Any of `enabled`, `schedule` (cron), `title`, `description` (`null` clears). Admin+. |
 | `DELETE` | `/v1/workspaces/{id}/schedules/{jobId}` | Delete. Admin+. |
 | `GET` | `/v1/workspaces/{id}/automations` | List automations. Admin+. |
 | `GET` | `/v1/workspaces/{id}/automations/{triggerId}/runs` | Run history. Admin+. |
 | `POST` | `/v1/workspaces/{id}/automations/{triggerId}/run` | Dispatch now. Admin+. |
-| `PATCH` | `/v1/workspaces/{id}/automations/{triggerId}` | Enable/disable. Admin+. |
+| `PATCH` | `/v1/workspaces/{id}/automations/{triggerId}` | Any of `enabled`, `cron`, `name` (1–120 chars), `instructions` (1–20,000 chars), `model`, `maxIterations`, `runBudgetMicroUsd`; only the fields sent change, tool grants are kept. Caps bounded as on `PATCH /crew`. → `{ enabled, cron, next_run_at }`. Admin+. |
 | `DELETE` | `/v1/workspaces/{id}/automations/{triggerId}` | Delete. Admin+. |
 | `GET` | `/v1/workspaces/{id}/runs` | Unified run list (`surface`, `status`, `limit`). Admin+. |
 | `GET` | `/v1/workspaces/{id}/runs/{surface}/{runId}` | Run Inspector detail (`crew`/`job`/`alert`). Admin+. |

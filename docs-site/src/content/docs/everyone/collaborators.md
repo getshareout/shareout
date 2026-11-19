@@ -41,16 +41,23 @@ be undone.
 
 ## Access requests
 
-When someone opens your private page but isn't on the invite list, they can tap
-**Request access** after signing in. Pending requests show up as a banner on
-**Home** — approve or deny right there. If you use the
-[Telegram bot](/guides/telegram-bot/), you also get inline **Approve / Deny** buttons
+People can ask you for access in two ways:
+
+- **Request access** — someone opens your private page but isn't on the invite list.
+  They tap it after signing in.
+- **Request edit access** — someone who can already see the page wants to change it.
+  They tap it when they open the page in ShareOut.
+
+You get an **email** for each request, and it shows up on **Home** — approve or deny
+right there (the email's **Review the request** button takes you there). If you use
+the [Telegram bot](/guides/telegram-bot/), you also get inline **Approve / Deny** buttons
 in chat.
 
-Approving adds them as a **viewer** collaborator automatically. Denying leaves the
-page private with no access granted, and the same person can't ask again for a week —
-so a "no" stays a no instead of pinging you on repeat. Workspace owners and admins
-see and can answer requests for any page in their workspace, not just their own.
+Approving adds them automatically: as a **viewer** for a plain request, as an **editor**
+for an edit request. They get an email either way. Denying leaves the page as it was,
+and the same person can't ask again for a week — so a "no" stays a no instead of pinging
+you on repeat. Workspace owners and admins see and can answer requests for any page in
+their workspace, not just their own.
 
 ## Who can do what
 

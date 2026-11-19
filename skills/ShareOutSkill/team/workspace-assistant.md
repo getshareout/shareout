@@ -14,17 +14,20 @@ Load [SKILL.md](SKILL.md) first.
 
 ## Availability
 
-Gated by the `ai.web_agent` feature flag (`GET …/features` or Admin → AI). On **self-host /
+Gated by the `ai.web_agent` feature flag (`GET …/features`, or read-only under Admin → General → Features). On **self-host /
 OSS**, enable the flag if the dock is missing — do **not** send users to a billing upgrade
 page.
 
-When disabled, the Home agent dock is hidden and the API returns `404`. There is no AI
-credit/billing system in this build — every request is allowed. If no AI provider is
+When disabled, the Home agent dock is hidden and the API returns `404`. There is no plan
+or credit purchase, but a workspace admin can set a **monthly AI budget** (Admin → Billing);
+once it is reached, new AI calls are refused with code `workspace_budget` until the first of
+next month (UTC). (The in-artifact agent also has a per-member daily token cap.) If no AI provider is
 configured (no platform key, no workspace BYO key), the Home agent doesn't error — it
 replies in the chat thread itself: instance admins get an actionable message naming the
 env vars to set (`ANTHROPIC_API_KEY`, `VERCEL_AI_GATEWAY`, or `OPENAI_API_KEY` — e.g.
 `npx wrangler secret put ANTHROPIC_API_KEY`); other members are told to ask their admin.
-Never send anyone to a billing page — there isn't one.
+Never send anyone to buy credits — there is nothing to buy. A reached budget is raised or
+removed by a workspace admin in Admin → Billing.
 
 ## What it can do
 
@@ -48,7 +51,7 @@ Never send anyone to a billing page — there isn't one.
 
 Destructive or write actions always go through a **confirmation** step. The assistant cannot mutate data stores, publish artifacts without confirmation, or run non-`SELECT` SQL.
 
-> **Connector queries are opt-in per connector.** Admins toggle **AI query: On** in Admin → **AI** (or the connectors panel). Use read-only credentials — the SQL guard allows only a single `SELECT` statement.
+> **Connector queries are opt-in per connector.** Admins tick **AI** ("Let workspace AI query this") on the connector in Home → **Data**. Use read-only credentials — the SQL guard allows only a single `SELECT` statement.
 
 ## UI
 
@@ -150,17 +153,18 @@ Manage in **Admin → Sharing → [client] → Notes about this client**. See [e
 
 ## Setup checklist (onboarding)
 
-When a user joins a workspace in the last **14 days**, Home auto-opens the chat sheet with a localized **setup checklist** — a progress ring and inline action buttons, no model call on first paint. External sharees get no checklist. On **Personal home** (no workspace), a shorter **personal** track runs instead (publish → try assistant → share → get the skill).
+When a user joined a workspace in the last **14 days** (counted from accepting the invite) — or the account is that new, on **Personal home** — the chat prepares a localized **setup checklist**, with no model call. It does not pop open: the **Ask your workspace…** pill shows an unread dot. Until the user has a first artifact, the greeting offers starter chips instead; after that a **Get set up** card shows a progress ring and **only the next undone step**, with one button that does it. External sharees get no checklist.
 
-| Track | Tasks (live-derived) |
+| Track | Steps, in order (`src/onboarding/tasks.ts`) |
 | --- | --- |
-| **Admin** (`owner`/`admin`) | First artifact, connect data, Telegram, Slack (skippable), metric alert, acknowledge skill |
-| **Member** | Explore artifacts, leave a comment, Telegram, publish via skill |
-| **Personal** (solo home) | First artifact, try assistant, share a page, acknowledge skill |
+| **Admin** (`owner`/`admin`) | `first_artifact` · `data_source` · `invite_team` (skippable) · `alert` |
+| **Member** | `first_artifact` (opens the **New** menu) · `connect_agent` (skippable) · `explore` · `comment` |
+| **Personal** (solo home) | `first_artifact` · `try_assistant` · `share_page` |
 
-- Each task button runs the right action (`ask` seeds guided chat, `nav` opens a lens, `page` opens Settings, `skill` opens the skill library).
+- Each step's button runs its action: `ask` seeds a guided chat, `nav` opens a lens, `page` opens a connect page in a new tab, `skill` opens the skill library, `invite` opens **Invite people**, `new` opens the **New** menu.
+- Skippable steps have **Skip** and don't count toward the percentage, so 100% stays reachable.
 - Ask *"how do I get started?"* anytime — the assistant calls **`show_onboarding`** to render the same checklist in the dock.
-- Returning after OAuth (e.g. Telegram) or completing a connector auto-crosses items off.
+- Steps cross themselves off from live signals: returning to the tab after connecting an agent or a data source updates the card.
 - At **100%**, a one-shot celebration fires once (`POST /v1/home/onboarding/celebrate`); established workspaces are backfilled so it never retro-triggers.
 - Dismiss with the checklist control (`POST /v1/home/onboarding/dismiss`). Status: `GET /v1/home/onboarding?workspace=`.
 
@@ -176,11 +180,11 @@ Content-Type: application/json
 { "agent_query_enabled": true }
 ```
 
-Or use **AI query: On/Off** in Admin → **AI**. Only warehouse connectors (Snowflake, BigQuery, Postgres, etc.) support ad-hoc queries.
+Or tick **AI** ("Let workspace AI query this") on the connector in Home → **Data**. Only warehouse connectors (Snowflake, BigQuery, Postgres, etc.) support ad-hoc queries.
 
 ## Related
 
-- [admin-portal.md](admin-portal.md) — Admin → AI tab
+- [admin-portal.md](admin-portal.md) — Admin → AI & models (model, BYO key) and Billing (budget)
 - [external-sharing.md](external-sharing.md) — per-client notes for external sharing Clients
 - [workspace-connections.md](workspace-connections.md) — define connectors the assistant can see
 - [api.md](api.md) — endpoint table

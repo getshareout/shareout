@@ -13,7 +13,7 @@ Compartí trabajo **fuera de tu equipo** — con un cliente, proveedor, socio o 
 
 1. **Creá un cliente.** Home → **Admin** → **Compartir** → **Agregar cliente o socio** — un formulario inline en la página (nombre de empresa + relación). Sin modal; el estado vacío guía los pasos y el mismo formulario aparece bajo el encabezado cuando ya hay clientes.
 2. **Invitá a su gente.** Agregá emails — reciben una invitación e inician sesión como cualquier usuario de ShareOut. Siguen siendo externos (nunca en tu lista de miembros, nunca facturados).
-3. **Compartí una carpeta o archivo.** Elegí una carpeta y un nivel — **Ver**, **Comentar**, **Puede crear** o **Puede editar**. Una carpeta comparte todo lo que hay adentro — **artefactos y archivos**. Desde Assets también podés **Share with a person** en un solo archivo (email + view/comment, sin org de cliente).
+3. **Compartí una carpeta o archivo.** Elegí una carpeta y un nivel — **Ver**, **Comentar**, **Puede crear** o **Puede editar**. Una carpeta comparte todo lo que hay adentro — **artefactos y archivos**. Para darle acceso a una sola persona de afuera sin org de cliente, usá el panel **Quién tiene acceso** de la carpeta (mirá [Compartir con una persona](#compartir-con-una-persona-sin-org-de-cliente)).
 4. **Abren `/shared`.** Cada persona externa tiene una página "compartido con vos" con solo lo que les diste — artefactos y archivos descargables — con la marca de su org de cliente cuando están agrupados. Los visitantes nuevos ven una tarjeta de orientación breve. Los **archivos** compartidos con acceso **comment** incluyen un hilo de comentarios inline en la tarjeta del portal; los artefactos abren en el visor normal.
 
 ## Niveles de acceso
@@ -25,7 +25,7 @@ Compartí trabajo **fuera de tu equipo** — con un cliente, proveedor, socio o 
 | Puede crear | Crear artefactos nuevos **dentro** de la carpeta compartida (quedan privados a esa carpeta). |
 | Puede editar | Editar los artefactos compartidos. |
 
-Un nivel más alto incluye los de abajo. Podés compartir una carpeta entera con un cliente, un solo artefacto o un solo **archivo** desde Assets.
+Un nivel más alto incluye los de abajo. Podés compartir una carpeta entera con un cliente o un solo artefacto. Los archivos que se suben en Home ahora son artefactos (la pestaña Recursos se retiró), así que se comparten igual; un **archivo** viejo del workspace todavía se puede compartir solo con `share-person` (abajo).
 
 ### Compartir con una persona (sin org de cliente)
 

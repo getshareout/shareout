@@ -146,7 +146,10 @@ Reads are never gated.
 | `"collaborator"` | Artifact owner + editor collaborators only |
 | `"owner"` | Artifact owner only |
 
-Viewers who mutate a restricted table get `403 TABLE_WRITE_FORBIDDEN`.
+Viewers who mutate a restricted table get `403 TABLE_WRITE_FORBIDDEN`. Two rules fail closed:
+a manifest that doesn't parse, or a `write` value that isn't one of the three above, makes the
+table owner-only; and when the page has a separate mobile entry page, the stricter of the two
+declarations wins.
 
 ```json
 "tables": {

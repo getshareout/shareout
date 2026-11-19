@@ -17,7 +17,7 @@ Open a workspace and select **Knowledge** in the left navigation. An owner or ad
 
 Once on, the lens is empty until pages are learned:
 
-- **Learn from existing pages** — owner/admin queues up to the **200 most recent** live pages in one click; a progress bar tracks the bounded on-demand run (`GET …/knowledge/status`); the rest drains on the hourly cron.
+- **Learn from existing pages** — owner/admin queues up to the **200 most recent** live pages in one click, then one durable background run (a `KNOWLEDGE_INGEST` Workflow in `distill` mode, `startDistillDrain`) learns the whole queue in retried steps; a progress bar tracks it (`GET …/knowledge/status`). Clicking again while it runs joins the same run. An instance without Workflows falls back to one bounded pass (≤10 pages) and leaves the rest to the hourly cycle.
 - **Let it grow** — every page you publish from now on is learned automatically.
 
 ```http
@@ -106,6 +106,7 @@ Authorization: Bearer {token}
 }
 ```
 
+- Passages are cut at 700 characters; add `&full=1` for whole passages. `limit` defaults to 10 (max 30).
 - Add `&format=md` to get compact markdown (`[1] cite (kind id, url)` + passage) ready to drop into an LLM prompt.
 - **Quote `cite` when you answer** so the reader can find the source. Pages include a `url`; Files are identified by `source.id`.
 - `mode` is `hybrid` (meaning + keywords) when the instance has embeddings configured, else `keyword`.
@@ -297,7 +298,7 @@ All routes require workspace membership (`status` and `reindex` also accept an i
 | `POST` | `/v1/workspaces/{id}/knowledge/enable` | Admin+ | Turn learning on/off |
 | `POST` | `/v1/workspaces/{id}/knowledge/reindex` | Admin+ (instance admin too) | Re-learn every page and File (or `{ "artifactIds": [...] }`) even when unchanged → `202 { queued, remaining, skipped }`; once per 10 min |
 | `POST` | `/v1/workspaces/{id}/knowledge/backfill` | Admin+ | Queue up to 200 recent live pages for notes, and every page and File for search → `{ queued, kicked, corpus, corpusRemaining }` |
-| `GET` | `/v1/workspaces/{id}/knowledge/search?q=&limit=&format=md` | Member+ | Cited passages from Files and pages (hybrid search) |
+| `GET` | `/v1/workspaces/{id}/knowledge/search?q=&limit=&full=1&format=md` | Member+ | Cited passages from Files and pages (hybrid search); `full=1` returns whole passages instead of 700-char snippets |
 | `GET` | `/v1/workspaces/{id}/knowledge/sources?limit=` | Member+ | What has been learned: counts by status + recent sources |
 | `GET` | `/v1/workspaces/{id}/knowledge/entities?type=&q=&limit=` | Member+ | Entities by mentions + `types` with counts |
 | `GET` | `/v1/workspaces/{id}/knowledge/entities/{entityId}?format=md` | Member+ | One entity: facts, relations, quoted mentions |

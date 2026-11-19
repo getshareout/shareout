@@ -234,7 +234,7 @@ different surfaces handle it differently:
   for admins and "ask your admin" for everyone else.
 
 Either way, tell them to ask the instance operator to set a provider key or add a
-workspace BYO key in Admin → AI — never suggest a billing upgrade.
+workspace BYO key in Admin → AI & models — never suggest a billing upgrade.
 
 ## Related
 

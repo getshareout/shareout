@@ -45,6 +45,28 @@ await sdk.email.notifyOwner({
 50 emails/día por cuenta · 10/día por artefacto (SDK + jobs combinados).
 </Aside>
 
+## Cuando el email no está disponible
+
+En una instancia sin envío de email configurado, un envío lanza un `ShareOutError` con
+`status: 503` y `code: "EMAIL_UNAVAILABLE"`. Revisá `status().enabled` antes y usá una
+alternativa, como en el ejemplo de arriba.
+
+## Darse de baja
+
+Cada email que manda un artefacto — desde el SDK, un job programado o un crew — lleva un
+link **Darte de baja** al pie y un header `List-Unsubscribe` de un clic. La baja es **por
+artefacto**: esa dirección deja de recibir emails de este artefacto nada más, no de tus
+otros artefactos, y la página de confirmación le deja volver a suscribirse. Los envíos
+siguientes saltean esa dirección (los resultados de jobs y crews la listan en
+`skippedOptedOut`); un envío cuyo único destinatario se dio de baja falla.
+
+Los dueños y editores pueden ver quién se dio de baja:
+
+```http
+GET /v1/data/{artifactId}/email/optouts
+→ { "success": true, "data": { "optouts": [{ "email": "ana@acme.com", "created_at": "…" }] } }
+```
+
 ## Email programado y masivo
 
 Para envíos por cron o múltiples destinatarios, usá un [job](/es/guides/jobs/) en su lugar

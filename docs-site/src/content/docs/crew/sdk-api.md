@@ -21,6 +21,7 @@ Base path: `https://shareout.site/v1/data/{artifactId}/crew`
 | `GET` | `/crew` | Get crew config + tool grants |
 | `POST` | `/crew/define` | Create or replace crew definition |
 | `PATCH` | `/crew` | Update only the fields sent (grants kept unless `tools` is sent) |
+| `DELETE` | `/crew` | Delete the crew with its grants, triggers, runs and approvals (`404` if none) |
 | `POST` | `/crew/run` | Start a run (SSE stream) |
 | `GET` | `/crew/runs` | List runs |
 | `GET` | `/crew/runs/{runId}` | Run + events |
@@ -186,5 +187,5 @@ Full reference: [Crew tools](/crew/tools/).
 
 | Tool | Mode |
 | --- | --- |
-| `json_get`, `table_query`, `table_schema`, `connection_query`, `web_search` | read |
-| `json_set`, `materialize_query`, `table_insert`, `table_update`, `comment_create`, `email_send`, `notify_send`, `scheduled_job_create` | write |
+| `json_get`, `table_query`, `table_schema`, `connection_query`, `web_search`, `file_list`, `file_read`, `workspace_artifacts`, `workspace_data_read`, `knowledge_search`, `action_item_list` | read |
+| `json_set`, `materialize_query`, `table_insert`, `table_update`, `comment_create`, `action_item_create`, `email_send`, `notify_send`, `scheduled_job_create`, `pilot_verify` | write |

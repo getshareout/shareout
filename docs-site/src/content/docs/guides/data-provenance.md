@@ -90,13 +90,24 @@ Two ways; use either or both.
 `source` is a `kind:key` ref — `connection:warehouse`, `json:revenue`,
 `table:rooms`.
 
-## 3. Show the drawer to viewers
+## 3. What viewers see
 
-One line of JavaScript:
+Nothing to add. In the ShareOut viewer, **every viewer** of a page that shows data —
+signed in, guest or on a public link — gets a **Data** button. It opens a **Data
+sources** panel: one entry per source with its description, when it was last updated,
+how it refreshes and whether it may be out of date. Picking a source highlights the
+elements it feeds (your `data-shareout-source` tags and `feeds`). Queries and
+credentials are shown only to people who can edit the page.
+
+The button appears once the page reads data (or declares live connections), and it
+follows the owner's choice to hide the viewer toolbar.
+
+Want **ⓘ source** badges on the elements themselves, or a drawer when the page is shown
+outside the ShareOut viewer? One line of JavaScript:
 
 ```javascript
 const sdk = await ShareOut.create();
-sdk.sources.mount(); // floating "Data sources" button + drawer + per-element badges
+sdk.sources.mount(); // per-element badges + "Data sources" drawer
 ```
 
 Or zero lines — add the attribute and the SDK mounts on DOM ready:
@@ -105,13 +116,12 @@ Or zero lines — add the attribute and the SDK mounts on DOM ready:
 <body data-shareout-sources>
 ```
 
-What viewers get:
-
-- A **Data sources** drawer: one card per dataset with description, tables,
-  refresh, as-of, a collapsible **View query**, and a **Replicate** block
-  (build/publish/credentials).
 - A small **ⓘ source** badge on every element you tagged (or mapped via `feeds`);
   clicking it opens the drawer at that dataset.
+- A **Data sources** drawer: one card per dataset with description, tables,
+  refresh, as-of, a collapsible **View query**, and a **Replicate** block
+  (build/publish/credentials). Inside the ShareOut viewer its own floating button
+  stays hidden, because the **Data** button already covers it.
 
 See [Sources SDK](/sdk/sources/) for the full API.
 

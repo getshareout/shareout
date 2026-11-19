@@ -55,6 +55,25 @@ privada.
 - **Pausalo** cuando quieras, o corrélo **ahora mismo** para probarlo.
 - **Revisá qué pasó** — hay un registro simple de cada corrida, así ves que funcionó (o por qué no).
 
+### Abrí una para ver y cambiar todo
+
+Cada automatización tiene su propia página:
+
+1. En la barra lateral, tocá **Automatizaciones**.
+2. Tocá la automatización que querés. Su página muestra **Qué hace**, **Cuándo corre** y su
+   **Historial de corridas**.
+3. Para cambiarla, tocá **Editar** — podés cambiar el nombre, cuándo corre, a quién le llega y
+   más — y después **Guardar cambios**. **Ejecutar ahora** la prueba en el momento; **Eliminar**
+   la borra.
+
+Si una corrida del **Historial de corridas** dice **Falló**, arreglá lo que indica (muchas veces
+un email o un Slack o una planilla desconectados) y tocá **Ejecutar ahora** para ver que vuelve a
+andar.
+
+Los admins del workspace también ven **Tareas con IA** en la barra lateral. Cada tarea con IA abre
+el mismo tipo de página, donde además podés cambiar sus **Instrucciones**, el **Modelo**, y sus
+**Pasos máximos** y **Presupuesto por corrida (US$)**.
+
 :::tip[Empezá de a poco]
 Elegí una cosa que hacés a mano todas las semanas — mandar un reporte, copiar números, avisarle al equipo — y dejá que tu artefacto lo haga en tu lugar.
 :::

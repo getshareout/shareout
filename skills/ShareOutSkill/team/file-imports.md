@@ -14,14 +14,16 @@ Copy a whole remote folder (with subfolders) into workspace files, keep it in sy
 |---|---|
 | Overview: providers, my connections, imported folders + last run | `GET /v1/workspaces/{ws}/file-imports` |
 | Browse folders (needs my connection) | `GET /v1/workspaces/{ws}/file-imports/browse/{google_drive\|microsoft}?ref=root[&q=site search]` |
-| Import a folder (starts a run) | `POST /v1/workspaces/{ws}/file-imports/sources` `{ provider, ref, name, targetFolderId?, convert?, dailySync? }` |
+| Import a folder (starts a run) | `POST /v1/workspaces/{ws}/file-imports/sources` `{ provider, ref, name, targetFolderId?, dailySync? }` |
 | Sync again (only changed files) | `POST /v1/workspaces/{ws}/file-imports/sources/{id}/sync` → `202 { run }`, `409 RUN_IN_PROGRESS` |
-| Daily sync on/off, conversion on/off | `PATCH /v1/workspaces/{ws}/file-imports/sources/{id}` `{ dailySync?, convert? }` (max 10 daily per workspace) |
+| Daily sync on/off | `PATCH /v1/workspaces/{ws}/file-imports/sources/{id}` `{ dailySync? }` (max 10 daily per workspace) |
 | Progress + per-file problems | `GET /v1/workspaces/{ws}/file-imports/runs/{runId}` |
 | Stop syncing (files stay) | `DELETE /v1/workspaces/{ws}/file-imports/sources/{id}` |
 | Disconnect my drive (stops every sync through it) | `DELETE /v1/workspaces/{ws}/file-imports/connections/{provider}` |
 
-`ref` is opaque: take it from a browse entry with `selectable: true`.
+`ref` is opaque: take it from a browse entry with `selectable: true`. A `convert` field is still
+accepted but ignored: every file that can become a page does (Word, Excel, PDF, Markdown, CSV,
+text, images, video, `.pptx`; `.ppt`/`.odp` only with the slides converter), up to 300 per run.
 
 ## Google Drive by sharing (when the instance sets `GOOGLE_DRIVE_SA_KEY`)
 

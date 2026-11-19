@@ -64,7 +64,9 @@ curl -X DELETE $ORIGIN/v1/workspaces/{workspace_id}/agent-tokens/{token_id} \
 
 ## Use the token
 
-Identical to a personal token — just send it as the Bearer credential:
+Send it as the Bearer credential. Unlike a personal token it works only on the artifact,
+publish, data and support routes, inside its own workspace and scopes; every other route
+(workspace admin, members, connections, Knowledge, jobs…) answers `403 INSUFFICIENT_SCOPE`:
 
 ```bash
 curl -X POST $ORIGIN/v1/publish \

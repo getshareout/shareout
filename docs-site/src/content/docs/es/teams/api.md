@@ -54,6 +54,12 @@ publica y queda confinado a su único workspace. Scopes de acción: `artifacts:r
 
 Un token sin el scope requerido recibe `403 INSUFFICIENT_SCOPE`; uno revocado/expirado, `401`.
 
+Un token `sot_` **no** es un token personal: en la API REST solo lo aceptan las rutas de
+artefactos (`/v1/artifacts/…`), publicación (`/v1/publish`), datos (`/v1/data/…`) y soporte
+(`/v1/support/…`), dentro de su workspace y sus scopes. Cualquier otra ruta — incluidos los
+endpoints de workspace, miembros, jobs y admin de esta página — responde
+`403 INSUFFICIENT_SCOPE` (*Agent tokens cannot perform this action*).
+
 ## Política de membresía
 
 ```http
@@ -293,12 +299,12 @@ Biblioteca aprendida opt-in. **Plan pago** requerido para `enable` y `backfill`.
 | `GET` | `/v1/workspaces/{id}/schedules` | Listar schedules. Admin+. |
 | `GET` | `/v1/workspaces/{id}/schedules/{jobId}/logs` | Logs recientes. Admin+. |
 | `POST` | `/v1/workspaces/{id}/schedules/{jobId}/run` | Ejecutar ahora. Admin+. |
-| `PATCH` | `/v1/workspaces/{id}/schedules/{jobId}` | Habilitar/deshabilitar. Admin+. |
+| `PATCH` | `/v1/workspaces/{id}/schedules/{jobId}` | Cualquiera de `enabled`, `schedule` (cron), `title`, `description` (`null` borra). Admin+. |
 | `DELETE` | `/v1/workspaces/{id}/schedules/{jobId}` | Eliminar. Admin+. |
 | `GET` | `/v1/workspaces/{id}/automations` | Listar automaciones. Admin+. |
 | `GET` | `/v1/workspaces/{id}/automations/{triggerId}/runs` | Historial de ejecuciones. Admin+. |
 | `POST` | `/v1/workspaces/{id}/automations/{triggerId}/run` | Despachar ahora. Admin+. |
-| `PATCH` | `/v1/workspaces/{id}/automations/{triggerId}` | Habilitar/deshabilitar. Admin+. |
+| `PATCH` | `/v1/workspaces/{id}/automations/{triggerId}` | Cualquiera de `enabled`, `cron`, `name` (1–120 caracteres), `instructions` (1–20.000 caracteres), `model`, `maxIterations`, `runBudgetMicroUsd`; cambian solo los campos enviados y los grants de tools se mantienen. Topes con los mismos límites que `PATCH /crew`. → `{ enabled, cron, next_run_at }`. Admin+. |
 | `DELETE` | `/v1/workspaces/{id}/automations/{triggerId}` | Eliminar. Admin+. |
 | `GET` | `/v1/workspaces/{id}/runs` | Lista unificada de runs (`surface`, `status`, `limit`). Admin+. |
 | `GET` | `/v1/workspaces/{id}/runs/{surface}/{runId}` | Detalle Run Inspector (`crew`/`job`/`alert`). Admin+. |

@@ -103,7 +103,22 @@ await sdk.email.notifyOwner({
 | `RATE_LIMITED` | Daily email cap for artifact or user |
 | `INVALID_REQUEST` | Missing body, invalid replyTo, owner has no email |
 | `EMAIL_UNAVAILABLE` (503) | This instance has no `EMAIL` binding — check `sdk.email.status().enabled` first; the instance admin adds the binding |
-| `INTERNAL_ERROR` | Cloudflare send failed |
+| `INTERNAL_ERROR` | Cloudflare send failed, or (`sendReport`) the only recipient unsubscribed from this artifact — message `All recipients opted out of this artifact's emails` |
+
+## Unsubscribe (per artifact)
+
+Every email sent through the artifact pipeline (`sendArtifactEmail`: SDK `notifyOwner` / `sendReport`, scheduled `email` jobs, delivery destinations, the crew `email_send` tool) goes out one message per recipient, each with a signed **Unsubscribe** footer link and RFC 8058 one-click headers (`List-Unsubscribe` + `List-Unsubscribe-Post`). The link points at `/v1/email/artifact-unsubscribe?token=…` (GET shows a confirmation, POST acts; the result page offers re-subscribing).
+
+- The opt-out is stored per `(artifact, email)` — that address stops getting this artifact's emails only; other artifacts and the user's ShareOut email preferences are untouched.
+- Later sends skip opted-out recipients and report them: `skippedOptedOut` on the send result (the crew `email_send` tool returns `skipped_opted_out`). If every recipient opted out, the send fails with `All recipients opted out of this artifact's emails`.
+- Owners/editors list them (session or token with access to the artifact; viewers get `403 FORBIDDEN`):
+
+```http
+GET /v1/data/{artifactId}/email/optouts
+→ { "success": true, "data": { "optouts": [{ "email": "ana@acme.com", "created_at": "2026-11-02T10:15:00Z" }] } }
+```
+
+Newest first, up to 500.
 
 ## Rate Limits
 

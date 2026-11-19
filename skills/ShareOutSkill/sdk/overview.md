@@ -107,12 +107,13 @@ try {
 | `sdk.table(name)` | [table.md](table.md) | Structured records (Tier 2) |
 | `sdk.grid(name)` | [grid.md](grid.md) | Editable spreadsheet grid (table or Sheets source) |
 | `sdk.workspace.table(name)` | [team/workspace-tables.md](../team/workspace-tables.md) | Share a table across artifacts in a workspace (Teams) |
-| `sdk.knowledge.search(q, {limit})` | [knowledge.md](knowledge.md) | Search the workspace Knowledge from the page (signed-in members only) |
+| `sdk.knowledge.search(q, {limit, full})` | [knowledge.md](knowledge.md) | Search the workspace Knowledge from the page (signed-in members only); `full: true` = whole passages, not ~700-char snippets |
 | `sdk.realtime(docId)` | [realtime.md](realtime.md) | Y.js collaboration (Tier 3) |
 | `sdk.blobs` | [blobs.md](blobs.md) | Per-artifact file storage (direct-from-R2) |
 | `sdk.files` | [files.md](files.md) | Workspace asset URLs (`dlv_*`, cross-artifact embed) |
 | `sdk.dataset(name)` | [datasets.md](datasets.md) | Bulk read-only data extracts (direct-from-R2) |
 | `sdk.connection(name)` | [connections.md](connections.md) | Query external sources + materialize extracts |
+| `sdk.mcp` | [mcp.md](mcp.md) | Call the viewer's own account on a remote MCP server (members-only pages) |
 | `sdk.lib(name)` | [libraries.md](libraries.md) | Import a private versioned JS module (workspace library, Teams) |
 | `sdk.sources` | [../patterns/data-provenance.md](../patterns/data-provenance.md) | Optional in-page drawer + badges (viewers already get a Data button from the manifest) |
 | Live data / BigQuery / Mixpanel in artifacts | [live-data.md](live-data.md) | **Required reading** — auth, anti-patterns, parsing |

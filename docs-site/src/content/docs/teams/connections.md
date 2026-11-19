@@ -149,6 +149,15 @@ BigQuery, and Slack.
 Each catalog entry exposes `docsUrl`, an `exampleSnippet` with your connector
 name, and whether it is `testable`.
 
+### Remote MCP servers
+
+Admins can also add any remote MCP server from the catalog: **MCP server → Server URL →
+Add MCP server**. Each member then presses **Connect my account** and signs in to that server with
+their own account (or sees **No sign-in needed**). Members-only pages read the server as whoever is
+viewing them, only through the tools the page declares — see [MCP connections](/sdk/mcp/) for the
+declaration, `sdk.mcp` calls and error codes. Routes: `POST /v1/workspaces/{id}/mcp-connections`,
+`GET /v1/workspaces/{id}/connections/{connId}/mcp/connect`, `POST …/connections/{connId}/mcp/tools`.
+
 ### Test credentials before saving
 
 ```http

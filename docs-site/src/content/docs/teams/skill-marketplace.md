@@ -50,7 +50,10 @@ A skill is a `.md` file published with `artifact_type: "skill"`. It is stored as
 markdown internally but served with a dedicated skill viewer when listed in the
 marketplace.
 
-Skills are always `workspace`-visible so every member can browse the catalog.
+Skills are `workspace`-visible by default, so every member can browse the catalog. An
+author can keep one `private` (a draft): it is hidden from the catalog for everyone else,
+and other members' agents never load it — not even if it was attached before it went
+private. Only the author and the skill's own collaborators can open it.
 
 ### Frontmatter
 
@@ -102,7 +105,9 @@ POST /v1/publish
 }
 ```
 
-`workspace_id` is required. Visibility is forced to `workspace`.
+`workspace_id` is required. Visibility is `workspace` unless you pass
+`"visibility": "private"` to keep the skill as a draft; any other value becomes
+`workspace`.
 
 Simpler, when all you have is a name and a body:
 
@@ -113,6 +118,8 @@ POST /v1/workspaces/{workspaceId}/skills
 ```json
 { "name": "Deploy checklist", "markdown": "# Deploy checklist\n\n…", "category": "Engineering" }
 ```
+
+Add `"visibility": "private"` here too to keep it a draft.
 
 This is what the Library's **New skill** button and the assistant's `save_skill`
 tool call.
@@ -235,6 +242,22 @@ DELETE /v1/workspaces/{scope}/agent-skills/{skillId}
 
 `GET /v1/skills/{skillId}/markdown` returns raw `SKILL.md` for the viewer (signed-in;
 skill must be official or visible to you).
+
+### Workspace default skills
+
+A workspace owner or admin can attach up to **5** skills to **every member's** assistant
+in that workspace. Defaults load first, ahead of each member's own attached skills (a skill
+in both loads once), and never in `__personal` chat.
+
+```http
+GET    /v1/workspaces/{workspaceId}/default-skills              ← any member
+POST   /v1/workspaces/{workspaceId}/default-skills              ← admin+ · { "skill_artifact_id": "art_skill" }
+DELETE /v1/workspaces/{workspaceId}/default-skills/{skillId}    ← admin+
+```
+
+A default is pinned to the skill's latest version when added; `POST` it again to move it to
+a newer one. It must be an official skill or one of this workspace's (`CROSS_WORKSPACE`
+otherwise), and not private (`SKILL_PRIVATE`). A sixth answers `LIMIT_REACHED`.
 
 ## Admin moderation
 

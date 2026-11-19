@@ -100,8 +100,14 @@ await sdk.agent.conversations.delete(id);
 
 ## Límites
 
-10 requests/min y 100,000 tokens/día por artefacto. Pasado el límite devuelve `429`
-con un header `Retry-After`.
+- **Visitantes anónimos:** 10 requests/min y 100.000 tokens/día por artefacto.
+- **Miembros del workspace con sesión:** 20 requests/min y 300.000 tokens/día por persona,
+  más el presupuesto mensual de IA del workspace si hay uno.
+- **Tokens de API y de agente:** se cobran al workspace — su presupuesto mensual de IA si
+  hay uno, más 1.000.000 tokens/día por workspace.
+
+Pasado el límite devuelve `429` con un header `Retry-After`; para miembros y tokens el cuerpo
+además trae `limit` y `resets_at`. Detalle: [sdk.agent → Límites de uso](/es/sdk/agent/#límites-de-uso).
 
 Para **automatización del lado del servidor** (resúmenes programados, entrega a Slack,
 narrativas de warehouse), ver [Crew](/es/guides/crew/) — un agente separado que corre

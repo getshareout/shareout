@@ -80,8 +80,8 @@ espacio, y direcciones por artefacto.
 El subdominio de bandeja está separado del apex a propósito, para que un catch-all nunca
 se trague casillas reales como `hola@tuempresa.com`.
 
-Cuando está vivo, **Admin → Configuración** muestra la dirección de la bandeja del
-espacio. Si esa sección no aparece, la instancia no tiene binding de correo — la dirección
+Cuando está vivo, **Admin → General → Bandeja de archivos** muestra la dirección de la
+bandeja del espacio. Si esa sección no aparece, la instancia no tiene binding de correo — la dirección
 se oculta en vez de mostrarse como algo que no puede recibir.
 
 ## Facturas por correo
@@ -113,8 +113,19 @@ Mandes lo que mandes, la reputación del dominio remitente es tuya:
 
 - SPF, DKIM y DMARC en el dominio remitente — el panel de Cloudflare te guía
 - una dirección `From` real y monitoreada, no `noreply@`
-- ShareOut mantiene una lista de supresión y respeta las bajas por categoría; un rebote o
-  una queja corta los envíos futuros a esa dirección por su cuenta
+- ShareOut mantiene una lista de supresión y respeta las bajas por categoría
+- los rebotes y las quejas llegan a esa lista solo por el webhook de eventos de entrega.
+  Definí un secreto y apuntá los eventos de rebote/queja de tu proveedor a
+  `{SHAREOUT_BASE_URL}/v1/webhooks/email-events`, mandando el secreto en un header
+  `x-webhook-secret` (o `?secret=`):
+
+  ```bash
+  openssl rand -hex 32 | npx wrangler secret put EMAIL_WEBHOOK_SECRET
+  ```
+
+  Desde ahí, un evento de rebote o queja corta los envíos futuros a esa dirección por su
+  cuenta. Sin `EMAIL_WEBHOOK_SECRET` el webhook responde `404` y ShareOut sigue mandando a
+  direcciones que rebotan; un secreto equivocado recibe `401`.
 
 ## Invitar gente sin correo
 

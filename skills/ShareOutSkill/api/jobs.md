@@ -115,7 +115,7 @@ click, what they will see); the two config sections below are the wire format.
 | `config` | object | Yes | Action-specific config |
 | `retry_config` | object | No | Retry configuration |
 
-> **Always set `title` and `description`** when creating a schedule. They appear in the user's **My schedules** view and the workspace **Admin → Schedules** tab. `PATCH /v1/jobs/{id}` accepts `title` / `description` too (send `null` to clear).
+> **Always set `title` and `description`** when creating a schedule. They appear in the user's **My schedules** view and the workspace **Admin → Automations** page. `PATCH /v1/jobs/{id}` accepts `title` / `description` too (send `null` to clear).
 
 ### Job object
 

@@ -37,13 +37,13 @@ export const BUILD_FAILURE_COPY: LocaleCopy<Record<BuildFailure, string>> = {
     gaveUpDraft: 'I built it but it still has errors after several fixes, so I kept it private and didn’t call it done. Try a simpler version, or tell me what matters most.',
   },
   es: {
-    truncated: 'La página salió demasiado larga para terminarla, así que no se publicó nada. Pedí una versión más simple o armala por partes.',
-    snag: 'Falló el armado de la página. Probá de nuevo.',
+    truncated: 'El artefacto salió demasiado largo para terminarlo, así que no se publicó nada. Pedí una versión más simple o armalo por partes.',
+    snag: 'Falló el armado del artefacto. Probá de nuevo.',
     empty: 'No pude armar eso. Probá contándolo de otra forma.',
-    publishFailed: 'La armé, pero no se pudo publicar. Probá de nuevo.',
+    publishFailed: 'Lo armé, pero no se pudo publicar. Probá de nuevo.',
     generic: 'Algo salió mal. Probá de nuevo.',
-    gaveUp: 'No logré que la página pase sus propias revisiones después de varios intentos, así que no la publiqué. Probá con una versión más simple o decime qué es lo más importante.',
-    gaveUpDraft: 'La armé pero sigue con errores después de varios arreglos, así que la dejé privada y no la doy por terminada. Probá con una versión más simple o decime qué es lo más importante.',
+    gaveUp: 'No logré que el artefacto pase sus propias revisiones después de varios intentos, así que no lo publiqué. Probá con una versión más simple o decime qué es lo más importante.',
+    gaveUpDraft: 'Lo armé pero sigue con errores después de varios arreglos, así que lo dejé privado y no lo doy por terminado. Probá con una versión más simple o decime qué es lo más importante.',
   },
 };
 

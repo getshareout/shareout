@@ -143,6 +143,16 @@ Explorá el catálogo siempre visible en el admin del workspace. La mayoría usa
 Google Analytics, Google Ads, Facebook Ads, Shopify, Tienda Nube, Google Sheets,
 Snowflake, BigQuery y Slack.
 
+### Servidores MCP remotos
+
+Los admins también pueden sumar cualquier servidor MCP remoto desde el catálogo: **Servidor MCP →
+URL del servidor → Agregar servidor MCP**. Después cada integrante toca **Conectar mi cuenta** y entra a
+ese servidor con su propia cuenta (o ve que no hace falta iniciar sesión). Los artefactos solo para
+integrantes leen el servidor como la persona que los está mirando, y solo con las herramientas que
+el artefacto declara — mirá [Conexiones MCP](/es/sdk/mcp/) para la declaración, las llamadas de
+`sdk.mcp` y los códigos de error. Rutas: `POST /v1/workspaces/{id}/mcp-connections`,
+`GET /v1/workspaces/{id}/connections/{connId}/mcp/connect`, `POST …/connections/{connId}/mcp/tools`.
+
 ### Probar credenciales antes de guardar
 
 ```http
