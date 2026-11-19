@@ -101,7 +101,7 @@ describe('the words themselves', () => {
     expect(es.label(SOURCES[12])).toBe('Conocimiento del espacio');
     expect(es.feeds(SOURCES[0])).toBe('Alimenta: 3 elementos');
     expect(es.feeds(SOURCES[1])).toBe('Alimenta: 1 elemento');
-    expect(es.feeds(SOURCES[2])).toBe('No está vinculada a elementos de la página');
+    expect(es.feeds(SOURCES[2])).toBe('No está vinculada a elementos del artefacto');
     expect(es.details(DETAILS[2])?.rows).toContainEqual(['La actualiza', 'Job “Ads” · 0 6 * * * · la última vez falló']);
     expect(es.details(DETAILS[2])?.rows).toContainEqual(['La actualiza', 'Sincronización “Ventas” · en pausa']);
     expect(en.details(DETAILS[2])?.rows).toContainEqual(['Connection', 'warehouse · only this page · shared credentials']);
