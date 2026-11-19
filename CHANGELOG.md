@@ -17,10 +17,11 @@ adds to both (AGENTS.md → Gate contract).
   - Guide: /everyone/get-help/
   - Guía: /es/everyone/get-help/
   - Integrators: What's new is also an Atom feed on the docs site, `/whats-new.xml` and `/es/whats-new.xml`; each change has its own link, `/whats-new/#<date>-<headline>`. Home markup can localize a link with `data-i18n-href="<copy key>"`. (#323)
-- **The docs start with the basics.** The docs home now opens with a "Start here" path in plain words — what ShareOut is, your first page, keeping it up to date, sharing — plus the latest changes and where you use ShareOut. The developer reference has its own clearly labelled sections.
-  - es: **La documentación arranca por lo básico.** La portada de la documentación ahora abre con un camino "Empezá acá" en palabras simples — qué es ShareOut, tu primer artefacto, cómo mantenerlo al día, cómo compartirlo — más las últimas novedades y dónde usás ShareOut. La referencia para developers tiene sus propias secciones, bien marcadas.
+- **The docs start with the basics.** The docs home now opens with a "Start here" path in plain words — what ShareOut is, your first page, keeping it up to date, sharing — plus the latest changes and where you use ShareOut. The developer reference has its own clearly labelled sections. On ShareOut Cloud, What's new on shareout.site opens this list too, and shareout.site/whats-new is a short address to share it.
+  - es: **La documentación arranca por lo básico.** La portada de la documentación ahora abre con un camino "Empezá acá" en palabras simples — qué es ShareOut, tu primer artefacto, cómo mantenerlo al día, cómo compartirlo — más las últimas novedades y dónde usás ShareOut. La referencia para developers tiene sus propias secciones, bien marcadas. En ShareOut Cloud, Novedades en shareout.site abre esta misma lista, y shareout.site/whats-new es una dirección corta para compartirla.
   - Guide: /
   - Guía: /es/
+  - Integrators: where `MARKETING_ORIGIN` is set, `GET /resources/changelog` and `/whats-new` on the apex answer 302 to the docs What's new (`/es/` for an `es` Accept-Language) instead of proxying the marketing site. (#323)
 
 ### 2026-11-18
 
