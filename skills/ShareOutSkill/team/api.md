@@ -477,6 +477,21 @@ Metric alert endpoints stay under `/v1/metric-alerts`; workspace role changes pe
 
 Full reference: [../api/metric-alerts.md](../api/metric-alerts.md).
 
+## Direct Messages
+
+One-to-one messages between internal members of a workspace (Home's Messages menu, the assistant, MCP and this API share the rules). Workspace agent tokens are refused.
+
+| Method | Endpoint | Notes |
+| --- | --- | --- |
+| `GET` | `/v1/workspaces/{id}/messages` | Your conversations, most recent first, with unread counts (`?unread=1`, `?limit`). |
+| `POST` | `/v1/workspaces/{id}/messages` | Send `{to, text, artifact_id?}`; `to` = name, email or user id (409 `RECIPIENT_AMBIGUOUS` lists `candidates`). |
+| `GET` | `/v1/workspaces/{id}/messages/unread` | `{ unread }` for a badge. |
+| `GET` | `/v1/workspaces/{id}/messages/people` | Who you can write to. |
+| `GET` | `/v1/workspaces/{id}/messages/with/{userId}` | One conversation, newest first (`?before`, `?limit`). |
+| `POST` | `/v1/workspaces/{id}/messages/with/{userId}/read` | Mark it read. |
+
+Full reference: [messages.md](messages.md).
+
 ## Home Activity
 
 Activity feed and visibility settings for the redesigned workspace Home. Full guide: [activity-feed.md](activity-feed.md).

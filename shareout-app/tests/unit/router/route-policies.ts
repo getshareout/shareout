@@ -166,6 +166,8 @@ export const MCP_TOOL_POLICIES: Record<string, McpToolPolicy> = {
   publish_artifact: 'workspace',
   list_members: 'workspace',
   invite_members: 'workspace',
+  send_message: 'workspace',
+  read_messages: 'workspace',
   resend_invite: 'workspace',
   revoke_invite: 'workspace',
   folder_access: 'workspace',

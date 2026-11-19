@@ -52,6 +52,7 @@ There is no public hosted default — resolve origin or deploy first.
 | Workspace admin portal / Run Inspector | [team/admin-portal.md](team/admin-portal.md) | [team/api.md](team/api.md) |
 | Home lenses (Datasets, Catalog, Crew, Library, Connectors, Admin, Assets, Knowledge) | [core/workspace-home.md](core/workspace-home.md#workspace-lenses) | [team/SKILL.md](team/SKILL.md#workspace-admin-surfaces) |
 | Home activity feed (Needs You + Pulse) | [team/activity-feed.md](team/activity-feed.md) | [core/workspace-home.md](core/workspace-home.md) |
+| Message someone in the workspace (direct messages, Messages menu, assistant / MCP send_message) | [team/messages.md](team/messages.md) | [team/api.md](team/api.md#direct-messages) |
 | Home notifications panel (bell, Unread/Seen tabs, dismiss, approvals) | [core/workspace-home.md](core/workspace-home.md#notifications) | [team/api.md](team/api.md#home-activity) |
 | Home pro search (⌘K palette, inline quick-jump) | [core/workspace-home.md](core/workspace-home.md#pro-search-k) | [api/search.md](api/search.md) |
 | Link multiple Google accounts on Home | [auth.md](auth.md#linked-accounts) | [core/workspace-home.md](core/workspace-home.md) |

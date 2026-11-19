@@ -115,6 +115,21 @@ POST   /v1/workspaces/{id}/artifacts/{artifactId}/move
 
 Mirá [Carpetas](/es/teams/folders/).
 
+## Mensajes directos
+
+Mensajes de a dos entre miembros internos del workspace. Sesión o token personal; los tokens de agente del workspace se rechazan.
+
+```http
+GET  /v1/workspaces/{id}/messages                    # your conversations (?unread=1) + unread total
+POST /v1/workspaces/{id}/messages                    # {to, text, artifact_id?} — to = name, email or user id
+GET  /v1/workspaces/{id}/messages/unread
+GET  /v1/workspaces/{id}/messages/people
+GET  /v1/workspaces/{id}/messages/with/{userId}      # newest first (?before, ?limit)
+POST /v1/workspaces/{id}/messages/with/{userId}/read
+```
+
+Un nombre que coincide con varias personas responde `409 RECIPIENT_AMBIGUOUS` con `candidates`. El asistente (`send_message` con tarjeta de confirmación, `read_messages`) y el conector MCP (`send_message` en dos pasos con `confirm_token`, `read_messages`) siguen las mismas reglas. Ver [Mensajes](/es/teams/messages/).
+
 ## Assets (deliverables)
 
 Biblioteca de assets por alcance — un bucket oculto por workspace (compartido) y uno personal. Cualquier miembro del workspace puede usar las rutas de workspace; las personales usan `/v1/assets` sin prefijo de workspace.

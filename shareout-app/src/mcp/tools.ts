@@ -22,6 +22,7 @@ import {
   type Args, type ToolContext, type ToolDef, type ToolResult,
 } from './tool-kit';
 import { MEMBER_TOOLS } from './member-tools';
+import { MESSAGE_TOOLS } from './message-tools';
 import { BUILD_TOOLS } from './build-tools';
 import { KNOWLEDGE_TOOLS } from './knowledge-tools';
 import { KNOWLEDGE_CURATION_TOOLS } from './knowledge-curation-tools';
@@ -53,6 +54,8 @@ export const SERVER_INSTRUCTIONS = [
   'To share a folder with someone outside the team: folder_access (who can see it), share_with_person, revoke_share, folder_activity (who opened what).',
   'Workspace owners and admins can invite people with invite_members: confirm the emails and the role with them first,',
   'then say who was invited, who already was a member and who was skipped.',
+  'To write to someone in their workspace use send_message: its first call only returns the draft; show them who it goes to and the exact text,',
+  'and only after they say yes send it again with the confirm_token. If several people match the name, ask which one. read_messages answers "did anyone write to me?".',
   'To update a page by email (the person emails an Excel or CSV and the page updates itself): ask who sends the file, one question,',
   'and offer their own address as the answer; keep ids, dataset names and job talk to yourself. Then set_email_sync with that address',
   '(if it says the page already has data under that name, ask before replacing it) and give them the page\'s address ready to copy, with what its',
@@ -645,7 +648,7 @@ const fetchTool: ToolDef = {
 // Deterministic order (lets clients cache the list).
 export const TOOLS: ToolDef[] = [
   whoami, listWorkspaces, listArtifacts, getArtifact, publishArtifact, updateArtifact, ...EDIT_TOOLS, ...BUILD_TOOLS,
-  ...PAGE_TOOLS, ...SHEET_SYNC_TOOLS, ...EMAIL_SYNC_TOOLS, ...SHARING_TOOLS, ...MEMBER_TOOLS, ...KNOWLEDGE_TOOLS, ...KNOWLEDGE_CURATION_TOOLS, ...CONNECTOR_TOOLS, getHelp, reportProblem, search, fetchTool,
+  ...PAGE_TOOLS, ...SHEET_SYNC_TOOLS, ...EMAIL_SYNC_TOOLS, ...SHARING_TOOLS, ...MEMBER_TOOLS, ...MESSAGE_TOOLS, ...KNOWLEDGE_TOOLS, ...KNOWLEDGE_CURATION_TOOLS, ...CONNECTOR_TOOLS, getHelp, reportProblem, search, fetchTool,
 ];
 
 export function listTools() {

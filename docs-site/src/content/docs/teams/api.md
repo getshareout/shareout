@@ -117,6 +117,21 @@ POST   /v1/workspaces/{id}/artifacts/{artifactId}/move
 
 See [Folders](/teams/folders/).
 
+## Direct messages
+
+One-to-one messages between internal members of the workspace. Session or personal token; workspace agent tokens are refused.
+
+```http
+GET  /v1/workspaces/{id}/messages                    # your conversations (?unread=1) + unread total
+POST /v1/workspaces/{id}/messages                    # {to, text, artifact_id?} — to = name, email or user id
+GET  /v1/workspaces/{id}/messages/unread
+GET  /v1/workspaces/{id}/messages/people
+GET  /v1/workspaces/{id}/messages/with/{userId}      # newest first (?before, ?limit)
+POST /v1/workspaces/{id}/messages/with/{userId}/read
+```
+
+A name that matches several people answers `409 RECIPIENT_AMBIGUOUS` with `candidates`. The assistant (`send_message` with a confirm card, `read_messages`) and the MCP connector (`send_message` in two steps with a `confirm_token`, `read_messages`) follow the same rules. See [Messages](/teams/messages/).
+
 ## Assets (deliverables)
 
 Per-scope asset library — one hidden bucket per workspace (shared) and one personal bucket. Any workspace member may use the workspace routes; personal routes use `/v1/assets` without a workspace prefix.

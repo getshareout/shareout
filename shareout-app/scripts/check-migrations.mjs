@@ -147,7 +147,7 @@ const TABLE_OWNERS = {
   ai: 'src/data/agent', analytics: 'src/analytics.ts', artifact: 'src/artifacts', artifacts: 'src/artifacts',
   asset: 'src/assets', assets: 'src/assets', audit: 'src/audit.ts', blob: 'src/data/blobs', blobs: 'src/data/blobs',
   catalog: 'src/catalog', collaborators: 'src/artifacts', comment: 'src/realtime', connection: 'src/data/connections',
-  connections: 'src/data/connections', crew: 'src/crew', crews: 'src/crew', datasets: 'src/data/datasets',
+  connections: 'src/data/connections', crew: 'src/crew', crews: 'src/crew', datasets: 'src/data/datasets', direct: 'src/messages',
   deployments: 'src/publish', device: 'src/auth', editor: 'src/editor', email: 'src/email', favorites: 'src/artifacts',
   file: 'src/assets', folders: 'src/folders.ts', funnel: 'src/analytics.ts', google: 'src/data/sheets',
   grants: 'src/access', health: 'src/observability', home: 'src/pages/home', job: 'src/scheduling',

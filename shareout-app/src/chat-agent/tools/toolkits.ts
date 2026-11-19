@@ -31,8 +31,8 @@ export const TOOLKITS: Record<string, { summary: string; tools: string[] }> = {
     tools: ['list_skills', 'read_skill', 'save_skill'],
   },
   people: {
-    summary: 'see who is in the workspace and invite people by email (admins)',
-    tools: ['list_members', 'invite_members'],
+    summary: 'send a direct message to someone in the workspace, read your messages, see who is in the workspace, invite people by email (admins)',
+    tools: ['send_message', 'read_messages', 'list_members', 'invite_members'],
   },
 };
 
