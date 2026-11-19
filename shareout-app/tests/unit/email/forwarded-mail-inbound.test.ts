@@ -298,7 +298,7 @@ describe('Gmail forwarding confirmation sent to the page address', () => {
     expect(st.forwarding).toEqual([]);
   });
 
-  it('a new request from the same mailbox replaces the old one; at most 3 are kept per page (newest)', async () => {
+  it('a new request from the same mailbox replaces the old one; at most 3 are kept per page (the page\'s own first, then newest)', async () => {
     const addr = await pageWithSync('art_cnf_cap', [ASKER]);
     await send(confirmation(addr, { legacy: '111111111' }));
     await send(confirmation(addr, { legacy: '222222222' }));
@@ -306,8 +306,30 @@ describe('Gmail forwarding confirmation sent to the page address', () => {
     for (const n of [1, 2, 3, 4]) await send(confirmation(addr, { asker: `extra${n}@gmail.com` }));
     const st = await status('art_cnf_cap');
     expect(FORWARD_CONFIRMS_KEPT).toBe(3);
-    expect(st.forwarding.map((c: { requester: string }) => c.requester)).toEqual(['extra4@gmail.com', 'extra3@gmail.com', 'extra2@gmail.com']);
+    expect(st.forwarding.map((c: { requester: string }) => c.requester)).toEqual([ASKER, 'extra4@gmail.com', 'extra3@gmail.com']);
     expect(st.forwarding.find((c: { requester: string }) => c.requester === 'extra4@gmail.com').requesterAllowed).toBe(false);
+  });
+
+  it('strangers cannot bury or evict the editor\'s own: an allowed requester stays, comes first and is the headline', async () => {
+    const addr = await pageWithSync('art_cnf_rank', [ASKER]);
+    await send(confirmation(addr));
+    for (const n of [1, 2, 3, 4]) await send(confirmation(addr, { asker: `stranger${n}@gmail.com` }));
+    const st = await status('art_cnf_rank');
+    expect(st.forwarding).toHaveLength(3);
+    expect(st.forwarding.map((c: { requester: string; requesterAllowed: boolean }) => [c.requester, c.requesterAllowed])).toEqual([
+      [ASKER, true], ['stranger4@gmail.com', false], ['stranger3@gmail.com', false],
+    ]);
+    expect(st.message).toContain(`forwarding from ${ASKER}`);
+  });
+
+  it('a requester at the inbox\'s own domain (self-hosted: inbox domain = company mail domain) is recognised', async () => {
+    const addr0 = await pageWithSync('art_cnf_samedom', ['placeholder@acme.test']);
+    const local = `ana@${addr0.split('@')[1]}`;
+    as(owner);
+    expect((await api('art_cnf_samedom', 'PUT', { senders: [local] }, '/senders')).status).toBe(200);
+    const m = await send(confirmation(addr0, { asker: local }));
+    expect(m.setReject).not.toHaveBeenCalled();
+    expect((await status('art_cnf_samedom')).forwarding).toEqual([expect.objectContaining({ requester: local, requesterAllowed: true })]);
   });
 
   it('expired ones are not shown', async () => {

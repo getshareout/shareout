@@ -273,60 +273,70 @@ export const workspace_client_home_views_emailSync_JS = `  // ===== Update a dat
       }).catch(function () { esWatch(gen); });
     }, 10000);
   }
-  // Gmail asks this address to confirm before it forwards (GET …/email-sync, forwarding): one step
-  // on top — who asked, Confirm (Google's own page, opened in a new tab), the code if Gmail asks for
-  // it, "It's not mine". Once opened: whose report will be forwarded (added to who may send), Done.
-  // Only a link on Google's own host is ever rendered, whatever the server sends.
+  // Gmail asks this address to confirm before it forwards (GET …/email-sync, forwarding): a step on
+  // top for each request — who asked, Confirm (Google's own page, opened in a new tab), the code if
+  // Gmail asks for it, "It's not mine". Anyone who knows the address can make their own Gmail ask,
+  // so every pending request shows, the page's own people first, and only theirs gets the main
+  // button; a stranger's gets a plain one and a warning. Once opened: whose report will be forwarded
+  // (added to who may send), Done. Only a link on Google's own host is ever rendered.
   var ES_GOOGLE = /^https:\\/\\/(?:mail-settings|mail|isolated\\.mail)\\.google\\.com\\/mail\\/vf-[A-Za-z0-9%._~-]+$/;
-  function esFwdList(st) { return (Array.isArray(st.forwarding) ? st.forwarding : []).filter(function (c) { return c && c.id && ES_GOOGLE.test(String(c.confirmUrl || '')); }); }
+  function esFwdList(st) {
+    var l = (Array.isArray(st.forwarding) ? st.forwarding : []).filter(function (c) { return c && c.id && ES_GOOGLE.test(String(c.confirmUrl || '')); });
+    var at = function (c) { var d = esDate(c.receivedAt); return d ? d.getTime() : 0; };
+    return l.slice().sort(function (a, b) { return (b.requesterAllowed ? 1 : 0) - (a.requesterAllowed ? 1 : 0) || at(b) - at(a); });
+  }
   function esFwdKey(st) { return esFwdList(st).map(function (c) { return c.id + (c.openedAt ? '+' : ''); }).join(','); }
-  function esFwd(st) {
-    var c = esFwdList(st)[0];
-    if (!c) return '';
+  function esFwdOne(c) {
     var link = function (cls, label, attr) { return '<a class="' + cls + '" href="' + esc(c.confirmUrl) + '" target="_blank" rel="noopener noreferrer"' + (attr || '') + '>' + esc(label) + '</a>'; };
     if (!c.openedAt) {
       return '<div class="wsx-slink__warn wsx-esync__fwd" role="alert" data-es-fwd="' + esc(c.id) + '">'
         + '<p><b>' + esc(esT('esync.fwdAsk', { who: c.requester })) + '</b></p>'
         + '<p>' + esc(t('esync.fwdAskWhat')) + '</p>'
-        + '<div class="wsx-esync__acts">' + link('wsx-abtn wsx-abtn--primary', t('esync.fwdConfirm'), ' data-es-fwd-open="1"') + esBtn('data-es-fwd-no="1"', t('esync.fwdNotMine'), false) + '</div>'
+        + '<div class="wsx-esync__acts">' + link('wsx-abtn' + (c.requesterAllowed ? ' wsx-abtn--primary' : ''), t('esync.fwdConfirm'), ' data-es-fwd-open="1"') + esBtn('data-es-fwd-no="1"', t('esync.fwdNotMine'), false) + '</div>'
         + (c.code ? '<p class="wsx-field__note">' + esc(esT('esync.fwdCode', { code: c.code })) + '</p>' : '')
         + (c.requesterAllowed ? '' : '<p class="wsx-field__note">' + esc(t('esync.fwdUnknown')) + '</p>')
         + '</div>';
     }
     return '<div class="wsx-slink__warn wsx-esync__fwd" data-es-fwd="' + esc(c.id) + '" data-es-fwd-opened="1">'
       + '<p><b>' + esc(esT('esync.fwdOpened', { who: c.requester })) + '</b></p>'
-      + esField(t('esync.fwdWhose'), '<input class="wsx-field__in" id="es_fwd_who" type="email" autocomplete="off" spellcheck="false" placeholder="' + esc(t('esync.fwdWhosePh')) + '">', t('esync.fwdWhoseNote'))
+      + esField(t('esync.fwdWhose'), '<input class="wsx-field__in" data-es-fwd-who="1" type="email" autocomplete="off" spellcheck="false" placeholder="' + esc(t('esync.fwdWhosePh')) + '">', t('esync.fwdWhoseNote'))
       + '<div class="wsx-esync__acts">' + esBtn('data-es-fwd-add="1"', t('esync.fwdAdd'), true) + esBtn('data-es-fwd-done="1"', t('esync.fwdDone'), false) + '</div>'
       + '<p class="wsx-field__note">' + link('wsx-link', t('esync.fwdReopen')) + '</p>'
       + '</div>';
   }
+  function esFwd(st) { return esFwdList(st).map(esFwdOne).join(''); }
+  // Each box is drawn fresh, so binding it never stacks; the list and the error line are read when tapped.
   function esFwdBind(root, st) {
-    var box = root.querySelector('[data-es-fwd]'); if (!box) return;
-    var id = box.getAttribute('data-es-fwd'), err = root.querySelector('#es_err'), senders = st.senders || [];
-    function act(action) { return esReq('POST', esUrl('/forwarding/' + encodeURIComponent(id)), { action: action }); }
-    function fail(el) { return function () { if (el) el.disabled = false; err.textContent = t('autof.couldNotSave'); }; }
-    // Confirm: the link opens Google's page in a new tab; here the step moves on to the next question.
-    var open = box.querySelector('[data-es-fwd-open]');
-    if (open) open.addEventListener('click', function () { act('opened').then(function () { esLoad(false); }, fail()); });
-    var no = box.querySelector('[data-es-fwd-no]'), done = box.querySelector('[data-es-fwd-done]');
-    [no, done].forEach(function (el) {
-      if (el) el.addEventListener('click', function () {
-        el.disabled = true;
-        act('dismiss').then(function () { if (el === no) wsxToast(t('esync.fwdDismissed')); esLoad(false); }, fail(el));
+    root.querySelectorAll('[data-es-fwd]').forEach(function (box) {
+      var id = box.getAttribute('data-es-fwd');
+      var errEl = function () { return root.querySelector('#es_err') || { textContent: '' }; };
+      function act(action) { return esReq('POST', esUrl('/forwarding/' + encodeURIComponent(id)), { action: action }); }
+      function fail(el) { return function () { if (el) el.disabled = false; errEl().textContent = t('autof.couldNotSave'); }; }
+      // Confirm: the link opens Google's page in a new tab; here the step moves on to the next question.
+      var open = box.querySelector('[data-es-fwd-open]');
+      if (open) open.addEventListener('click', function () { act('opened').then(function () { esLoad(false); }, fail()); });
+      var no = box.querySelector('[data-es-fwd-no]'), done = box.querySelector('[data-es-fwd-done]');
+      [no, done].forEach(function (el) {
+        if (el) el.addEventListener('click', function () {
+          el.disabled = true;
+          act('dismiss').then(function () { if (el === no) wsxToast(t('esync.fwdDismissed')); esLoad(false); }, fail(el));
+        });
       });
-    });
-    var add = box.querySelector('[data-es-fwd-add]'), who = box.querySelector('#es_fwd_who');
-    if (who) esClearOnInput(box, err);
-    if (who) who.addEventListener('keydown', function (e) { if (e.key === 'Enter') add.click(); });
-    if (add) add.addEventListener('click', function () {
-      err.textContent = '';
-      var s = esSenders(who.value); if (s.err) { err.textContent = s.err; return; }
-      var list = senders.slice(); s.list.forEach(function (v) { if (list.indexOf(v) === -1) list.push(v); });
-      add.disabled = true;
-      esReq('PUT', esUrl('/senders'), { senders: list }).then(function (res) {
-        if (!res.ok) { add.disabled = false; err.textContent = esSendersErr(res.d); return; }
-        return act('dismiss').then(function () { wsxToast(esT('esync.fwdAdded', { who: s.list.join(', ') })); esLoad(false); });
-      }).catch(fail(add));
+      var add = box.querySelector('[data-es-fwd-add]'), who = box.querySelector('[data-es-fwd-who]');
+      if (!who || !add) return;
+      who.addEventListener('input', function () { errEl().textContent = ''; });
+      who.addEventListener('keydown', function (e) { if (e.key === 'Enter') add.click(); });
+      add.addEventListener('click', function () {
+        errEl().textContent = '';
+        var s = esSenders(who.value); if (s.err) { errEl().textContent = s.err; return; }
+        var list = (esSendersNow.length ? esSendersNow : (st.senders || [])).slice();
+        s.list.forEach(function (v) { if (list.indexOf(v) === -1) list.push(v); });
+        add.disabled = true;
+        esReq('PUT', esUrl('/senders'), { senders: list }).then(function (res) {
+          if (!res.ok) { add.disabled = false; errEl().textContent = esSendersErr(res.d); return; }
+          return act('dismiss').then(function () { wsxToast(esT('esync.fwdAdded', { who: s.list.join(', ') })); esLoad(false); });
+        }).catch(fail(add));
+      });
     });
   }
   // "Let the report arrive by itself": three steps for Gmail, three for Outlook, folded.

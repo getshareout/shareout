@@ -219,7 +219,7 @@ export async function handleInboundEmail(
     // through to the sender check below and is bounced like any other mail.
     const confirmation = gmailForwardingConfirmation(cf, email, message.to);
     if (confirmation) {
-      await saveForwardConfirmation(env, res.artifactId, confirmation);
+      await saveForwardConfirmation(env, res.artifactId, confirmation, res.allowlist);
       return;
     }
     // A mail auto-forwarded by a mailbox means forwarding from it works: its confirmation is done.

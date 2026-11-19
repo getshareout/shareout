@@ -6,7 +6,8 @@
 -- the page's editors need to finish the step, and shows it in the Update-by-email panel and over
 -- check_email_sync. The mail itself is not stored and never becomes data.
 --
--- At most 3 pending per page (older ones are dropped), one per asking mailbox (a new request from
+-- At most 3 pending per page — over that, requesters not on the page's list are dropped first, so a
+-- stranger's requests cannot push out the person's own — one per asking mailbox (a new request from
 -- the same mailbox replaces the old one), gone after expires_at or once dismissed.
 CREATE TABLE IF NOT EXISTS email_forward_confirmations (
   id           TEXT PRIMARY KEY,                                         -- efc_…
