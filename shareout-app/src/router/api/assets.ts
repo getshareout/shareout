@@ -20,7 +20,10 @@
  *   POST   /v1/assets/collections/{id}/share       { expiresAt? } → { url }
  *   POST   /v1/assets/collections/{id}/send        { to, expiresAt? } → email the link
  *   ...same under /v1/workspaces/{ws}/assets (any member; deleting another member's file needs owner/admin).
- *   POST   /v1/workspaces/{ws}/assets/to-artifacts  { dryRun?, limit?, retry? } → Files become artifacts (owner/admin)
+ *   POST   /v1/workspaces/{ws}/assets/to-artifacts  { dryRun?, limit?, retry? } → Files become artifacts (owner/admin);
+ *          safe to retry mid-run: `inProgress` counts files another call is still converting
+ *   GET    /v1/workspaces/{ws}/assets/duplicates   → pages made from byte-identical files, grouped (owner/admin, read-only)
+ *   POST   /v1/workspaces/{ws}/assets/duplicates/remove  { keep, remove[], confirm: true } → trash copies of `keep` (owner only, 30 days)
  */
 import type { FetchContext } from '../context';
 import type { Env } from '../../types';
@@ -31,6 +34,7 @@ import { getOrCreateAssetBucket, buildAssetBucketContext, type AssetBucketRow } 
 import { enrichDeliverable } from '../../assets/enrich';
 import { listFileUsage } from '../../assets/usage';
 import { filesToArtifacts, planFilesToArtifacts } from '../../assets/to-artifacts';
+import { findDuplicatePages, removeDuplicatePages } from '../../assets/duplicates';
 import { queueKnowledgeSource } from '../../knowledge/corpus/ingest';
 import {
   collectionInBucket,
@@ -78,10 +82,12 @@ export async function routeAssetApi(ctx: FetchContext): Promise<Response | null>
 
   // Deleting someone else's workspace file is an owner/admin action; personal scope is all yours.
   let isWsAdmin = !workspaceId;
+  let isWsOwner = false;
   if (workspaceId) {
     const role = await getInternalWorkspaceRole(env, workspaceId, user.id);
     if (!role) return addCORS(Response.json({ error: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 }));
     isWsAdmin = role === 'owner' || role === 'admin';
+    isWsOwner = role === 'owner';
   }
   const forbidden = () => addCORS(Response.json({ error: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 }));
 
@@ -107,6 +113,21 @@ export async function routeAssetApi(ctx: FetchContext): Promise<Response | null>
     if (!isWsAdmin) return forbidden();
     const b = await body<{ dryRun?: boolean; limit?: number; retry?: boolean }>();
     return json(b.dryRun ? await planFilesToArtifacts(env, workspaceId) : await filesToArtifacts(env, workspaceId, { limit: b.limit, retry: b.retry }));
+  }
+  if (sub === 'duplicates' && method === 'GET' && workspaceId) {
+    if (!isWsAdmin) return forbidden();
+    return json({ groups: await findDuplicatePages(env, workspaceId) });
+  }
+  if (sub === 'duplicates/remove' && method === 'POST' && workspaceId) {
+    // Never automatic: only the workspace owner, naming each page and confirming.
+    if (!isWsOwner) return forbidden();
+    const b = await body<{ keep?: unknown; remove?: unknown; confirm?: unknown }>();
+    if (typeof b.keep !== 'string' || !Array.isArray(b.remove) || !b.remove.every((id) => typeof id === 'string')) {
+      return json({ error: 'keep (page id) and remove (page ids) required', code: 'BAD_REQUEST' }, 400);
+    }
+    if (b.confirm !== true) return json({ error: 'Send confirm: true to move these pages to the trash.', code: 'CONFIRM_REQUIRED' }, 400);
+    const res = await removeDuplicatePages(env, workspaceId, b.keep, b.remove as string[]);
+    return res.ok ? json(res) : json({ error: res.message, code: res.code }, res.code === 'NOT_A_DUPLICATE' ? 409 : 400);
   }
 
   if ((rest === '' || rest === '/') && method === 'GET') {

@@ -1,6 +1,7 @@
 // Workspace Files → artifacts in place, against the migrated schema: each convertible file
 // becomes a page by its owner in its folder and is soft-deleted; linked or unconvertible
-// files are kept and skipped; batches report what is left.
+// files are kept and skipped; batches report what is left. A retried call (client timeout)
+// never makes a second page of the same file.
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 
 const queueKnowledgeSource = vi.hoisted(() => vi.fn(async () => true));
@@ -9,6 +10,7 @@ vi.mock('../../../src/knowledge/corpus/ingest', () => ({ queueKnowledgeSource })
 import { applyMigrations, e } from '../helpers/migrated-db';
 import { getOrCreateAssetBucket } from '../../../src/assets/bucket';
 import { filesToArtifacts, planFilesToArtifacts } from '../../../src/assets/to-artifacts';
+import { convertToPage } from '../../../src/file-imports/convert';
 
 const U = 'usr_ta';
 const M = 'usr_ta_m';
@@ -43,6 +45,11 @@ async function file(name: string, filename: string, body: string, opts: { owner?
   if (opts.usedBy) await e.DB.prepare('INSERT INTO file_artifact_usage (deliverable_id, artifact_id) VALUES (?, ?)').bind(id, opts.usedBy).run();
   return id;
 }
+
+const livePages = () => e.DB.prepare('SELECT COUNT(*) AS n FROM artifacts WHERE workspace_id = ? AND deleted_at IS NULL').bind(WS).first<number>('n');
+const claimed = (id: string, slug: string, minutesAgo: number) => e.DB.prepare(`
+  UPDATE asset_deliverables SET type_metadata = json_set(COALESCE(type_metadata, '{}'), '$.toArtifact', json_object('claim', ?, 'at', ?)) WHERE id = ?
+`).bind(slug, new Date(Date.now() - minutesAgo * 60_000).toISOString(), id).run();
 
 const state = (id: string) => e.DB.prepare('SELECT deleted_at, type_metadata FROM asset_deliverables WHERE id = ?').bind(id)
   .first<{ deleted_at: string | null; type_metadata: string | null }>();
@@ -87,5 +94,44 @@ describe('files → artifacts', () => {
     // Kept files are not retried until asked; a retry clears the marks and tries again.
     expect((await filesToArtifacts(e, WS)).kept).toEqual([]);
     expect((await filesToArtifacts(e, WS, { retry: true, limit: 5 })).kept.map((k) => k.code)).toEqual(['NOT_CONVERTIBLE', 'IN_USE']);
+  });
+
+  it('two calls at once (a client retrying after a timeout) make one page per file', async () => {
+    const ids = [await file('Acme A', 'a.md', '# A'), await file('Acme B', 'b.md', '# B'), await file('Acme C', 'c.md', '# C')];
+    const before = await livePages();
+    const [x, y] = await Promise.all([filesToArtifacts(e, WS, { limit: 5 }), filesToArtifacts(e, WS, { limit: 5 })]);
+    expect([...x.converted, ...y.converted].map((c) => c.id).sort()).toEqual([...ids].sort());
+    expect(await livePages()).toBe(before! + 3);
+    // Whichever call finished first saw the other's file still in progress; once both are done, nothing is.
+    expect(await filesToArtifacts(e, WS)).toMatchObject({ converted: [], inProgress: 0, remaining: 0 });
+  });
+
+  it('leaves a file another call holds, and takes over a dead call without a second page', async () => {
+    const held = await file('Acme held', 'held.md', '# held');
+    await claimed(held, 'acme-held-aaaaaa', 1);
+    const busy = await filesToArtifacts(e, WS);
+    expect(busy).toMatchObject({ converted: [], kept: [], inProgress: 1, remaining: 0 });
+    expect((await planFilesToArtifacts(e, WS)).files.map((f) => f.id)).not.toContain(held);
+
+    // The holder published its page, then died before marking the file: that page is reused.
+    const page = await convertToPage(e, {
+      user: { id: U, email: 'ta@example.com' }, workspaceId: WS, folderId: FLD, visibility: 'workspace',
+      filename: 'held.md', displayName: 'Acme held.md', bytes: new TextEncoder().encode('# held'), slug: 'acme-held-aaaaaa',
+    });
+    if (!page.ok) throw new Error(page.message);
+    await claimed(held, 'acme-held-aaaaaa', 16);
+    const before = await livePages();
+    const took = await filesToArtifacts(e, WS);
+    expect(took.converted).toEqual([{ id: held, name: 'Acme held', artifactId: page.artifactId, slug: 'acme-held-aaaaaa' }]);
+    expect(took.inProgress).toBe(0);
+    expect(await livePages()).toBe(before);
+    expect(JSON.parse((await state(held))!.type_metadata!).toArtifact).toBe(page.artifactId);
+
+    // The holder died before publishing: converted now, under the slug it claimed.
+    const lost = await file('Acme lost', 'lost.md', '# lost');
+    await claimed(lost, 'acme-lost-bbbbbb', 16);
+    const again = await filesToArtifacts(e, WS);
+    expect(again.converted.map((c) => [c.id, c.slug])).toEqual([[lost, 'acme-lost-bbbbbb']]);
+    expect(await e.DB.prepare('SELECT display_slug FROM artifacts WHERE id = ?').bind(again.converted[0].artifactId).first('display_slug')).toBe('acme-lost-bbbbbb');
   });
 });
