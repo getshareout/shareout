@@ -150,15 +150,19 @@ repo root.
   merging is the maintainer's call. A PR is squash-merged once its branch has been
   through `integrate.sh`; a batch, or a branch that needed fixes there, lands as one
   `integration/<name>` PR.
-- **Every user-visible change ships with its words, in the same PR.** A change people or
-  integrators notice (an API route, an MCP tool or its text, UI copy, the SDK, the OpenAPI spec)
-  adds its line to `CHANGELOG.md` → `## Release notes` under today's date — plain English for
-  someone who uses ShareOut, an `es:` line, a short `Integrators:` line with the routes/tools —
-  plus the technical entry under `## [Unreleased]`, and updates the skill, the MCP text (tool
-  description or server instructions) and the docs-site pages (en + es) to match. The docs site's
-  What's new / Novedades pages render that section (`docs-site/src/lib/release-notes.mjs`), so
-  never keep a second copy. `check:changelog` (pre-push) fails a branch that touches those paths
-  without `CHANGELOG.md`; when it really isn't user-visible, put `Changelog: none` in a commit message.
+- **Every user-visible change ships with its words, in the same PR.** A new feature or a change
+  to one that people or integrators notice (an API route, an MCP tool or its text, an assistant
+  tool, UI copy, the SDK, the OpenAPI spec) adds its line to `CHANGELOG.md` → `## Release notes`
+  under today's date — plain English for someone who uses ShareOut, an `es:` line, a short
+  `Integrators:` line with the routes/tools — plus the technical entry under `## [Unreleased]`,
+  and updates the skill, the MCP text (tool description or server instructions) and the
+  docs-site pages (en + es) to match. The docs site's What's new / Novedades pages render the
+  Release notes (`docs-site/src/lib/release-notes.mjs`), so never keep a second copy.
+  `check:changelog` (pre-push) fails a branch that touches those paths without a Release notes
+  line, an Unreleased entry and a docs-site page — and without the skill when an agent surface
+  changed (API, MCP, assistant tools, SDK, OpenAPI) — and any branch that changes a docs page in
+  one language only (en ↔ `es/`). Not needed this time? One line in a commit message:
+  `Changelog: none` (not user-visible at all), `Docs: none` or `Skill: none`.
 - **Committed bundles:** build outputs (`public/_bundles/*`, `src/discovery/*`,
   `src/official-skills/*.generated.ts`) live in git. After editing `sdk/`,
   `editor-client/`, `chat-core/` or `skills/ShareOutSkill/`, run `npm run build:sdk` /
