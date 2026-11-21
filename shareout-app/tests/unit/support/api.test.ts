@@ -27,6 +27,12 @@ vi.mock('../../../src/support/triage', () => ({ triageTicket: (...a: unknown[]) 
 const alertMock = vi.fn(async () => true);
 vi.mock('../../../src/support/alert', () => ({ alertOperator: (...a: unknown[]) => alertMock(...a) }));
 
+const limitMock = vi.fn(async () => ({ allowed: true, limit: 10, remaining: 9, reset: 0 }));
+vi.mock('../../../src/rate-limit', async (orig) => ({
+  ...(await orig<typeof import('../../../src/rate-limit')>()),
+  checkSendFeedbackLimit: (...a: unknown[]) => limitMock(...a),
+}));
+
 const deliverMock = vi.fn(async () => ({ delivered: true, via: 'ui' }));
 vi.mock('../../../src/support/deliver', () => ({ deliverReply: (...a: unknown[]) => deliverMock(...a) }));
 
@@ -63,6 +69,8 @@ beforeEach(async () => {
   triageMock.mockClear();
   alertMock.mockClear();
   deliverMock.mockClear();
+  limitMock.mockReset();
+  limitMock.mockResolvedValue({ allowed: true, limit: 10, remaining: 9, reset: 0 });
   await e.DB.exec('DELETE FROM ticket_messages');
   await e.DB.exec('DELETE FROM tickets');
 });
@@ -102,6 +110,59 @@ describe('create', () => {
     });
     const plain = await createOne({}, { authorization: 'Bearer so_x' });
     expect((await getTicket(e, plain.ticket.id))!.client).toBe('api');
+  });
+
+  it('takes an idea or feedback from an agent and thanks instead of promising a fix', async () => {
+    for (const category of ['feature_request', 'feedback'] as const) {
+      const res = await routeSupportApi(ctx('POST', '/v1/support/tickets', {
+        subject: 'Let me export a page to PDF', body: 'Asked twice this week.', category, client: 'claude',
+      }, { authorization: 'Bearer so_x' }))!;
+      expect(res!.status).toBe(201);
+      const j = await res!.json() as { ticket: { id: string }; message: string };
+      expect(j.message).toMatch(/^Thanks/);
+      expect(j.message).toContain(j.ticket.id);
+      expect(await getTicket(e, j.ticket.id)).toMatchObject({ category, channel: 'skill', client: 'claude' });
+    }
+    const bug = await routeSupportApi(ctx('POST', '/v1/support/tickets', { subject: 's', body: 'b', category: 'bug' }))!;
+    expect(((await bug!.json()) as { message: string }).message).toMatch(/^Your report is in the support queue/);
+  });
+
+  it('caps ideas and feedback per account (429, nothing filed or alerted) but never problems', async () => {
+    limitMock.mockResolvedValue({ allowed: false, limit: 10, remaining: 0, reset: Math.floor(Date.now() / 1000) + 600, retryAfter: 600 });
+    for (const category of ['feature_request', 'feedback'] as const) {
+      const res = await routeSupportApi(ctx('POST', '/v1/support/tickets', { subject: 's', body: 'b', category }, { authorization: 'Bearer so_x' }))!;
+      expect(res!.status).toBe(429);
+      expect(((await res!.json()) as { code: string }).code).toBe('RATE_LIMIT_EXCEEDED');
+      expect(res!.headers.get('Retry-After')).toBe('600');
+    }
+    expect(limitMock).toHaveBeenCalledWith(expect.anything(), 'usr_req');
+    expect(alertMock).not.toHaveBeenCalled();
+    expect((await e.DB.prepare('SELECT COUNT(*) AS n FROM tickets').first<{ n: number }>())!.n).toBe(0);
+    limitMock.mockClear();
+    const bug = await routeSupportApi(ctx('POST', '/v1/support/tickets', { subject: 's', body: 'b', category: 'bug' }, { authorization: 'Bearer so_x' }))!;
+    expect(bug!.status).toBe(201);
+    expect(limitMock).not.toHaveBeenCalled();
+  });
+
+  it('caps questions from agents (token) but not questions people type in the app', async () => {
+    limitMock.mockResolvedValue({ allowed: false, limit: 10, remaining: 0, reset: Math.floor(Date.now() / 1000) + 600, retryAfter: 600 });
+    const agent = await routeSupportApi(ctx('POST', '/v1/support/tickets', { subject: 's', body: 'b', category: 'question' }, { authorization: 'Bearer so_x' }))!;
+    expect(agent!.status).toBe(429);
+    expect(alertMock).not.toHaveBeenCalled();
+    expect(limitMock).toHaveBeenCalledTimes(1);
+    const person = await routeSupportApi(ctx('POST', '/v1/support/tickets', { subject: 's', body: 'b', category: 'question' }))!;
+    expect(person!.status).toBe(201);
+    expect(limitMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('a retried idea with the same idempotencyKey returns the first ticket without spending the cap', async () => {
+    const first = await createOne({ category: 'feature_request', idempotencyKey: 'idea-1' });
+    expect(limitMock).toHaveBeenCalledTimes(1);
+    limitMock.mockResolvedValue({ allowed: false, limit: 10, remaining: 0, reset: 0 });
+    const again = await routeSupportApi(ctx('POST', '/v1/support/tickets', { subject: 'Help', body: 'broken', category: 'feature_request', idempotencyKey: 'idea-1' }))!;
+    expect(again!.status).toBe(200);
+    expect(((await again!.json()) as { ticket: { id: string } }).ticket.id).toBe(first.ticket.id);
+    expect(limitMock).toHaveBeenCalledTimes(1);
   });
 
   it('rejects an unknown category/severity/client', async () => {

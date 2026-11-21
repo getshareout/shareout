@@ -3280,8 +3280,11 @@
                       "question",
                       "access",
                       "billing",
+                      "feature_request",
+                      "feedback",
                       "other"
-                    ]
+                    ],
+                    "description": "feature_request and feedback are not problems — an idea or an opinion for the team; the answer thanks instead of promising a fix."
                   },
                   "severity": {
                     "type": "string",

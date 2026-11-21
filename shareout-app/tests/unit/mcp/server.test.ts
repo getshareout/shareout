@@ -111,7 +111,7 @@ describe('/mcp protocol', () => {
       'update_artifact', 'invite_members', 'list_members', 'resend_invite', 'revoke_invite',
       'knowledge_search', 'knowledge_entity', 'knowledge_facts', 'knowledge_status',
       'list_connections', 'query_connection', 'browse_storage', 'read_connector',
-      'get_help', 'report_problem', 'search', 'fetch',
+      'get_help', 'report_problem', 'send_feedback', 'search', 'fetch',
     ]));
   });
 

@@ -60,6 +60,10 @@ The AI tells you the link and who can see the page. Pages go to your workspace b
 
 Tell the AI. It can send a report to the ShareOut team for you, and we follow up by email.
 
+## Ideas and feedback
+
+Wish ShareOut did something, or want to tell us what worked? Say it to the AI: "Send ShareOut the idea: export a page to PDF." It goes straight to the ShareOut team, and the AI tells you it was sent. The AI may also send us a note on its own when ShareOut got in its way, without your personal or company data.
+
 ## Disconnect
 
 Remove the ShareOut connector in Claude or ChatGPT settings. It stops working within an hour.

@@ -37,6 +37,15 @@ describe('alertOperator', () => {
     expect(text).toContain('error code: 1010');
   });
 
+  it('names an idea or feedback as such, not as a support ticket', async () => {
+    const t = await createTicket(base, { channel: 'skill', client: 'mcp', category: 'feature_request', subject: 'Export to PDF', body: 'would help' });
+    expect(await alertOperator(on, t, 'would help')).toBe(true);
+    const text = sendMock.mock.calls[0][2] as string;
+    expect(text).toContain(`💡 New feature request ${t.id}`);
+    expect(text).toContain('Category: feature_request');
+    expect(text).not.toContain('🆘');
+  });
+
   it('does nothing when the instance has no alert chat configured', async () => {
     const t = await createTicket(base, { channel: 'skill', subject: 'x', body: 'y' });
     expect(await alertOperator({ ...base, TELEGRAM_BOT_TOKEN: 'bot' } as Env, t, 'y')).toBe(false);

@@ -2058,7 +2058,8 @@ paths:
                   description: Must be a workspace the caller belongs to (else 403).
                 category:
                   type: string
-                  enum: [bug, question, access, billing, other]
+                  enum: [bug, question, access, billing, feature_request, feedback, other]
+                  description: feature_request and feedback are not problems — an idea or an opinion for the team; the answer thanks instead of promising a fix.
                 severity:
                   type: string
                   enum: [low, normal, high, blocker]

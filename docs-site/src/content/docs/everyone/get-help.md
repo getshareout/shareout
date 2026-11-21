@@ -17,6 +17,12 @@ Other in-product channels (when configured):
 - **Slack** — `/shareout support <what went wrong>` if the Slack bot is linked
 - **Telegram** — `/support <what went wrong>` if the Telegram bot is linked
 
+## Send an idea or feedback
+
+Not a problem, but worth saying? Use the same Help panel, or tell the assistant or the AI you
+connected (Claude, ChatGPT): "Send ShareOut the idea: …". Ideas, feedback and questions reach
+the same team as support tickets, and they read every one.
+
 ## Open-source project
 
 ShareOut's code is open source. For bugs and docs issues in the public codebase:

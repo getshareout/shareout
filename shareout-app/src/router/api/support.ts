@@ -7,7 +7,7 @@ import { getInternalWorkspaceRole } from '../../workspaces/roles';
 import {
   createTicket, getTicket, getThread, appendMessage, setStatus, assign,
   listForWorkspace, listAll, listForRequester, findByIdempotencyKey,
-  TICKET_CATEGORIES, TICKET_SEVERITIES, TICKET_CLIENTS,
+  TICKET_CATEGORIES, TICKET_SEVERITIES, TICKET_CLIENTS, FEEDBACK_CATEGORIES,
   type Ticket, type TicketStatus, type TicketCategory, type TicketSeverity, type TicketClient,
 } from '../../support/store';
 import { triageTicket } from '../../support/triage';
@@ -15,6 +15,7 @@ import { deliverReply } from '../../support/deliver';
 import { ingestSupportEmail } from '../../support/email-ingest';
 import { dispatchLifecycleEmail } from '../../email/gateway';
 import { alertOperator } from '../../support/alert';
+import { checkSendFeedbackLimit, rateLimitResponse } from '../../rate-limit';
 
 // Agent tokens may file and read their own tickets; workspace-scoped filing checks
 // `auth.service.workspaceId` below.
@@ -81,8 +82,11 @@ function created(ticket: Ticket, deduped: boolean) {
     success: true,
     deduped,
     ticket,
-    message: `Your report is in the support queue as ${ticket.id}. The team replies on the ticket thread`
-      + ' (Help & support in the app) and by email — nothing else to do now.',
+    message: FEEDBACK_CATEGORIES.includes(ticket.category as TicketCategory)
+      ? `Thanks — the ShareOut team got it as ${ticket.id} and reads every one. If they have a question`
+        + ' they answer on the ticket thread (Help & support in the app) and by email.'
+      : `Your report is in the support queue as ${ticket.id}. The team replies on the ticket thread`
+        + ' (Help & support in the app) and by email — nothing else to do now.',
     check_replies: { method: 'GET', path: check, hint: 'Staff messages appear in `thread` with author "staff"; status turns "pending" once answered.' },
   };
 }
@@ -128,6 +132,13 @@ export async function routeSupportApi(ctx: FetchContext): Promise<Response | nul
       }
       // Token caller → programmatic (skill); session caller → in-app UI.
       const viaToken = !!request.headers.get('authorization');
+      // Agents may send ideas, feedback and questions on their own, and each one pings the operator:
+      // one hourly budget per account, shared with the MCP send_feedback tool. Problems, and
+      // questions people type in the app, stay uncapped.
+      if (FEEDBACK_CATEGORIES.includes(body.category as TicketCategory) || (viaToken && body.category === 'question')) {
+        const rl = await checkSendFeedbackLimit(ctx.env, auth.id);
+        if (!rl.allowed) return cors(rateLimitResponse(rl));
+      }
       const ticket = await createTicket(ctx.env, {
         workspaceId,
         requesterUserId: auth.id,

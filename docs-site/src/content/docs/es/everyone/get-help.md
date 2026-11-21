@@ -17,6 +17,13 @@ Otros canales (si están configurados):
 - **Slack** — `/shareout support <qué pasó>` si el bot está vinculado
 - **Telegram** — `/support <qué pasó>` si el bot está vinculado
 
+## Mandá una idea o un comentario
+
+¿No es un problema pero vale la pena decirlo? Usá el mismo panel de Ayuda, o decíselo al
+asistente o a la IA que conectaste (Claude, ChatGPT): "Mandale a ShareOut la idea: …". Las
+ideas, comentarios y preguntas le llegan al mismo equipo que los tickets de soporte, y los lee
+todos.
+
 ## Proyecto open-source
 
 El código de ShareOut es abierto. Bugs y docs del código público:

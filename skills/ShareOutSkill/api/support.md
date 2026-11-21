@@ -14,6 +14,7 @@ except the platform-internal email-gateway ingest (see below).
 | --- | --- |
 | **In-app Help** | Floating **Help & support** button (bottom-left) on the workspace shell — file a ticket, open your tickets, read replies and answer them |
 | **In-app assistant** | The Home chat agent calls its `report_problem` tool when you are stuck — tagged `client: "chat_agent"` |
+| **Connector (MCP)** | `report_problem` for a problem; `send_feedback` for an idea, feedback or a question — tagged `client: "mcp"` |
 | **This API** | `POST /v1/support/tickets` with a Bearer token — tagged `channel: "skill"` |
 | **Telegram** | `/support <what went wrong>` or `/bug <what went wrong>` on the linked account bot |
 | **Slack** | `/shareout support <what went wrong>` in a linked DM |
@@ -52,7 +53,7 @@ Only `subject` and `body` are required.
 | Field | Values |
 | --- | --- |
 | `workspaceId` | A workspace you are a member of (else `403`). Omit for a personal ticket. |
-| `category` | `bug` · `question` · `access` · `billing` · `other` |
+| `category` | `bug` · `question` · `access` · `billing` · `feature_request` · `feedback` · `other` |
 | `severity` | `low` · `normal` · `high` · `blocker` (you cannot work at all) |
 | `client` | `ui` · `claude` · `chatgpt` · `mcp` · `api` · `slack` · `telegram` · `email` · `chat_agent` — defaults to `api` for token callers |
 | `requestId` | The `request_id` from the error response that brought you here |
@@ -76,6 +77,38 @@ Returns `201`:
 To see whether anyone answered, `GET` the `check_replies.path`: staff messages appear in
 `thread` with `author: "staff"`, and `status` turns `pending`. AI triage runs after the
 response and never blocks it.
+
+## Feedback, ideas and questions
+
+The same endpoint takes what is not a problem. Set `category`:
+
+| `category` | For |
+| --- | --- |
+| `feature_request` | Something ShareOut should do, or do better |
+| `feedback` | What worked, or what got in the way |
+| `question` | Something to ask the team |
+
+```bash
+curl -sS -X POST "$ORIGIN/v1/support/tickets" \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"category":"feedback","subject":"The verify step caught a broken chart before the client saw it",
+       "body":"Published a sales dashboard; verify flagged a JS error on phone width.","client":"claude"}'
+```
+
+The answer starts with `Thanks` instead of the support-queue line, and carries the same
+`ticket` and `check_replies`. Agents may send one on their own when ShareOut got in their way
+(a missing endpoint, an unhelpful error, wrong docs): keep it about ShareOut, with no personal
+or customer data, and tell the person. Through the connector, `send_feedback` does the same.
+`feature_request`, `feedback` and — from an API token — `question` share one budget per
+account across both: 10 an hour, then `429 RATE_LIMIT_EXCEEDED` with `Retry-After` (a retry
+with the same `idempotencyKey` does not count). Problems (`bug`, `access`, …) and questions
+people type in the app are never capped.
+
+Where it lands: the instance admins' queue (`/admin?view=support`, or
+`GET /v1/support/tickets?scope=all&category=feature_request`). Pick
+**feature_request** or **feedback** in the category filter to see only these. Triage drafts a
+reply like any ticket; nothing is sent until someone answers. A filed ticket with no category
+gets one from triage, from the same list.
 
 ## List tickets
 

@@ -13,6 +13,7 @@ export const reportProblemTool: AccountTool = {
   description:
     'Open a support ticket for the user so the ShareOut team sees it. Use it when the user is stuck, '
     + 'hits an error you cannot resolve, asks for a human, or reports a bug — do not leave them without a next step. '
+    + 'Also use it when the user wants to send the team an idea (category feature_request) or feedback (category feedback). '
     + 'Include what they were trying to do, what you already tried, and any error text. '
     + 'After it succeeds, tell the user in their own language that the team was notified and that the reply will '
     + 'show up in Help & support and by email.',

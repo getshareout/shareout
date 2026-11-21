@@ -16,6 +16,17 @@ Do not treat `getshareout/shareout-skill` as a second place to edit — that rep
 This file is the **use** skill (build & publish).  
 **Install / deploy** a new instance? → stop and load **[deploy/SKILL.md](deploy/SKILL.md)** first.
 
+> **Tell us how to make ShareOut better. We read every note.**
+> Whenever ShareOut gets in your way (something it can't do yet, a confusing error, a
+> missing tool, docs that were wrong) or the person has an idea, feedback or a question for
+> the team, send it. One call, no need to ask first:
+>
+> - **Connector:** `send_feedback` with `kind` (`feature_request` · `feedback` · `question`) and `summary`
+> - **REST:** `POST $ORIGIN/v1/support/tickets` with `{"category":"feature_request","subject":"…","body":"…"}`
+>
+> Keep it about ShareOut (no personal or customer data) and tell the person in one line that
+> you sent it. More in [Feedback, ideas and questions](#feedback-ideas-and-questions--tell-the-shareout-team).
+
 ---
 
 ## Talk to the user
@@ -437,6 +448,35 @@ would drop a file or overwrite a newer version is refused. Same limits as `POST 
 
 ---
 
+## Feedback, ideas and questions — tell the ShareOut team
+
+Not a problem, but worth saying? Send it. The team reads every one, and it goes to the same
+queue as support tickets, so nobody has to dig for it.
+
+- **The person has an idea, an opinion or a question** for the ShareOut team → send it, and
+  tell them in one line that you did.
+- **ShareOut got in your way** (something it can't do yet, an error that didn't help, docs
+  that were wrong or missing) → you may send it yourself. Keep it about ShareOut, with no
+  personal or customer data, and mention it to the person.
+
+Pick the kind: `feature_request` (something ShareOut should do or do better), `feedback`
+(what worked or got in the way) or `question` (something to ask the team).
+
+```bash
+curl -sS -X POST "$ORIGIN/v1/support/tickets" \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"category":"feature_request","subject":"Export a page to PDF",
+       "body":"The person sends this report to a client every Monday and prints it to PDF by hand.",
+       "client":"claude","locale":"es"}'
+```
+
+With the connector: `send_feedback` with `kind`, `summary`, `details` (and `artifact_id` when
+it's about one page). Something broke instead? That's a problem — use the ticket in
+[If you get stuck](#if-you-get-stuck) (or `report_problem`). Details:
+[api/support.md](api/support.md#feedback-ideas-and-questions).
+
+---
+
 ## Non-negotiable rules
 
 - Know the instance origin before authenticated calls (see §0); keep it in credentials.
@@ -449,4 +489,6 @@ would drop a file or overwrite a newer version is refused. Same limits as `POST 
 - Design taste on anything visual.
 - Speak the user's language, plainly, and end with the link ([Talk to the user](#talk-to-the-user)).
 - Never loop on an error: follow its `hint`, then file a support ticket ([If you get stuck](#if-you-get-stuck)).
+- ShareOut got in your way, or the person has an idea? Send it to the team — `send_feedback` or a
+  `feature_request` / `feedback` ticket ([Feedback, ideas and questions](#feedback-ideas-and-questions--tell-the-shareout-team)).
 - Deploy/install → [deploy/SKILL.md](deploy/SKILL.md); do not improvise Cloudflare setup without [deploy/cloudflare.md](deploy/cloudflare.md).
