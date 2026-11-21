@@ -168,7 +168,8 @@ export async function getAnalytics(
     // Daily aggregates, today's live (not yet aggregated) events, viewer tracking and
     // perf are independent: one D1 batch plus two parallel reads = one round trip.
     const todayStr = new Date().toISOString().split('T')[0];
-    const todayStart = Math.floor(new Date(todayStr).getTime() / 1000);
+    // analytics_events.created_at is ISO text: compare with an ISO string, never unix seconds.
+    const todayStart = `${todayStr}T00:00:00.000Z`;
 
     const [[dailyResult, todayTotalsResult, todayReferrersResult, todayCountriesResult], viewerTracking, perf] = await Promise.all([
       env.DB.batch([
@@ -331,6 +332,7 @@ export async function getAccountAnalytics(
   const now = Date.now();
   const todayStr = dayStr(now);
   const todayStart = Math.floor(new Date(todayStr).getTime() / 1000);
+  const todayIso = `${todayStr}T00:00:00.000Z`; // analytics_events.created_at is ISO text
   const startStr = dayStr(now - (days - 1) * UTC_DAY);
   const prevStartStr = dayStr(now - (2 * days - 1) * UTC_DAY);
 
@@ -342,7 +344,7 @@ export async function getAccountAnalytics(
         FROM analytics_daily WHERE artifact_id IN ${owned} AND date >= ? AND date < ?
         GROUP BY date ORDER BY date`).bind(...ownedParams, startStr, todayStr),
       env.DB.prepare(`SELECT COUNT(*) AS views, COUNT(DISTINCT visitor_hash) AS uniques
-        FROM analytics_events WHERE artifact_id IN ${owned} AND created_at >= ?`).bind(...ownedParams, todayStart),
+        FROM analytics_events WHERE artifact_id IN ${owned} AND created_at >= ?`).bind(...ownedParams, todayIso),
       env.DB.prepare(`SELECT COALESCE(SUM(views),0) AS views, COALESCE(SUM(unique_visitors),0) AS uniques
         FROM analytics_daily WHERE artifact_id IN ${owned} AND date >= ? AND date < ?`).bind(...ownedParams, prevStartStr, startStr),
       env.DB.prepare(`SELECT ad.artifact_id, a.name, COALESCE(d.slug, a.slug) AS slug,
@@ -354,12 +356,14 @@ export async function getAccountAnalytics(
         GROUP BY ad.artifact_id ORDER BY views DESC LIMIT 20`).bind(...ownedParams, startStr),
       env.DB.prepare(`SELECT artifact_id, COUNT(*) AS views, COUNT(DISTINCT visitor_hash) AS uniques
         FROM analytics_events WHERE artifact_id IN ${owned} AND created_at >= ?
-        GROUP BY artifact_id`).bind(...ownedParams, todayStart),
+        GROUP BY artifact_id`).bind(...ownedParams, todayIso),
       env.DB.prepare(`SELECT fcp, lcp, dcl, ttfb FROM artifact_perf
         WHERE artifact_id IN ${owned} AND created_at >= ? ORDER BY created_at DESC LIMIT 2000`)
         .bind(...ownedParams, new Date((todayStart - (days - 1) * 86400) * 1000).toISOString()),
-      env.DB.prepare(`SELECT COUNT(DISTINCT artifact_id) AS n FROM analytics_daily
-        WHERE artifact_id IN ${owned} AND date >= ?`).bind(...ownedParams, startStr),
+      env.DB.prepare(`SELECT COUNT(*) AS n FROM (
+          SELECT artifact_id FROM analytics_daily WHERE artifact_id IN ${owned} AND date >= ?
+          UNION SELECT artifact_id FROM analytics_events WHERE artifact_id IN ${owned} AND created_at >= ?)`)
+        .bind(...ownedParams, startStr, ...ownedParams, todayIso),
     ]);
 
     const dailyRows = (dailyRes.results || []) as Array<{ date: string; views: number; uniques: number; countries: string; referrers: string }>;
@@ -507,8 +511,10 @@ export async function aggregateDailyStats(env: Env): Promise<number> {
     cursor = { date: dateStr, lastArtifactId: '' };
   }
 
-  const startTs = Math.floor(new Date(cursor.date).getTime() / 1000);
-  const endTs = startTs + 86400;
+  // analytics_events.created_at is ISO text: bound the day with ISO strings. Unix seconds
+  // compare as text ('2026-…' < '1795…' is never true) and the day rolled up as empty.
+  const startTs = `${cursor.date}T00:00:00.000Z`;
+  const endTs = new Date(Date.parse(startTs) + 86400_000).toISOString();
 
   // Next bounded, contiguous slice of artifacts for this day. Ordering by artifact_id
   // makes the slice the range (lastArtifactId, sliceMax], which every aggregation
@@ -543,8 +549,8 @@ export async function aggregateDailyStats(env: Env): Promise<number> {
 async function aggregateArtifactRange(
   env: Env,
   dateStr: string,
-  startTs: number,
-  endTs: number,
+  startTs: string,
+  endTs: string,
   afterId: string,
   untilId: string
 ): Promise<void> {

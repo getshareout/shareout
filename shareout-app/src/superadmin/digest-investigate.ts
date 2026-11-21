@@ -152,8 +152,8 @@ export async function investigatePlatformMetrics(
     }
 
     case 'top_artifacts': {
-      const dayStart = Math.floor(new Date(`${date}T00:00:00.000Z`).getTime() / 1000);
-      const dayEnd = dayStart + 86_400;
+      const dayStart = `${date}T00:00:00.000Z`; // analytics_events.created_at is ISO text
+      const dayEnd = new Date(Date.parse(dayStart) + 86_400_000).toISOString();
       const [rollup, live] = await Promise.all([
         env.DB.prepare(
           `SELECT a.name, a.slug, a.artifact_type AS type, COALESCE(w.name, '') AS workspace,
