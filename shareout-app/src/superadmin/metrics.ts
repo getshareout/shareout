@@ -282,7 +282,7 @@ export async function getPlatformMetrics(env: Env, days = 30): Promise<PlatformM
   ]);
 
   // Add today's not-yet-aggregated events to the view totals.
-  const todayStart = Math.floor(new Date(new Date().toISOString().split('T')[0]).getTime() / 1000);
+  const todayStart = `${new Date().toISOString().split('T')[0]}T00:00:00.000Z`; // created_at is ISO text
   const todayViews = await env.DB.prepare(
     "SELECT COUNT(*) AS views, COUNT(DISTINCT visitor_hash) AS visitors FROM analytics_events WHERE event_type = 'view' AND created_at >= ?"
   ).bind(todayStart).first<{ views: number; visitors: number }>();

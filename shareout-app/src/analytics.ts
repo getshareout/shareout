@@ -168,7 +168,8 @@ export async function getAnalytics(
     // Daily aggregates, today's live (not yet aggregated) events, viewer tracking and
     // perf are independent: one D1 batch plus two parallel reads = one round trip.
     const todayStr = new Date().toISOString().split('T')[0];
-    const todayStart = Math.floor(new Date(todayStr).getTime() / 1000);
+    // analytics_events.created_at is ISO text: compare with an ISO string, never unix seconds.
+    const todayStart = `${todayStr}T00:00:00.000Z`;
 
     const [[dailyResult, todayTotalsResult, todayReferrersResult, todayCountriesResult], viewerTracking, perf] = await Promise.all([
       env.DB.batch([
@@ -331,6 +332,7 @@ export async function getAccountAnalytics(
   const now = Date.now();
   const todayStr = dayStr(now);
   const todayStart = Math.floor(new Date(todayStr).getTime() / 1000);
+  const todayIso = `${todayStr}T00:00:00.000Z`; // analytics_events.created_at is ISO text
   const startStr = dayStr(now - (days - 1) * UTC_DAY);
   const prevStartStr = dayStr(now - (2 * days - 1) * UTC_DAY);
 
@@ -342,7 +344,7 @@ export async function getAccountAnalytics(
         FROM analytics_daily WHERE artifact_id IN ${owned} AND date >= ? AND date < ?
         GROUP BY date ORDER BY date`).bind(...ownedParams, startStr, todayStr),
       env.DB.prepare(`SELECT COUNT(*) AS views, COUNT(DISTINCT visitor_hash) AS uniques
-        FROM analytics_events WHERE artifact_id IN ${owned} AND created_at >= ?`).bind(...ownedParams, todayStart),
+        FROM analytics_events WHERE artifact_id IN ${owned} AND created_at >= ?`).bind(...ownedParams, todayIso),
       env.DB.prepare(`SELECT COALESCE(SUM(views),0) AS views, COALESCE(SUM(unique_visitors),0) AS uniques
         FROM analytics_daily WHERE artifact_id IN ${owned} AND date >= ? AND date < ?`).bind(...ownedParams, prevStartStr, startStr),
       env.DB.prepare(`SELECT ad.artifact_id, a.name, COALESCE(d.slug, a.slug) AS slug,
@@ -354,12 +356,14 @@ export async function getAccountAnalytics(
         GROUP BY ad.artifact_id ORDER BY views DESC LIMIT 20`).bind(...ownedParams, startStr),
       env.DB.prepare(`SELECT artifact_id, COUNT(*) AS views, COUNT(DISTINCT visitor_hash) AS uniques
         FROM analytics_events WHERE artifact_id IN ${owned} AND created_at >= ?
-        GROUP BY artifact_id`).bind(...ownedParams, todayStart),
+        GROUP BY artifact_id`).bind(...ownedParams, todayIso),
       env.DB.prepare(`SELECT fcp, lcp, dcl, ttfb FROM artifact_perf
         WHERE artifact_id IN ${owned} AND created_at >= ? ORDER BY created_at DESC LIMIT 2000`)
         .bind(...ownedParams, new Date((todayStart - (days - 1) * 86400) * 1000).toISOString()),
-      env.DB.prepare(`SELECT COUNT(DISTINCT artifact_id) AS n FROM analytics_daily
-        WHERE artifact_id IN ${owned} AND date >= ?`).bind(...ownedParams, startStr),
+      env.DB.prepare(`SELECT COUNT(*) AS n FROM (
+          SELECT artifact_id FROM analytics_daily WHERE artifact_id IN ${owned} AND date >= ?
+          UNION SELECT artifact_id FROM analytics_events WHERE artifact_id IN ${owned} AND created_at >= ?)`)
+        .bind(...ownedParams, startStr, ...ownedParams, todayIso),
     ]);
 
     const dailyRows = (dailyRes.results || []) as Array<{ date: string; views: number; uniques: number; countries: string; referrers: string }>;
@@ -499,16 +503,25 @@ interface AggCursor {
 export async function aggregateDailyStats(env: Env): Promise<number> {
   let cursor = await loadAggCursor(env);
   if (!cursor) {
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    const dateStr = utcDateString(yesterday);
-    // Already rolled up by a prior tick — nothing to do.
-    if (await isDayAggregated(env, dateStr)) return 0;
-    cursor = { date: dateStr, lastArtifactId: '' };
+    // A day marked done with nothing counted goes first: its raw events are the next
+    // ones cleanupOldEvents deletes.
+    const uncounted = await findUncountedDay(env);
+    if (uncounted) {
+      cursor = { date: uncounted, lastArtifactId: '' };
+    } else {
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      const dateStr = utcDateString(yesterday);
+      // Already rolled up by a prior tick — nothing to do.
+      if (await isDayAggregated(env, dateStr)) return 0;
+      cursor = { date: dateStr, lastArtifactId: '' };
+    }
   }
 
-  const startTs = Math.floor(new Date(cursor.date).getTime() / 1000);
-  const endTs = startTs + 86400;
+  // analytics_events.created_at is ISO text: bound the day with ISO strings. Unix seconds
+  // compare as text ('2026-…' < '1795…' is never true) and the day rolled up as empty.
+  const startTs = `${cursor.date}T00:00:00.000Z`;
+  const endTs = new Date(Date.parse(startTs) + 86400_000).toISOString();
 
   // Next bounded, contiguous slice of artifacts for this day. Ordering by artifact_id
   // makes the slice the range (lastArtifactId, sliceMax], which every aggregation
@@ -543,8 +556,8 @@ export async function aggregateDailyStats(env: Env): Promise<number> {
 async function aggregateArtifactRange(
   env: Env,
   dateStr: string,
-  startTs: number,
-  endTs: number,
+  startTs: string,
+  endTs: string,
   afterId: string,
   untilId: string
 ): Promise<void> {
@@ -671,6 +684,25 @@ async function isDayAggregated(env: Env, dateStr: string): Promise<boolean> {
     `SELECT 1 AS present FROM analytics_agg_state WHERE date = ?`
   ).bind(dateStr).first<{ present: number }>();
   return !!row;
+}
+
+// A recent past day watermarked in analytics_agg_state with raw events but no analytics_daily
+// row — what the rollup left while it bound unix seconds against the ISO created_at (it
+// matched no rows and still marked the day done). Oldest first; only the last week, since
+// cleanupOldEvents removes a watermarked day's raw events after two days. Indexed lookups on
+// a handful of rows, so it is cheap on every idle tick.
+async function findUncountedDay(env: Env): Promise<string | null> {
+  const now = Date.now();
+  const row = await env.DB.prepare(`
+    SELECT s.date AS date FROM analytics_agg_state s
+    WHERE s.date >= ?1 AND s.date < ?2
+      AND NOT EXISTS (SELECT 1 FROM analytics_daily d WHERE d.date = s.date)
+      AND EXISTS (SELECT 1 FROM analytics_events e
+                  WHERE e.created_at >= s.date || 'T00:00:00.000Z'
+                    AND e.created_at < date(s.date, '+1 day') || 'T00:00:00.000Z')
+    ORDER BY s.date LIMIT 1
+  `).bind(utcDateString(new Date(now - 7 * 86400_000)), utcDateString(new Date(now))).first<{ date: string }>();
+  return row?.date || null;
 }
 
 // After a day completes, point the cursor at the next still-past, not-yet-aggregated

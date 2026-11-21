@@ -127,12 +127,13 @@ export function defaultReportDate(d = new Date()): string {
   return y.toISOString().slice(0, 10);
 }
 
-function dayStartUnix(date: string): number {
-  return Math.floor(new Date(`${date}T00:00:00.000Z`).getTime() / 1000);
+// analytics_events.created_at is ISO text: day bounds are ISO strings, never unix seconds.
+function dayStartIso(date: string): string {
+  return `${date}T00:00:00.000Z`;
 }
 
-function dayEndUnix(date: string): number {
-  return dayStartUnix(date) + 86_400;
+function dayEndIso(date: string): string {
+  return new Date(Date.parse(dayStartIso(date)) + 86_400_000).toISOString();
 }
 
 async function scalarOnDay(
@@ -214,8 +215,8 @@ export async function getDailyPlatformDigest(
   prior.setUTCDate(prior.getUTCDate() - 1);
   const priorDate = prior.toISOString().slice(0, 10);
   const hourPrefix = `${reportDate}T`;
-  const dayStart = dayStartUnix(reportDate);
-  const dayEnd = dayEndUnix(reportDate);
+  const dayStart = dayStartIso(reportDate);
+  const dayEnd = dayEndIso(reportDate);
   // Month-to-date window: first of the report month through the report day (inclusive).
   const monthStart = `${reportDate.slice(0, 7)}-01`;
   const daysElapsed = parseInt(reportDate.slice(8, 10), 10) || 1;
