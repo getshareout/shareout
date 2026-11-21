@@ -98,8 +98,10 @@ curl -sS -X POST "$ORIGIN/v1/support/tickets" \
 The answer starts with `Thanks` instead of the support-queue line, and carries the same
 `ticket` and `check_replies`. Agents may send one on their own when ShareOut got in their way
 (a missing endpoint, an unhelpful error, wrong docs): keep it about ShareOut, with no personal
-or customer data, and tell the person. Through the connector, `send_feedback` does the same
-(10 an hour per account).
+or customer data, and tell the person. Through the connector, `send_feedback` does the same.
+`feature_request` and `feedback` share one budget per account across both: 10 an hour, then
+`429 RATE_LIMIT_EXCEEDED` with `Retry-After` (a retry with the same `idempotencyKey` does not
+count). Problems (`bug`, `access`, …) are never capped.
 
 Where it lands: the instance admins' queue (`/admin?view=support`, or
 `GET /v1/support/tickets?scope=all&category=feature_request`). Pick

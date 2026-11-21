@@ -15,6 +15,7 @@ import { deliverReply } from '../../support/deliver';
 import { ingestSupportEmail } from '../../support/email-ingest';
 import { dispatchLifecycleEmail } from '../../email/gateway';
 import { alertOperator } from '../../support/alert';
+import { checkSendFeedbackLimit, rateLimitResponse } from '../../rate-limit';
 
 // Agent tokens may file and read their own tickets; workspace-scoped filing checks
 // `auth.service.workspaceId` below.
@@ -128,6 +129,12 @@ export async function routeSupportApi(ctx: FetchContext): Promise<Response | nul
       if (idempotencyKey) {
         const existing = await findByIdempotencyKey(ctx.env, auth.id, idempotencyKey);
         if (existing) return cors(jsonResponse(created(existing, true)));
+      }
+      // Agents may send ideas and feedback on their own, and each one pings the operator:
+      // one hourly budget per account, shared with the MCP send_feedback tool. Problems stay uncapped.
+      if (FEEDBACK_CATEGORIES.includes(body.category as TicketCategory)) {
+        const rl = await checkSendFeedbackLimit(ctx.env, auth.id);
+        if (!rl.allowed) return cors(rateLimitResponse(rl));
       }
       // Token caller → programmatic (skill); session caller → in-app UI.
       const viaToken = !!request.headers.get('authorization');
