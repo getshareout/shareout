@@ -3,16 +3,10 @@ import type { HomeLocaleCopy } from '../types';
 /** Datasets, connectors, library, crew, schedules, alerts, artifacts, and catalog copy. */
 export const WORKSPACE_COPY: HomeLocaleCopy = {
   en: {
-    'activity.allCaughtUp': 'All caught up. Nothing new since you were away.',
-    'activity.needsYou': '{n} need you',
-    'activity.needsYouPlural': '{n} needs you',
     'activity.noRecentRuns': 'No recent runs.',
     'activity.nothingForYou': 'Nothing to surface yet.',
     'activity.nothingNeedsYou': 'Nothing needs you right now.',
     'activity.recentEmpty': 'Pages you open show up here.',
-    'activity.sinceAway': 'Since you were away: {summary}.',
-    'activity.update': '{n} update',
-    'activity.updates': '{n} updates',
     'alerts.intro': 'Get pinged when a number moves — a spike in views, a drop in a metric, a threshold crossed. Start one in chat, or build it step by step.',
     'alerts.prefillChat': 'Set up an alert that pings me when ',
     'alerts.prefillStep': 'Walk me through creating a metric alert step by step: pick a page, a metric, a condition (above/below a threshold) and how often to check.',
@@ -500,16 +494,10 @@ export const WORKSPACE_COPY: HomeLocaleCopy = {
     'sched.viewAllRuns': 'View all runs \u2192',
   },
   es: {
-    'activity.allCaughtUp': 'Al día. Nada nuevo desde tu última visita.',
-    'activity.needsYou': '{n} te necesitan',
-    'activity.needsYouPlural': '{n} te necesita',
     'activity.noRecentRuns': 'Sin ejecuciones recientes.',
     'activity.nothingForYou': 'Todavía no hay nada para mostrar.',
     'activity.nothingNeedsYou': 'Nada te necesita por ahora.',
     'activity.recentEmpty': 'Los artefactos que abras van a aparecer acá.',
-    'activity.sinceAway': 'Desde tu última visita: {summary}.',
-    'activity.update': '{n} actualización',
-    'activity.updates': '{n} actualizaciones',
     'alerts.intro': 'Recibí avisos cuando cambia un número — un pico de vistas, una caída en una métrica, un umbral cruzado. Arrancá una desde el chat o configurala paso a paso.',
     'alerts.prefillChat': 'Creá una alerta que me avise cuando ',
     'alerts.prefillStep': 'Guiame paso a paso para crear una alerta de métrica: elegir un artefacto, una métrica, una condición (por encima/debajo de un umbral) y cada cuánto revisar.',

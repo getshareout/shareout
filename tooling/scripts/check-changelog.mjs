@@ -135,6 +135,13 @@ async function main() {
 		}
 	}
 
+	// 1b. Home's "What's new in ShareOut" card is generated from the same notes.
+	const whatsNew = join(root, 'shareout-app', 'scripts', 'gen-whats-new.mjs');
+	if (existsSync(whatsNew)) {
+		try { execFileSync(process.execPath, [whatsNew, '--check'], { cwd: join(root, 'shareout-app'), stdio: 'inherit' }); }
+		catch { failed = true; }
+	}
+
 	// 2. The branch ships its words.
 	const base = process.env.SHAREOUT_TEST_BASE || 'origin/main';
 	let mergeBase = '';

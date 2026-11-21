@@ -1,18 +1,10 @@
 /** Activity feed, Brief widgets, and tile/table artifact widgets. */
 export const workspace_client_activity_feed_JS = `  // ===== activity feed + brief widgets =====
-  var recentItems = [], homeLoaded = {}, forYouIds = {};
-  // Whole Home empty: one sentence + one action, only once every source has answered.
-  function syncHomeEmpty() {
-    var em = document.getElementById('wsxHomeEmpty'); if (!em) return;
-    var allIn = homeLoaded.foryou && homeLoaded.recent && homeLoaded.feed;
-    var any = document.querySelector('#wsxBrief .wsx-widget:not(.is-empty-hidden)');
-    em.hidden = !(allIn && !any);
-    var b = em.querySelector('[data-art-first]'); if (b) b.hidden = !(typeof newBtn !== 'undefined' && newBtn);
-  }
+  var recentItems = [], homeLoaded = {};
   // Grouped row: same event repeated (kind|artifact|actor) collapses to one with an Nx count.
-  function evRow(g, dismissable) {
+  // actLabel: what the row's button says (Reply, Review, Open) — the whole row is the link.
+  function evRow(g, dismissable, actLabel) {
     var e = g.e || g; var count = g.count || 1; var ids = g.ids ? g.ids.join(',') : e.id; var ts = g.ts || e.ts;
-    var ic = e.actor_picture ? '<img src="' + esc(e.actor_picture) + '" alt="">' : (KIND_ICON[e.kind] || '\\u2022');
     var top = e.actor ? esc(e.actor) : esc(e.artifact_name || (e.kind === 'unused_artifacts' ? t('evt.cleanup') : ''));
     var sum = e.actor && e.artifact_name ? (esc(e.summary) + ' \\u00B7 ' + esc(e.artifact_name)) : esc(e.summary);
     if (count > 1) sum += ' \\u00B7 ' + count + '\\u00D7';
@@ -22,22 +14,34 @@ export const workspace_client_activity_feed_JS = `  // ===== activity feed + bri
     var janOk = e.kind === 'unused_artifacts' && ((window.WSX_ADMIN && e.workspaceId) || (!window.WSX_WS && !e.workspaceId));
     var act = janOk
       ? '<button type="button" class="so-c-btn so-c-btn--secondary so-c-btn--sm" data-unused-archive="' + esc(e.workspaceId || '') + '" data-unused-n="' + (e.count || 0) + '">' + esc(t('evt.archiveAll')) + '</button>'
-      : '';
+      : (actLabel ? '<span class="wsx-ev__go">' + esc(actLabel) + '</span>' : '');
     // Workspace-level cards (unused pages, files) carry no artifact slug — route them to /home.
     var href = e.slug ? '/a/' + encodeURIComponent(e.slug) + '/' : '/home';
     return '<a class="wsx-ev" data-kind="' + esc(e.kind) + '" data-name="' + esc(e.artifact_name) + '" data-id="' + esc(e.artifact_id) + '" href="' + href + '">'
-      + '<span class="wsx-ev__ic">' + ic + '</span>'
+      + iconChip(e, 'wsx-ev__ic')
       + '<span class="wsx-ev__main"><span class="wsx-ev__top">' + top + '</span><span class="wsx-ev__sum">' + sum + '</span></span>'
       + act
       + '<span class="wsx-ev__time">' + timeAgo(ts) + '</span>' + x + '</a>';
   }
-  // Group duplicate events (same as the Activity panel) so 4× "sheets_append failed" is one row.
-  function fill(id, rows, empty, dismissable) {
-    var el = document.getElementById(id); if (!el) return;
-    var groups = groupFeed(rows);
-    var wdg = el.closest('.wsx-widget'); if (wdg) wdg.classList.toggle('is-empty-hidden', !groups.length);
-    el.innerHTML = groups.length ? groups.map(function (g) { return evRow(g, dismissable); }).join('') : '<div class="wsx-empty">' + empty + '</div>';
+  // Needs you on Home: fresh items only (older than two weeks stay in the bell), each with
+  // the action it asks for. Returns how many are shown, for the line under the greeting.
+  var NEEDS_FRESH_MS = 14 * 864e5;
+  function needsAct(k) {
+    if (k === 'comment' || k === 'reply' || k === 'mention' || k === 'message') return t('home.actReply');
+    if (k === 'access' || k === 'admin_request') return t('home.actReview');
+    return t('home.actOpen');
   }
+  function renderNeeds() {
+    var el = document.getElementById('wsxNeedsYou'); if (!el) return 0;
+    var now = Date.now();
+    var groups = groupFeed(needsEvents).filter(function (g) { return now - (g.ts < 1e12 ? g.ts * 1000 : g.ts) < NEEDS_FRESH_MS; });
+    var n = document.getElementById('wsxNeedsN'); if (n) { n.hidden = !groups.length; n.textContent = String(groups.length); }
+    el.innerHTML = groups.length
+      ? groups.slice(0, 4).map(function (g) { return evRow(g, true, needsAct(g.e.kind)); }).join('')
+      : '<div class="wsx-empty wsx-empty--calm">' + esc(t('activity.nothingNeedsYou')) + '</div>';
+    return groups.length;
+  }
+  var WIN_LABEL = { today: 'inspector.today', '7d': 'inspector.win7d', '30d': 'inspector.win30d' };
   // Two-surface feed: actionable Needs You (individual, dismissable) + aggregated Pulse.
   // The first (boot) response is kept in feedBoot so the notifications bell primes its
   // badge from it instead of issuing a second /v1/home/activity-feed at boot.
@@ -52,20 +56,12 @@ export const workspace_client_activity_feed_JS = `  // ===== activity feed + bri
       .then(function (d) {
         needsEvents = (d && d.needs) || [];
         pulseEvents = (d && d.pulse) || [];
+        homeLoaded.feed = true;
         renderActivity();
-        fill('wsxNeedsYou', needsEvents, t('activity.nothingNeedsYou'), true);
-        homeLoaded.feed = true; syncHomeEmpty();
-        var nEl = document.getElementById('wsxNarration');
-        if (nEl) {
-          var bits = [];
-          var needN = groupFeed(needsEvents).length, pulseN = pulseEvents.length;
-          if (needN) bits.push(t(needN === 1 ? 'activity.needsYouPlural' : 'activity.needsYou').replace('{n}', String(needN)));
-          if (pulseN) bits.push(t(pulseN === 1 ? 'activity.update' : 'activity.updates').replace('{n}', String(pulseN)));
-          nEl.innerHTML = bits.length ? esc(t('activity.sinceAway').replace('{summary}', bits.join(', ')))
-            : '<span class="muted">' + esc(t('activity.allCaughtUp')) + '</span>';
-        }
+        renderBriefLine(renderNeeds());
+        var pw = document.getElementById('wsxPulseWin'); if (pw) pw.textContent = t(WIN_LABEL[WSX_WIN || '7d'] || 'inspector.win7d');
       })
-      .catch(function () { homeLoaded.feed = true; syncHomeEmpty(); });
+      .catch(function () { homeLoaded.feed = true; renderActivity(); renderBriefLine(renderNeeds()); });
   }
   loadFeed();
   wireActivityControls();
@@ -108,7 +104,17 @@ export const workspace_client_activity_feed_JS = `  // ===== activity feed + bri
       return '<span class="wsx-tr__' + c[0] + '"' + own + tip + '>' + (c[1] ? esc(t(c[1])) : '') + '</span>';
     }).join('') + '</div>';
   }
-  function widgetView(id) { try { return localStorage.getItem(VIEW_LS + id) === 'table' ? 'table' : 'tile'; } catch (e) { return 'tile'; } }
+  // Home's Your artifacts panes share one tile/table choice (stored under For you's key).
+  var ARTS_IDS = { wsxRecentArts: 1, wsxForYou: 1, wsxFavArts: 1, wsxSharedArts: 1 };
+  function widgetView(id) { try { return localStorage.getItem(VIEW_LS + (ARTS_IDS[id] ? 'wsxForYou' : id)) === 'table' ? 'table' : 'tile'; } catch (e) { return 'tile'; } }
+  // Small tiles carry their time as data-ts (D1 "YYYY-MM-DD HH:MM:SS" is UTC); show it as "3h".
+  function fillTimes(root) {
+    root.querySelectorAll('[data-ts]').forEach(function (x) {
+      var v = x.getAttribute('data-ts') || '';
+      var ms = /^\\d+$/.test(v) ? Number(v) : Date.parse(/^\\d{4}-\\d\\d-\\d\\d \\d/.test(v) ? v.replace(' ', 'T') + 'Z' : v);
+      x.textContent = isNaN(ms) ? '' : timeAgo(ms);
+    });
+  }
   function renderArtView(id) {
     var el = document.getElementById(id); var d = ART_DATA[id]; if (!el || !d) return;
     var head = d.folderHead || '';
@@ -118,10 +124,12 @@ export const workspace_client_activity_feed_JS = `  // ===== activity feed + bri
         : '<div class="wsx-empty">' + esc(d.empty || t('common.nothingHere')) + '</div>')
       : (widgetView(id) === 'table'
         ? '<div class="wsx-tbl wsx-tbl--art">' + tblHead(d.sort) + (d.rowsHtml || '') + '</div>'
+        : d.miniHtml != null ? '<div class="wsx-minis">' + d.miniHtml + '</div>'
         : (d.foldersHtml ? '<div class="wsx-art-folders">' + d.foldersHtml + '</div>' : '')
           + (d.cardsHtml ? '<div class="artifacts-grid">' + d.cardsHtml + '</div>' : ''));
     el.innerHTML = head + body;
     localizeFragment(el);
+    fillTimes(el);
     hidePendingArts(el);
   }
   function syncViewSeg(id) {
@@ -137,26 +145,24 @@ export const workspace_client_activity_feed_JS = `  // ===== activity feed + bri
     var id = seg.getAttribute('data-viewseg-for'); var mode = btn.getAttribute('data-vw');
     try { localStorage.setItem(VIEW_LS + id, mode); } catch (_) {}
     seg.querySelectorAll('[data-vw]').forEach(function (x) { x.classList.toggle('is-on', x === btn); });
-    renderArtView(id);
+    (ARTS_IDS[id] ? Object.keys(ARTS_IDS) : [id]).forEach(renderArtView);
   });
   function fillCardWidget(id, url, empty) {
     fetch(url, { credentials: 'same-origin' })
       .then(function (r) { return r.json(); })
       .then(function (d) {
-        ART_DATA[id] = { cardsHtml: d && d.cardsHtml, rowsHtml: d && d.rowsHtml, count: (d && d.count) || 0, empty: empty };
-        if (id === 'wsxForYou') { forYouIds = {}; ((d && d.ids) || []).forEach(function (x) { forYouIds[x] = 1; }); if (typeof renderActivity === 'function') renderActivity(); }
-        var wdg = document.getElementById(id).closest('.wsx-widget'); if (wdg) wdg.classList.toggle('is-empty-hidden', !ART_DATA[id].count);
+        ART_DATA[id] = { cardsHtml: d && d.cardsHtml, rowsHtml: d && d.rowsHtml, miniHtml: (d && d.miniHtml) || '', count: (d && d.count) || 0, empty: empty };
         renderArtView(id);
-        homeLoaded.foryou = true; syncHomeEmpty();
+        homeLoaded.foryou = true;
       })
-      .catch(function () { homeLoaded.foryou = true; syncHomeEmpty(); });
+      .catch(function () { homeLoaded.foryou = true; ART_DATA[id] = { miniHtml: '', rowsHtml: '', count: 0, empty: empty }; renderArtView(id); });
   }
   var homeWsq = window.WSX_WS ? '&workspace=' + encodeURIComponent(window.WSX_WS) : '';
-  fillCardWidget('wsxForYou', '/v1/home/for-you?limit=8' + homeWsq, t('activity.nothingForYou'));
-  fetch('/v1/home/recent?limit=8' + homeWsq, { credentials: 'same-origin' })
+  fillCardWidget('wsxForYou', '/v1/home/for-you?limit=9' + homeWsq, t('activity.nothingForYou'));
+  fetch('/v1/home/recent?limit=12' + homeWsq, { credentials: 'same-origin' })
     .then(function (r) { return r.json(); })
-    .then(function (d) { recentItems = (d && d.items) || []; })
-    .catch(function () {})
-    .then(function () { homeLoaded.recent = true; renderActivity(); });
+    .then(function (d) { recentItems = (d && d.items) || []; ART_DATA.wsxRecentArts = { miniHtml: (d && d.miniHtml) || '', rowsHtml: (d && d.rowsHtml) || '', count: (d && d.count) || 0, empty: t('home.noRecent') }; })
+    .catch(function () { ART_DATA.wsxRecentArts = { miniHtml: '', rowsHtml: '', count: 0, empty: t('home.noRecent') }; })
+    .then(function () { homeLoaded.recent = true; renderArtView('wsxRecentArts'); briefArtsDefault(recentItems.length); });
 
 `;

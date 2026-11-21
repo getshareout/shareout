@@ -17,25 +17,32 @@ AI tasks, Data, Knowledge, Catalog and Admin appear inside a team workspace.
 
 Rails and panes are resizable; widths are remembered in your browser.
 
-## Home — Needs you, For you, Recent
+## Home
 
-**Home** is a calm, fixed page. A line at the top sums up what happened since you were
-away (or says you're all caught up). Under it, up to three lists:
+**Home** fits what matters on one screen. At the top: a greeting, today's date and how many
+things are waiting on you, and a box to **ask your workspace or make something** — type and
+press Enter to send it to the assistant, or pick **Table from an Excel file** or **Upload
+files**. The sparkle at the start of the box opens the chat; a dot on it means a reply is
+waiting. Under it, cards:
 
-| List | What it shows |
+| Card | What it shows |
 | --- | --- |
-| **Needs you** | Rows that need action: unresolved comments or replies (not yours), shares to you, access requests, metric alerts and watches, failed tests, failed job or AI task runs, and more. **×** dismisses a row |
-| **For you** | Pages picked for you |
-| **Recent** | Pages you opened and recent activity (publishes, comments, runs) in one list, newest first |
+| **Your artifacts** | Small tiles with a preview: **Recent** (what you opened), **For you**, **Favorites** and **Shared with me**. **See all** opens Artifacts |
+| **Needs you** | What is waiting on you from the last two weeks, each with its button (**Review**, **Reply**, **Open**): comments and replies, mentions, access requests, alerts, failed runs and more. **×** dismisses a row; **See all** opens the bell, where older items stay |
+| **In your workspace** | What happened lately: publishes, data that updated by itself, failed deliveries, new members |
+| **This week** | Views of the artifacts you made, by day and against last week, how many people opened them and the most viewed one. **Analytics** has the detail |
+| **What's new in ShareOut** | The latest changes, each linked to its entry in [What's new](/whats-new/) |
+| **All your artifacts** | Below the first screen: your artifacts as a table, newest first |
 
-A list with nothing in it is hidden — **Needs you** only shows up when something is
-waiting on you. When all three are empty, Home shows **Create your first page** instead.
+Every card keeps its place when it is empty and says so in one line. On a phone, **Needs
+you** comes first and the tiles slide sideways.
 
 The **More** menu (**⋯**, top right of Home) holds the rest:
 
-- **Customize** — drag the lists to reorder them and resize them from the corner, then
+- **Customize** — drag the cards to reorder them, resize them from the corner (a third, two
+  thirds or the full width), and switch **Your artifacts** between tiles and a table; then
   **Done**. The layout is saved in your browser.
-- **Today**, **7d**, **30d** — how far back the activity in **Recent** goes.
+- **Today**, **7d**, **30d** — how far back **In your workspace** goes.
 - **Activity visibility** (owners and admins) — who sees each event kind (see
   [Workspace admin → Activity visibility](/teams/admin/#activity-visibility)).
 

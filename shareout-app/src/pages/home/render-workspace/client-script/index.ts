@@ -29,6 +29,7 @@ import { workspace_client_onboarding_JS } from './onboarding';
 import { workspace_client_create_ai_JS } from './create-ai';
 import { workspace_client_new_menu_JS } from './new-menu';
 import { workspace_client_drop_import_JS } from './drop-import';
+import { workspace_client_home_brief_JS } from './home-brief';
 import { workspace_client_doc_moves_JS } from './doc-moves';
 import { workspace_client_widget_layout_JS } from './widget-layout';
 import { workspace_client_account_menu_JS } from './account-menu';
@@ -70,6 +71,7 @@ export const WORKSPACE_CLIENT = [
   workspace_client_create_ai_JS,
   workspace_client_new_menu_JS,
   workspace_client_drop_import_JS,
+  workspace_client_home_brief_JS,
   workspace_client_doc_moves_JS,
   workspace_client_widget_layout_JS,
   workspace_client_account_menu_JS,

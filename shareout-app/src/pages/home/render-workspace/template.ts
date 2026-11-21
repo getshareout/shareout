@@ -6,7 +6,8 @@ import { brandLockupHtml, brandMarkImg } from '../../../brand';
 import { parseBranding } from '../../../workspaces/branding';
 import type { RenderArgs } from '../types';
 import { ICON } from './constants';
-import { railNav, svg, widget, viewSeg } from './helpers';
+import { railNav, svg, briefCard, viewSeg } from './helpers';
+import { WHATS_NEW } from '../whats-new-data';
 import { homeLangSwitchHtml } from '../home-i18n/lang-switch';
 import { adminNavHtml } from './admin-nav';
 import type { NavItem, NavGroup } from './constants';
@@ -56,6 +57,9 @@ function railHtml(groups: NavGroup[], hidden: string[]): string {
 /** Builds the static workspace DOM inserted into the page body. */
 export function buildWorkspaceBody(args: RenderArgs): string {
   const name = args.userInfo?.name || 'You';
+  // Greet by first name; a name that is really an email handle (ana.ruiz, jdoe42) is left out.
+  const rawName = (args.userInfo?.name || '').trim();
+  const firstName = /[@._\d]/.test(rawName) ? '' : rawName.split(/\s+/)[0] || '';
   const initial = escapeHtml((name[0] || 'Y').toUpperCase());
   const avatar = args.userInfo?.picture
     ? `<img class="wsx__avatar" src="${escapeHtml(args.userInfo.picture)}" alt="">`
@@ -131,7 +135,16 @@ export function buildWorkspaceBody(args: RenderArgs): string {
         <div class="wsx__pane is-active" data-pane="home" id="wsxHomePane">
           <div class="wsx__view is-active" data-view="brief">
             <div class="wsx__homehead">
-              <p class="wsx__narration" id="wsxNarration"><span class="muted" data-i18n="narration.reading">Reading your workspace…</span></p>
+              <div class="wsx-hello">
+                <h1 class="wsx-hello__t" id="wsxHello" data-name="${escapeHtml(firstName)}">${escapeHtml(firstName ? `Hello, ${firstName}` : 'Hello')}</h1>
+                <p class="wsx__narration" id="wsxNarration"><span class="muted" data-i18n="narration.reading">Reading your workspace…</span></p>
+              </div>
+              <form class="wsx-hero" id="wsxHero" autocomplete="off">
+                <button class="wsx-hero__chat" type="button" data-hero="chat" data-i18n-aria="composer.pill" data-i18n-title="composer.pill" aria-label="Ask your workspace…" title="Ask your workspace…">${svg(ICON.foryou)}</button>
+                <input class="wsx-hero__in" id="wsxHeroAsk" type="text" data-i18n-placeholder="home.heroPlaceholder" placeholder="Ask your workspace or make something…" data-i18n-aria="composer.ask" aria-label="Ask your workspace" enterkeyhint="send">
+                ${canCreateHere(args) ? `<button class="wsx-hero__chip" type="button" data-hero="table">${svg('<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 4v16"/>')}<span data-i18n="new.table">Table from an Excel file</span></button><button class="wsx-hero__chip" type="button" data-hero="upload">${svg('<path d="M12 16V4M6 10l6-6 6 6M4 20h16"/>')}<span data-i18n="new.upload">Upload files</span></button>` : ''}
+                <button class="wsx-hero__go" type="submit" data-i18n-aria="composer.send" data-i18n-title="composer.send" aria-label="Send" title="Send">${svg('<path d="M5 12h14M13 6l6 6-6 6"/>')}</button>
+              </form>
               <div class="wsx__more">
                 <button class="wsx__morebtn" id="wsxHomeMore" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="wsxHomeMenu" data-i18n-title="home.more" data-i18n-aria="home.more" title="More" aria-label="More">${svg('<circle cx="5" cy="12" r="1.2"/><circle cx="12" cy="12" r="1.2"/><circle cx="19" cy="12" r="1.2"/>')}</button>
                 <div class="wsx__morem" id="wsxHomeMenu" role="menu" hidden>
@@ -146,11 +159,33 @@ export function buildWorkspaceBody(args: RenderArgs): string {
             </div>
             <div class="wsx__evsettings" id="wsxEvSettings" hidden></div>
             <div class="wsx__brief" id="wsxBrief">
-              ${widget('wsxNeedsYou', 'widget.needsYou', 'Needs you', 'shared', true)}
-              ${widget('wsxForYou', 'widget.forYou', 'For you', 'foryou', true, true)}
-              ${widget('wsxRecentW', 'widget.recent', 'Recent', 'recent', true)}
+              ${briefCard({ wid: 'wsxArtsW', titleKey: 'home.arts', title: 'Your artifacts', icon: 'browse', span: 2,
+                head: `<div class="wsx-arts__tabs" role="tablist" data-i18n-aria="home.arts" aria-label="Your artifacts">
+                  <button type="button" role="tab" class="is-on" aria-selected="true" data-arts-tab="recent" data-i18n="filter.recent">Recent</button>
+                  <button type="button" role="tab" aria-selected="false" data-arts-tab="foryou" data-i18n="widget.forYou">For you</button>
+                  <button type="button" role="tab" aria-selected="false" data-arts-tab="favorites" data-i18n="filter.favorites">Favorites</button>
+                  <button type="button" role="tab" aria-selected="false" data-arts-tab="shared" data-i18n="filter.shared">Shared with me</button>
+                </div>${viewSeg('wsxForYou')}<button type="button" class="wsx-card__more" data-go-lens="artifacts" data-i18n="home.seeAll">See all</button>`,
+                body: `<div class="wsx-arts__pane" id="wsxRecentArts" role="tabpanel"><div class="wsx-empty" data-i18n="common.loading">Loading…</div></div>
+                  <div class="wsx-arts__pane" id="wsxForYou" role="tabpanel" hidden><div class="wsx-empty" data-i18n="common.loading">Loading…</div></div>
+                  <div class="wsx-arts__pane" id="wsxFavArts" role="tabpanel" hidden></div>
+                  <div class="wsx-arts__pane" id="wsxSharedArts" role="tabpanel" hidden></div>` })}
+              ${briefCard({ wid: 'wsxNeedsW', titleKey: 'widget.needsYou', title: 'Needs you', icon: 'alert', span: 1,
+                head: `<span class="wsx-card__n" id="wsxNeedsN" hidden></span><button type="button" class="wsx-card__more" data-open-notifs data-i18n="home.seeAll">See all</button>`,
+                body: `<div id="wsxNeedsYou"><div class="wsx-empty" data-i18n="common.loading">Loading…</div></div>` })}
+              ${briefCard({ wid: 'wsxPulseW', titleKey: 'home.space', title: 'In your workspace', icon: 'recent', span: 1,
+                head: `<span class="wsx-card__meta" id="wsxPulseWin"></span>`,
+                body: `<div id="wsxPulse" class="wsx-pulse"><div class="wsx-empty" data-i18n="common.loading">Loading…</div></div>` })}
+              ${briefCard({ wid: 'wsxWeekW', titleKey: 'home.week', title: 'This week', icon: 'chart', span: 1,
+                head: `<button type="button" class="wsx-card__more" data-go-lens="analytics" data-i18n="nav.analytics">Analytics</button>`,
+                body: `<div id="wsxWeek"><div class="wsx-empty" data-i18n="common.loading">Loading…</div></div>` })}
+              ${briefCard({ wid: 'wsxNewsW', titleKey: 'home.news', title: 'What’s new in ShareOut', icon: 'foryou', span: 1,
+                head: `<a class="wsx-card__more" href="https://docs.shareout.site/whats-new/" target="_blank" rel="noopener" data-i18n-href="foot.whatsNewUrl" data-i18n="home.newsAll">See all</a>`,
+                body: `<div id="wsxNews" data-news="${escapeHtml(JSON.stringify(WHATS_NEW))}"></div>` })}
+              ${briefCard({ wid: 'wsxAllW', titleKey: 'home.all', title: 'All your artifacts', icon: 'brief', span: 3,
+                head: `<button type="button" class="wsx-card__more" data-go-lens="artifacts" data-i18n="home.seeAll">See all</button>`,
+                body: `<div id="wsxAllArts"><div class="wsx-empty" data-i18n="common.loading">Loading…</div></div>` })}
             </div>
-            <div class="wsx-empty wsx-empty--first" id="wsxHomeEmpty" hidden><p data-i18n="artifacts.emptyFirst">Nothing here yet. Make one page and it lives here.</p><button type="button" class="so-c-btn so-c-btn--primary" data-art-first data-i18n="artifacts.createFirst">Create your first page</button></div>
           </div>
           <div class="wsx__view" data-view="artifacts">
             <h2 class="wsx__viewtitle" data-i18n="view.allArtifacts">All Artifacts</h2>

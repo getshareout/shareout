@@ -29,7 +29,8 @@ export const workspace_client_artifact_links_JS = `  // ===== dismiss a "Needs y
     var card = a.closest('.artifact-card');
     var topEl = a.querySelector('.wsx-ev__top');
     var titleEl = card && card.querySelector('.card-title');
-    var name = (topEl && topEl.textContent) || (titleEl && titleEl.textContent) || a.getAttribute('data-name') || slug;
+    // The link's own data-name (the artifact) beats the event's top line (often the person).
+    var name = a.getAttribute('data-name') || (topEl && topEl.textContent) || (titleEl && titleEl.textContent) || slug;
     var id = a.getAttribute('data-id') || (card && card.getAttribute('data-id')) || '';
     openArtifact(slug, String(name).trim(), id);
   });
