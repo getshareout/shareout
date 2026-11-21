@@ -10,6 +10,12 @@ adds to both (AGENTS.md → Gate contract).
 
 ## Release notes
 
+### 2026-11-21
+
+- **Messages opens right away.** Your conversations show the moment you open Messages instead of sitting on Loading…, and the rest of ShareOut no longer stalls for seconds on a slow sign-in check.
+  - es: **Mensajes abre al instante.** Tus conversaciones aparecen apenas abrís Mensajes en vez de quedarse en Cargando…, y el resto de ShareOut ya no se traba varios segundos por un chequeo de sesión lento.
+  - Integrators: the session check reads its KV cache with the 500 ms budget (`kvCacheGet`) and fills it after the response (`deferWork`); Home's boot request is `GET …/messages?limit=50` (was `?unread=1&limit=20`).
+
 ### 2026-11-19
 
 - **Write to someone in your workspace without leaving ShareOut.** A new Messages menu in each workspace holds one-to-one conversations with the people on your team: pick someone with New message, write, press Enter. Unread messages show on the menu and in the bell, and the other person also gets a note on Telegram if they connected it. You can ask the assistant (on Home, Telegram or WhatsApp) or your own AI connected to ShareOut to send one for you — it shows who it goes to and the exact text first, nothing is sent until you confirm, and the message is marked as written through your assistant. Only workspace members can message each other; clients you share folders with are not included.
@@ -336,6 +342,8 @@ adds to both (AGENTS.md → Gate contract).
 - **Data Platform row-level scope is enforced structurally (skill v2.58.0):** under an `access_policy`, a scoped viewer can no longer send SQL to a platform connector. They run a query the author declares in the new `access_policy.queries` (`{ connection, provider, endpoint, params }`) by name (`execute(endpoint, { query: '<name>' })`); the server binds the viewer's values into `:viewer_scope` — counted only in SQL code, never in comments or quoted text — or, when the SQL has no placeholder, wraps it as `SELECT * FROM (<sql>) AS so_scoped WHERE so_scoped.<field> IN (…)`. Declared SQL must be one statement (checked when the policy is saved); anything that cannot be scoped returns `403 SCOPE_REQUIRED`. Scoped viewers are also refused on generic `sdk.connection()` query/materialize/test and on the chat `run_data_source` tool. **Breaking for authors:** pages whose viewers sent `:viewer_scope` SQL directly must declare those queries and call them by name.
 
 ### Fixed
+
+- **Messages no longer sits on Loading… for seconds.** `getSessionUser`'s disabled-flag cache read awaited raw KV (`userdisabled:` keys live 60 s, so most requests missed, and a miss from a far colo took ~9 s in prod) and awaited the fill: it now reads with `kvCacheGet` (500 ms budget, then D1) and fills with `deferWork`, like the workspace role cache. Home's boot messages request fetches every conversation (`?limit=50`, the same query as `?unread=1`), the Messages view paints them at once and refreshes behind, and pointing at the menu fetches the view's code.
 
 - **Files → artifacts under retries:** `filesToArtifacts` claims each file (`type_metadata.toArtifact = { claim: <slug>, at }`, compare-and-set) before transcribing and publishes under that slug, so a concurrent call skips it (`inProgress` in the result) and a claim left by a dead call is taken over after 15 minutes under the same slug — reusing the page it may already have published instead of making a second one.
 

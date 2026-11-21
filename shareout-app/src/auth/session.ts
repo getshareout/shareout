@@ -8,6 +8,7 @@ import { COOKIE_NAME, SESSION_MAX_AGE } from './constants';
 import { buildSessionCookie } from './cookies';
 import { getPlatformHostname } from '../config/origins';
 import { markAuthenticated, requestMemo, timePhase } from '../http/request-scope';
+import { deferWork, kvCacheGet } from '../kv-cache';
 
 /**
  * Resolve the session `Max-Age` for a user. Takes the strictest
@@ -78,11 +79,13 @@ async function resolveSessionUser(token: string, env: Env, host: string): Promis
   // though the signed token is still cryptographically valid. Only logged-in
   // requests reach this point, so the lookup never touches anonymous traffic.
   // Read-through KV cache; fail open on any error — a transient outage shouldn't
-  // sign everyone out.
+  // sign everyone out. Every authenticated request waits on this read, and a KV miss
+  // can take 10 s from a far colo: a slow read counts as a miss, and the fill runs
+  // after the response.
   const cacheKey = userDisabledCacheKey(payload.userId);
   if (env.SLUGS) {
     try {
-      const cached = await env.SLUGS.get(cacheKey);
+      const cached = await kvCacheGet(env.SLUGS, cacheKey);
       if (cached === USER_DISABLED_FLAG) return null;
       if (cached === USER_ENABLED_FLAG) return { id: payload.userId, email: payload.email };
     } catch { /* fall through to D1 */ }
@@ -93,11 +96,8 @@ async function resolveSessionUser(token: string, env: Env, host: string): Promis
       'SELECT disabled FROM users WHERE id = ?'
     ).bind(payload.userId).first<{ disabled: number }>();
     const disabled = !!row?.disabled;
-    if (env.SLUGS) {
-      try {
-        await env.SLUGS.put(cacheKey, disabled ? USER_DISABLED_FLAG : USER_ENABLED_FLAG, { expirationTtl: USER_DISABLED_TTL });
-      } catch { /* best-effort */ }
-    }
+    const slugs = env.SLUGS;
+    if (slugs) deferWork(() => slugs.put(cacheKey, disabled ? USER_DISABLED_FLAG : USER_ENABLED_FLAG, { expirationTtl: USER_DISABLED_TTL }));
     if (disabled) return null;
   } catch {
     /* fall through */

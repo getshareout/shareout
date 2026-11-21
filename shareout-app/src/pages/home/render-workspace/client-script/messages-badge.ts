@@ -1,10 +1,13 @@
 /** Direct messages in the boot shell: the unread count behind the rail badge and the bell, and the
  *  person chip both they and the Messages view use. The view itself is a lazy chunk
- *  (home-views/messages.ts). One request at boot; the bell reuses it while it is in flight. */
+ *  (home-views/messages.ts). One request at boot; the bell reuses it while it is in flight, and
+ *  the view paints its conversations at once and refreshes them behind. */
 export const workspace_client_messages_badge_JS = `
   // ===== direct messages: unread count (rail badge + bell) =====
   var msgUnread = { n: 0, threads: [] };
   var msgUnreadReq = null;
+  // Every conversation from the last boot/bell request (the Messages view's first paint).
+  var msgBootThreads = null;
   function msgName(p) { return (p && (p.name || p.email)) || t('msg.someone'); }
   function msgAv(p, cls) {
     var c = 'wsx-dm__av' + (cls ? ' ' + cls : '');
@@ -29,9 +32,9 @@ export const workspace_client_messages_badge_JS = `
   function msgFetchUnread() {
     if (!msgOn()) return Promise.resolve(msgUnread);
     if (msgUnreadReq) return msgUnreadReq;
-    msgUnreadReq = fetch('/v1/workspaces/' + encodeURIComponent(window.WSX_WS) + '/messages?unread=1&limit=20', { credentials: 'same-origin' })
+    msgUnreadReq = fetch('/v1/workspaces/' + encodeURIComponent(window.WSX_WS) + '/messages?limit=50', { credentials: 'same-origin' })
       .then(function (r) { return r.ok ? r.json() : null; })
-      .then(function (d) { if (d) msgSetUnread(d); return msgUnread; }, function () { return msgUnread; })
+      .then(function (d) { if (d) { msgBootThreads = d.threads || []; msgSetUnread(d); } return msgUnread; }, function () { return msgUnread; })
       .then(function (u) { msgUnreadReq = null; return u; });
     return msgUnreadReq;
   }
@@ -41,5 +44,12 @@ export const workspace_client_messages_badge_JS = `
     if (location.hash === h) applyHash(); else location.hash = h;
   }
   msgFetchUnread();
+  // Fetch the view's code on the way to a click, so opening Messages waits on nothing.
+  (function () {
+    var lb = ws.querySelector('[data-lens="messages"]'); if (!lb) return;
+    function warm() { wsxChunk('messages'); }
+    lb.addEventListener('pointerenter', warm, { once: true });
+    lb.addEventListener('focus', warm, { once: true });
+  })();
 
 `;

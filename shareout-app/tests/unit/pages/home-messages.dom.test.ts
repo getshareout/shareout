@@ -29,6 +29,8 @@ const thread = () => ({ id: 'dmt_1', with: MARTIN, last: { body: 'Te paso el res
 
 type Call = { url: string; method: string; body: unknown };
 const calls: Call[] = [];
+// While set, the conversation list request hangs until release() (a slow refresh).
+let holdList: { release: () => void } | null = null;
 const json = (b: unknown, status = 200) => new Response(JSON.stringify(b), { status, headers: { 'Content-Type': 'application/json' } });
 
 function route(url: string, method: string, body: Record<string, unknown> | null): Response {
@@ -69,6 +71,10 @@ beforeAll(async () => {
     const method = (init?.method || 'GET').toUpperCase();
     const body = typeof init?.body === 'string' ? JSON.parse(init.body) : null;
     calls.push({ url, method, body });
+    if (holdList && method === 'GET' && url.startsWith('/v1/workspaces/wsp_acme/messages?')) {
+      const held = holdList;
+      return new Promise<Response>((resolve) => { held.release = () => resolve(route(url, method, body)); });
+    }
     return route(url, method, body);
   }));
   const { body, scripts } = buildWorkspaceView(args);
@@ -89,6 +95,26 @@ describe('workspace messages', () => {
     expect(railBadge()?.hidden).toBe(false);
     expect(railBadge()?.textContent).toBe('2');
     expect($('#wsxNotifBadge')?.textContent).toBe('2');
+  });
+
+  it('Messages paints the conversations at once from the boot request, then refreshes behind', async () => {
+    // Pointing at Messages fetches the view's code before the click.
+    $<HTMLElement>('[data-lens="messages"]')!.dispatchEvent(new Event('pointerenter'));
+    await settle();
+    expect(calls.filter((c) => c.url.startsWith('/sdk/home-lens-messages.js'))).toHaveLength(1);
+
+    holdList = { release: () => {} };
+    $<HTMLElement>('[data-lens="messages"]')!.click();
+    await settle();
+    // The refresh is still out, yet the list is there, not a spinner.
+    expect(calls.filter((c) => c.url.startsWith('/v1/workspaces/wsp_acme/messages?'))).toHaveLength(2);
+    const rows = [...document.querySelectorAll('.wsx-dm__row')];
+    expect(rows.map((r) => r.getAttribute('data-msg-open'))).toEqual([MARTIN.id]);
+    expect(rows[0]!.textContent).toContain('Te paso el resumen');
+    holdList.release();
+    holdList = null;
+    await settle();
+    expect(document.querySelectorAll('.wsx-dm__row')).toHaveLength(1);
   });
 
   it('the bell lists unread conversations; a row opens it and marks it read', async () => {
