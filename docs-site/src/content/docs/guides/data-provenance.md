@@ -100,7 +100,7 @@ elements it feeds (your `data-shareout-source` tags and `feeds`). Queries and
 credentials are shown only to people who can edit the page.
 
 The button appears once the page reads data (or declares live connections), and it
-follows the owner's choice to hide the viewer toolbar.
+sits in the bar at the top, so it follows the owner's choice to hide that bar.
 
 Want **ⓘ source** badges on the elements themselves, or a drawer when the page is shown
 outside the ShareOut viewer? One line of JavaScript:

@@ -35,7 +35,7 @@ function json(status: number, body: unknown) {
 }
 
 function boot(opts: { locale?: 'en' | 'es'; visible?: boolean; toolbar?: boolean } = {}) {
-  document.body.innerHTML = `<iframe></iframe>${opts.toolbar ? '<div id="shareout-admin-toolbar"><div id="so-toolbar-items"></div><button id="so-toolbar-trigger"></button></div>' : ''}`;
+  document.body.innerHTML = `<iframe></iframe>${opts.toolbar ? '<header id="so-header"><div id="so-hd-actions"><button id="so-cmt-btn"></button><button id="so-share-btn"></button></div></header>' : ''}`;
   frameWin = { postMessage: vi.fn() };
   Object.defineProperty(document.querySelector('iframe')!, 'contentWindow', { value: frameWin });
   const html = renderDataSourcesPanel({ artifactId: 'art_1', page: 'index.html', locale: opts.locale ?? 'en', visible: !!opts.visible, withVars: !opts.toolbar });
@@ -105,10 +105,10 @@ describe('Data pill', () => {
     expect(pill().hidden).toBe(false);
   });
 
-  it('sits next to the toolbar trigger when there is a toolbar', () => {
+  it('joins the header actions, just before Share, when there is a header', () => {
     boot({ toolbar: true, locale: 'es' });
-    expect(pill().parentElement?.id).toBe('shareout-admin-toolbar');
-    expect(pill().nextElementSibling?.id).toBe('so-toolbar-trigger');
+    expect(pill().parentElement?.id).toBe('so-hd-actions');
+    expect(pill().nextElementSibling?.id).toBe('so-share-btn');
     expect(document.getElementById('so-ds-dock')).toBeNull();
     expect(pill().textContent?.trim()).toBe('Datos');
   });

@@ -38,7 +38,7 @@ Who can comment as a guest: only on artifacts they can already open without an a
 **public** page, or a **password / credentials** page they unlocked (the access cookie is the
 proof). Private and workspace pages stay account-only.
 
-Flow (the viewer toolbar shows it as **Comment as guest**: name, email, code):
+Flow (the viewer's comments panel shows it as **Comment as guest**: name, email, code):
 
 | Method | Path (`/v1/data/{artifactId}/comments`) | Body / result |
 |---|---|---|
@@ -145,7 +145,7 @@ The realtime channel also emits `presence` (`{ type: 'presence', count }`) and
 `typing` (`{ type: 'typing', name }`) frames. The built-in comments overlay
 consumes these for live presence ("N others here") and typing indicators.
 
-**Viewer toolbar:** signed-in viewers with comment access see a **Comments** button in the artifact toolbar. It opens reactions (emoji), typing indicators, live presence, and resolve controls. Owners and editors also manage threads from the Home **Inspector → Comments** tab; unresolved threads on artifacts you can see surface in Home **Needs You**.
+**Viewer header:** viewers with comment access see a **Comments** button in the header above the page. It opens a side panel floating on the right (the page stays usable) with reactions (emoji), typing indicators, live presence, and resolve controls. Owners and editors also manage threads from the Home **Inspector → Comments** tab; unresolved threads on artifacts you can see surface in Home **Needs You**.
 
 **Notifications:** when a comment @mentions someone or replies to another
 person, that recipient is notified by email and (if linked) Telegram with a deep

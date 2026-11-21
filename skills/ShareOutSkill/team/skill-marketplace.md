@@ -306,7 +306,7 @@ Attached skills are visible to editors and signed-in viewers — but only **inje
 | **Home artifact cards** | Signed-in owner/editor | **Skills** feature badge when attachments exist. |
 | **Home stats modal** | Signed-in owner/editor | **Attached skills** panel (attach/detach picker requires workspace context). |
 | **Editor Details rail** | `editor`+ | Read-only skill chips linking to each attached skill. |
-| **Viewer toolbar** | Signed-in viewers with access | **Skills N** button opens a read-only popover listing attached skills (anonymous views unchanged). |
+| **Viewer header** | Signed-in viewers with access | **Skills N** in the page-name menu opens a read-only side panel listing attached skills (anonymous views unchanged). |
 | **Library — skill viewer** | Any workspace member | In-Studio modal: rendered markdown, copy, download `.md` or Claude `.zip`, edit or propose a change, set the edit policy. |
 | **Library — Attach to agent** | Member | Toggle up to **8** skills into Home / Telegram / Slack assistant context. |
 

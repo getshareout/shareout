@@ -233,6 +233,9 @@ export function createServeEnv(scenario: ServeScenario = {}) {
               return assets[path] ? { r2_key: assets[path].r2_key } : null;
             }
 
+            if (sql.includes('SELECT v.version_no, v.created_by')) {
+              return { version_no: 7, created_by: null, artifact_name: 'Demo App', owner_name: 'Ana Owner' };
+            }
             if (sql.includes('SELECT owner_id FROM artifacts WHERE id')) {
               return { owner_id: 'usr_1' };
             }

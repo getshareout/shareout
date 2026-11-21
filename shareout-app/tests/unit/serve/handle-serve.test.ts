@@ -549,15 +549,16 @@ describe('handleServe', () => {
     expect(html).toContain('"hasMore":false');
   });
 
-  it('shows admin toolbar for collaborator editor', async () => {
+  it('shows the header for a collaborator editor, with owner tools left to ShareOut', async () => {
     vi.mocked(auth.getSessionUser).mockResolvedValue({ id: 'usr_2', email: 'editor@example.com' });
     const { env } = createServeEnv({
       collaborator: { role: 'editor' },
     });
 
     const html = await readStreamResponse(await handleServe(serveRequest(''), env, SLUG, ''));
-    expect(html).toContain('shareout-admin-toolbar');
-    expect(html).toContain('/a/demo-app/edit');
+    expect(html).toContain('id="so-header"');
+    expect(html).toContain('/home#a/demo-app');
+    expect(html).not.toContain('/a/demo-app/edit');
   });
 
   it('resolves the viewer session exactly once for a logged-in wrapper view', async () => {
@@ -740,11 +741,14 @@ describe('handleServe', () => {
     expect(html).toContain('theme.woff2?_raw" as="font" crossorigin');
   });
 
-  it('shows admin toolbar for artifact owners', async () => {
+  it('shows owners the header with the page name, owner and version', async () => {
     vi.mocked(auth.getSessionUser).mockResolvedValue({ id: 'usr_1', email: 'owner@example.com' });
     const { env } = createServeEnv({ ownerMatch: true });
     const html = await readStreamResponse(await handleServe(serveRequest(''), env, SLUG, ''));
-    expect(html).toContain('shareout-admin-toolbar');
+    expect(html).toContain('id="so-header"');
+    expect(html).toContain('<span class="so-hd__name">Demo App</span>');
+    expect(html).toContain('Ana Owner');
+    expect(html).toContain('>v7<');
   });
 
   it('ships the error bar, with a report button for a signed-in viewer', async () => {
@@ -779,7 +783,7 @@ describe('handleServe', () => {
     const { env } = createServeEnv();
     const html = await readStreamResponse(await handleServe(serveRequest(''), env, SLUG, ''));
     expect(html).toContain('<iframe');
-    expect(html).not.toContain('shareout-admin-toolbar');
+    expect(html).not.toContain('id="so-header"');
   });
   it('serves a typed artifact source as an attachment at the viewer Download link', async () => {
     const mdAsset = { r2_key: 'artifacts/demo/doc.md', mime: 'text/markdown', size_bytes: 7 };

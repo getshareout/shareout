@@ -7,8 +7,8 @@ Tu artefacto puede hacer cosas **solo** — sin nadie ahí apretando botones. Lo
 
 ## Desde el artefacto mismo
 
-Cuando estás viendo un artefacto que podés administrar, la barra de herramientas tiene un
-botón de **programar**. Elegí email, Slack o Telegram, definí cada cuánto, y ShareOut crea
+Cuando estás viendo un artefacto con tu cuenta, la barra de arriba tiene un botón
+**Programar**. Elegí email, Slack o Telegram, definí cada cuánto, y ShareOut crea
 el job por vos — sin llamadas a la API. Los owners y editores pueden programar envíos a
 otras personas; los viewers pueden suscribirse para recibir el artefacto en su propio mail de
 forma recurrente.

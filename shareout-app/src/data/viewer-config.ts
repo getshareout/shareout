@@ -5,15 +5,12 @@ const CONFIG_KEY = '_viewer_config';
 const CACHE_TTL = 60;
 
 export interface ViewerConfig {
-  /** When true, the floating ShareOut toolbar is not rendered at all. */
+  /** When true, the ShareOut header is not rendered above the page at all. */
   hide_toolbar: boolean;
-  /** When true, show the toolbar on small screens (hidden on mobile by default). */
-  show_on_mobile: boolean;
 }
 
 const DEFAULT_VIEWER_CONFIG: ViewerConfig = {
   hide_toolbar: false,
-  show_on_mobile: false,
 };
 
 function parseViewerConfig(raw: string | null | undefined): ViewerConfig {
@@ -22,7 +19,6 @@ function parseViewerConfig(raw: string | null | undefined): ViewerConfig {
     const cfg = JSON.parse(raw) as Partial<ViewerConfig>;
     return {
       hide_toolbar: cfg.hide_toolbar === true,
-      show_on_mobile: cfg.show_on_mobile === true,
     };
   } catch {
     return { ...DEFAULT_VIEWER_CONFIG };
@@ -42,7 +38,7 @@ export async function getViewerConfig(env: Env, artifactId: string): Promise<Vie
     } catch {}
   }
 
-  let config = { ...DEFAULT_VIEWER_CONFIG };
+  let config: ViewerConfig;
   try {
     const row = await createMiniDb(env, artifactId, '').prepare(
       'SELECT value FROM artifact_json WHERE artifact_id = ? AND key = ?'

@@ -1,8 +1,8 @@
 /**
  * The viewer's "Data" pill and Data sources panel, for every viewer of a page that shows
  * data (signed in, guest or public link). Self-contained: its own tokens-only styles,
- * markup and script, so it works with or without the floating toolbar — with a toolbar
- * the pill moves next to its trigger; without one it keeps the same corner.
+ * markup and script, so it works with or without the viewer header — with a header
+ * the pill joins its actions; without one it keeps its own corner.
  */
 import type { Locale } from '../../../i18n';
 import { cssVariables } from '../../../design-system/base.css';

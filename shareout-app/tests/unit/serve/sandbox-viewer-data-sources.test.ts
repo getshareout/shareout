@@ -48,13 +48,13 @@ beforeEach(() => {
   prefetchMocks.detectFavoriteState.mockResolvedValue({ loggedIn: false, isFavorite: false });
   prefetchMocks.detectCommentsState.mockResolvedValue({ loggedIn: false, enabled: false, count: 0, identityMode: 'anonymous' });
   prefetchMocks.fetchAttachedSkills.mockResolvedValue([]);
-  viewerConfig.getViewerConfig.mockResolvedValue({ hide_toolbar: false, show_on_mobile: false });
+  viewerConfig.getViewerConfig.mockResolvedValue({ hide_toolbar: false });
 });
 
 describe('Data sources in the shared-link viewer', () => {
   it('gives an anonymous viewer (no toolbar) the pill, hidden until the page says it shows data', async () => {
     const html = await render();
-    expect(html).not.toContain('id="shareout-admin-toolbar"');
+    expect(html).not.toContain('id="so-header"');
     expect(html).toMatch(/<button type="button" id="so-ds-pill" class="so-ds-pill" hidden aria-haspopup="dialog"/);
     expect(html).toContain('id="so-ds-panel" role="dialog" aria-modal="false" aria-labelledby="so-ds-title" hidden');
     // No toolbar means no token stylesheet: the panel ships its own.
@@ -84,7 +84,7 @@ describe('Data sources in the shared-link viewer', () => {
   });
 
   it('stays out of pages whose owner hid the ShareOut toolbar', async () => {
-    viewerConfig.getViewerConfig.mockResolvedValue({ hide_toolbar: true, show_on_mobile: false });
+    viewerConfig.getViewerConfig.mockResolvedValue({ hide_toolbar: true });
     const html = await render();
     expect(html).not.toContain('so-ds-pill');
     expect(html).not.toContain('soDataSources');

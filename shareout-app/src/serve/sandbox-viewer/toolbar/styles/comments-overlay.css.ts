@@ -1,51 +1,13 @@
 /**
- * Viewer toolbar styles — Comments panel, pins, and composer
+ * Viewer toolbar styles — Comments panel content, pins, and composer
  * @module serve/sandbox-viewer/toolbar/styles/comments-overlay
  */
 
-/** CSS rules for: Comments panel, pins, and composer */
-export const commentsOverlayStyles = `    #so-comments-overlay {
-      position: fixed;
-      inset: 0;
-      z-index: 10001;
-      display: none;
-      align-items: stretch;
-      justify-content: flex-end;
-      font-family: 'Source Sans 3', 'Segoe UI', system-ui, sans-serif;
-    }
-    #so-comments-overlay.open { display: flex; }
-    #so-comments-overlay .backdrop {
-      position: absolute;
-      inset: 0;
-      background: rgba(28, 25, 23, 0.2);
-      backdrop-filter: blur(4px);
-      -webkit-backdrop-filter: blur(4px);
-    }
-    #so-comments-panel {
-      position: relative;
-      width: 400px;
-      max-width: 90vw;
-      height: 100%;
-      display: flex;
-      flex-direction: column;
-      background: rgba(255, 255, 255, 0.94);
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
-      box-shadow: var(--shadow-xl);
-      border-left: 1px solid rgba(231, 229, 228, 0.6);
-      animation: soSlideIn 0.25s ease-out;
-    }
-    @keyframes soSlideIn {
-      from { transform: translateX(100%); opacity: 0; }
-      to { transform: translateX(0); opacity: 1; }
-    }
-    @media (prefers-reduced-motion: reduce) {
-      #so-comments-panel { animation: none; }
-    }
-    .so-cmt-tabs {
+/** CSS rules for: Comments panel content, pins, and composer */
+export const commentsOverlayStyles = `    .so-cmt-tabs {
       display: flex;
       gap: 4px;
-      padding: 0 24px;
+      padding: 0 var(--space-5);
       border-bottom: 1px solid var(--color-border);
     }
     .so-cmt-tab {
@@ -160,11 +122,6 @@ export const commentsOverlayStyles = `    #so-comments-overlay {
       background: var(--color-error-light);
       color: var(--color-error);
     }
-    @keyframes soCmtFlash {
-      0%, 100% { transform: scale(1); }
-      50% { transform: scale(1.18); }
-    }
-    .so-toolbar-btn.so-cmt-flash { animation: soCmtFlash 0.6s ease; }
     .so-cmt-head {
       display: flex;
       align-items: center;

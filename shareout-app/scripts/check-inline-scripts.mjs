@@ -19,8 +19,6 @@ const TARGETS = [
   'src/serve/sandbox-viewer/toolbar/script-core.ts',
   'src/serve/sandbox-viewer/toolbar/script-auth.ts',
   'src/serve/sandbox-viewer/toolbar/script-comments.ts',
-  'src/serve/sandbox-viewer/toolbar/script-admin.ts',
-  'src/serve/sandbox-viewer/toolbar/script-drag.ts',
   'src/serve/sandbox-viewer/toolbar/script-presence.ts',
   'src/serve/sandbox-viewer/data-sources/script.ts',
   'src/serve/sandbox-viewer/data-sources/format-js.ts',

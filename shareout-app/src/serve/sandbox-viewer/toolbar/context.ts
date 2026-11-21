@@ -1,4 +1,3 @@
-import { escapeHtml } from '../../utils';
 import type { AdminInfo } from '../../types';
 import type { ToolbarRenderContext, ViewerUser } from '../types';
 import type { Locale } from '../../../i18n';
@@ -17,9 +16,11 @@ interface BuildToolbarContextInput {
   baseUrl: string;
   slug: string;
   artifactId: string;
-  visualEditorEnabled: boolean;
   attachedSkills: Array<{ name: string; slug: string }>;
   locale?: Locale;
+  title: string;
+  ownerName?: string | null;
+  versionNo?: number | null;
 }
 
 /** Derive display fields and visibility flags for toolbar rendering. */
@@ -38,9 +39,11 @@ export function buildToolbarContext(input: BuildToolbarContextInput): ToolbarRen
     baseUrl,
     slug,
     artifactId,
-    visualEditorEnabled,
     attachedSkills,
     locale = 'en',
+    title,
+    ownerName = null,
+    versionNo = null,
   } = input;
 
   if (hideToolbar) return null;
@@ -49,18 +52,6 @@ export function buildToolbarContext(input: BuildToolbarContextInput): ToolbarRen
   if (!showToolbar) return null;
 
   const loginRedirect = `/a/${slug}/`;
-  const userInitials = currentUser
-    ? (currentUser.name || currentUser.email || '?').trim().slice(0, 2).toUpperCase()
-    : '';
-  const userLabel = currentUser ? (currentUser.name || currentUser.email) : '';
-  const userFirstName = currentUser
-    ? (currentUser.name ? currentUser.name.trim().split(/\s+/)[0] : currentUser.email.split('@')[0])
-    : '';
-  const avatarInner = currentUser
-    ? (currentUser.picture
-      ? `<img src="${escapeHtml(currentUser.picture)}" alt="" class="so-avatar-img" referrerpolicy="no-referrer">`
-      : `<span class="so-avatar-fallback">${escapeHtml(userInitials)}</span>`)
-    : '';
 
   return {
     showToolbar,
@@ -77,11 +68,11 @@ export function buildToolbarContext(input: BuildToolbarContextInput): ToolbarRen
     slug,
     artifactId,
     loginRedirect,
-    userLabel,
-    userFirstName,
-    avatarInner,
-    visualEditorEnabled,
     attachedSkills,
+    title,
+    // Owner and version are team context: never shown to a viewer without an account.
+    ownerName: loggedIn ? ownerName : null,
+    versionNo: loggedIn ? versionNo : null,
     locale,
   };
 }

@@ -34,7 +34,6 @@ export const dataSourcesStyles = `
       outline-offset: 2px;
     }
     #so-ds-dock { position: fixed; right: var(--space-5); bottom: var(--space-5); z-index: 10000; }
-    #shareout-admin-toolbar.so-dragging .so-ds-pill { display: none; }
 
     #so-ds-panel {
       position: fixed;
@@ -173,7 +172,6 @@ export const dataSourcesStyles = `
     @media (max-width: 640px) {
       #so-ds-panel { top: auto; left: var(--space-4); width: auto; max-height: 72vh; }
       #so-ds-dock { right: var(--space-4); bottom: var(--space-4); }
-      body.so-hide-toolbar-mobile #so-ds-dock { display: none; }
     }
     @media (prefers-reduced-motion: reduce) {
       #so-ds-panel { animation: none; }

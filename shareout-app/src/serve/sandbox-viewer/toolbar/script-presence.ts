@@ -1,6 +1,6 @@
 import { TOOLBAR_COPY, js, type ToolbarCopy } from './copy';
 
-/** Auto-extracted client script for live viewer presence in toolbar chrome. */
+/** Live presence in the viewer header: shown only while someone besides you has the page open. */
 export function renderToolbarScriptPresence(baseUrl: string, artifactId: string, c: ToolbarCopy = TOOLBAR_COPY.en): string {
   return `
     var livePresenceBtn = document.getElementById('so-live-presence-btn');
@@ -24,7 +24,7 @@ export function renderToolbarScriptPresence(baseUrl: string, artifactId: string,
         }
         avatars.innerHTML = html;
       }
-      livePresenceBtn.classList.toggle('is-active', safeCount > 0);
+      livePresenceBtn.hidden = safeCount < 2;
     }
     function pollLivePresence() {
       if (!livePresenceBtn) return;

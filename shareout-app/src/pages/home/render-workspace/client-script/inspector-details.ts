@@ -13,6 +13,7 @@ export const workspace_client_inspector_details_JS = `  // ===== Inspector Detai
     organize: ['<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>', 'n'],
     analytics: ['<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>', 'p'],
     tests: ['<path d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6z"/>', 'w'],
+    viewbar: ['<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18"/>', 'n'],
     knowledge: ['<path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z"/><path d="M8 7h7"/>', 'p']
   };
   function sec(key, labelText, helpText, body) {
@@ -63,6 +64,36 @@ export const workspace_client_inspector_details_JS = `  // ===== Inspector Detai
       rollback: function () { set(on); },
       request: function () { return fetch('/v1/artifacts/' + encodeURIComponent(id) + '/favorite', { method: on ? 'DELETE' : 'POST', credentials: 'same-origin' }); },
       error: t('cards.favFailed'),
+    });
+  }
+  // The ShareOut bar above the published page (the viewer header): on unless the owner
+  // turned it off. Kept in the artifact's _viewer_config, which the viewer reads per view.
+  var viewBarOn = {};
+  function wireViewBar(art) {
+    var inp = document.getElementById('wsxViewBar'); if (!inp || !art || !art.id) return;
+    var url = '/v1/data/' + encodeURIComponent(art.id) + '/json/_viewer_config';
+    function paint() { var on = viewBarOn[art.id]; if (typeof on === 'boolean') { inp.checked = on; inp.disabled = false; } }
+    if (typeof viewBarOn[art.id] === 'boolean') paint();
+    else {
+      fetch(url, { credentials: 'same-origin' })
+        .then(function (r) { return r.status === 404 ? {} : r.ok ? r.json() : null; })
+        .then(function (res) {
+          if (!res) return;
+          var cfg = (res.data && res.data.value) || res.value || {};
+          viewBarOn[art.id] = cfg.hide_toolbar !== true;
+          if (inp.isConnected) paint();
+        })
+        .catch(function () {});
+    }
+    inp.addEventListener('change', function () {
+      var on = inp.checked;
+      optimistic({
+        key: 'viewbar:' + art.id,
+        apply: function () { viewBarOn[art.id] = on; inp.checked = on; },
+        rollback: function () { viewBarOn[art.id] = !on; inp.checked = !on; },
+        request: function () { return fetch(url, { method: 'PUT', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ hide_toolbar: !on }) }); },
+        error: t('inspector.viewBarFailed'),
+      });
     });
   }
   // Confirm, then the tab closes at once and the shared card-actions delete takes over

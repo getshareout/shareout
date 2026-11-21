@@ -114,7 +114,7 @@ There is no public hosted default — resolve origin or deploy first.
 | Authentication | [auth.md](auth.md) | [api/overview.md](api/overview.md) |
 | Self-serve API token (avatar menu / /v1/me/tokens) | [auth.md](auth.md#self-serve-api-tokens) | [api/overview.md](api/overview.md) |
 | Request access to a private page | [modules/_shared/permissions.md](modules/_shared/permissions.md#access-requests-private--workspace-artifacts) | [core/access-policy.md](core/access-policy.md) |
-| Hide viewer toolbar on mobile | [api/artifacts.md](api/artifacts.md#viewer-toolbar-shareout-chrome) | [modules/_shared/publishing.md](modules/_shared/publishing.md) |
+| Hide the viewer header | [api/artifacts.md](api/artifacts.md#viewer-header-shareout-chrome) | [modules/_shared/publishing.md](modules/_shared/publishing.md) |
 | Delete an artifact / restore a deleted one / trash & 30-day recovery | [api/artifacts.md](api/artifacts.md#delete--restore-trash) | [api/overview.md](api/overview.md) |
 | Check which modules are enabled / handle "feature disabled" | [api/features.md](api/features.md) | [api/errors.md](api/errors.md) |
 

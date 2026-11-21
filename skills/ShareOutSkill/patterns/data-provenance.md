@@ -86,8 +86,8 @@ Two ways; use either or both.
 ## 3. Viewers see it automatically
 
 Nothing to mount. When the page shows data (declared sources or feeds, bound elements,
-or SDK data calls), the viewer gets a **Data / Datos** button next to the ShareOut
-toolbar. It opens **Data sources**: one row per source with
+or SDK data calls), the viewer gets a **Data / Datos** button in the ShareOut
+header. It opens **Data sources**: one row per source with
 
 - its label (yours, or the key) and where it comes from (`From BigQuery`),
 - freshness — what ShareOut saw (`Updated 2 h ago · by the job “Ads diario”`), else your

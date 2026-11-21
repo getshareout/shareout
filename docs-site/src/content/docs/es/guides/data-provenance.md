@@ -101,7 +101,7 @@ Al elegir una fuente se resaltan los elementos que alimenta (tus etiquetas
 puede editar el artefacto.
 
 El botón aparece cuando el artefacto lee datos (o declara conexiones en vivo), y respeta
-la decisión del dueño de ocultar la barra del visor.
+está en la barra de arriba, así que respeta la decisión del dueño de ocultarla.
 
 ¿Querés badges **ⓘ source** en los elementos mismos, o un drawer cuando el artefacto se
 muestra fuera del visor de ShareOut? Una línea de JavaScript:

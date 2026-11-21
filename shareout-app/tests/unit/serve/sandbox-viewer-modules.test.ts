@@ -24,17 +24,25 @@ describe('sandbox-viewer modules', () => {
     expect(head).not.toContain('</body>');
   });
 
-  it('signed-out visitors get the labeled Comments pill directly, signed-in keep the menu trigger', () => {
+  it('the header gives signed-out visitors the title and Comments only, signed-in viewers the full bar', () => {
     const base = {
       loggedIn: false, isFav: false, commentsEnabled: true, commentsIdentityMode: 'anonymous', commentsGuest: false,
       commentCount: 0, hasMetrics: false, adminInfo: null, currentUser: null, hideToolbar: false,
-      baseUrl: 'https://x.dev', slug: 's', artifactId: 'art_1', visualEditorEnabled: false, attachedSkills: [], locale: 'es',
+      baseUrl: 'https://x.dev', slug: 's', artifactId: 'art_1', title: 'Demo page', attachedSkills: [], locale: 'es',
     } as unknown as Parameters<typeof buildToolbarContext>[0];
     const anon = renderToolbar(buildToolbarContext(base)!);
-    expect(anon).toContain('class="so-solo so-open"');
+    expect(anon).toContain('class="so-hd so-hd--guest"');
     expect(anon).toContain('Comentarios');
+    expect(anon).not.toContain('id="so-share-btn"');
+    expect(anon).not.toContain('soOpenSchedule(');
+    expect(anon).not.toContain('href="https://x.dev/home"');
     const signed = renderToolbar(buildToolbarContext({ ...base, loggedIn: true })!);
-    expect(signed).not.toContain('class="so-solo so-open"');
+    expect(signed).toContain('id="so-header" class="so-hd"');
+    expect(signed).toContain('href="https://x.dev/home"');
+    expect(signed).toContain('id="so-share-btn"');
+    expect(signed).toContain('id="so-fav-btn"');
+    // No floating logo menu any more.
+    expect(signed).not.toContain('so-toolbar-trigger');
     const en = renderToolbar(buildToolbarContext({ ...base, locale: 'en' })!);
     expect(en).toContain('Comments');
     expect(en).not.toContain('Comentarios');
@@ -133,7 +141,7 @@ describe('sandbox-viewer modules', () => {
       baseUrl: 'https://shareout.site',
       slug: 'demo',
       artifactId: 'art_1',
-      visualEditorEnabled: true,
+      title: 'Demo page',
       attachedSkills: [],
     })).toBeNull();
   });
@@ -151,31 +159,29 @@ describe('sandbox-viewer modules', () => {
       baseUrl: 'https://shareout.site',
       slug: 'demo',
       artifactId: 'art_1',
-      visualEditorEnabled: true,
+      title: 'Demo page',
       attachedSkills: [],
     })).toBeNull();
   });
 
-  it('buildToolbarContext builds avatar fallback when no picture', () => {
-    const ctx = buildToolbarContext({
-      loggedIn: true,
-      isFav: false,
-      commentsEnabled: false,
-      commentCount: 0,
-      hasMetrics: false,
-      adminInfo: null,
-      currentUser: { email: 'leo@example.com', name: 'Leo Example', picture: '' },
-      hideToolbar: false,
-      baseUrl: 'https://shareout.site',
-      slug: 'demo',
-      artifactId: 'art_1',
-      visualEditorEnabled: true,
-      attachedSkills: [],
-    });
-
-    expect(ctx?.showToolbar).toBe(true);
-    expect(ctx?.avatarInner).toContain('so-avatar-fallback');
-    expect(ctx?.avatarInner).toContain('LE');
+  it('shows the owner and version to signed-in viewers only', () => {
+    const base = {
+      loggedIn: true, isFav: false, commentsEnabled: true, commentCount: 0, hasMetrics: false,
+      adminInfo: null, currentUser: { email: 'leo@example.com', name: 'Leo Example', picture: '' }, hideToolbar: false,
+      baseUrl: 'https://shareout.site', slug: 'demo', artifactId: 'art_1', attachedSkills: [],
+      title: 'Q3 <review>', ownerName: 'Ana Acme', versionNo: 12,
+    };
+    const signed = renderToolbar(buildToolbarContext(base)!);
+    expect(signed).toContain('Q3 &lt;review&gt;');
+    expect(signed).toContain('Ana Acme');
+    expect(signed).toContain('>v12<');
+    const anon = buildToolbarContext({ ...base, loggedIn: false, currentUser: null })!;
+    expect(anon.ownerName).toBeNull();
+    expect(anon.versionNo).toBeNull();
+    const anonHtml = renderToolbar(anon);
+    expect(anonHtml).toContain('Q3 &lt;review&gt;');
+    expect(anonHtml).not.toContain('Ana Acme');
+    expect(anonHtml).not.toContain('>v12<');
   });
 
   function followCtx(hasMetrics: boolean) {
@@ -191,7 +197,7 @@ describe('sandbox-viewer modules', () => {
       baseUrl: 'https://shareout.site',
       slug: 'demo',
       artifactId: 'art_1',
-      visualEditorEnabled: true,
+      title: 'Demo page',
       attachedSkills: [],
     })!;
   }
@@ -199,10 +205,14 @@ describe('sandbox-viewer modules', () => {
   it('renders the Follow metric button only when the artifact has metrics', () => {
     const withMetrics = renderToolbar(followCtx(true));
     expect(withMetrics).toContain('Follow metric');
-    expect(withMetrics).toContain('onclick="soOpenFollow()"');
+    // It lives in the title menu, which closes when it opens the modal.
+    expect(withMetrics).toContain('onclick="soHdMenu(false);soOpenFollow()"');
+    expect(withMetrics).toContain('id="so-hd-menu"');
 
     const without = renderToolbar(followCtx(false));
     expect(without).not.toContain('Follow metric');
+    // Nothing to put in the menu: the title is plain text, no caret.
+    expect(without).not.toContain('id="so-hd-menu"');
   });
 
   it('wires the Follow metric modal to the metric-alerts API', () => {
@@ -259,15 +269,17 @@ describe('sandbox-viewer modules', () => {
       baseUrl: 'https://shareout.site',
       slug: 'demo',
       artifactId: 'art_1',
-      visualEditorEnabled: true,
+      title: 'Demo page',
       attachedSkills: [],
       locale: 'es',
     })!);
-    expect(es).toContain('Todos los artefactos');
+    expect(es).toContain('Volver a ShareOut');
+    expect(es).toContain('Abrir en ShareOut');
+    expect(es).toContain('Programar');
     expect(es).toContain('Escribí un comentario…');
     expect(es).toContain('No pudimos cargar los comentarios');
     expect(es).toContain('Compartir');
-    expect(es).not.toContain('All artifacts');
+    expect(es).not.toContain('Back to ShareOut');
     expect(es).not.toContain('Add a comment');
     expect(es).not.toContain("Couldn\\'t load comments");
     expect(es).not.toContain('Follow a metric');
@@ -278,30 +290,43 @@ describe('sandbox-viewer modules', () => {
     expect(renderEarlyHead('x', '', '', undefined, false)).toContain('<html lang="en">');
   });
 
-  it('toolbar styles hide chrome on mobile unless opted in', () => {
+  it('the header sits above the page on every screen and pushes the frame down', () => {
     const html = renderToolbar(followCtx(false));
-    expect(html).toContain('body.so-hide-toolbar-mobile #shareout-admin-toolbar');
+    expect(html).toContain('body > iframe { display: block; margin-top: var(--so-hd-h); height: calc(100% - var(--so-hd-h)); }');
+    // Phones get the same header with icon-only buttons, not a hidden toolbar.
+    expect(html).toContain('@media (max-width: 640px)');
+    expect(html).toContain('.so-hd__label, .so-hd__meta');
+    expect(html).not.toContain('so-hide-toolbar-mobile');
   });
 
-  it('greys out the Editor toolbar control when Live Studio is off', () => {
-    const html = renderToolbar(buildToolbarContext({
+  it('keeps owner tools in ShareOut: no Editor, Stats or Settings, one link to open it there', () => {
+    const owner = renderToolbar(buildToolbarContext({
       loggedIn: true,
       isFav: false,
       commentsEnabled: false,
       commentCount: 0,
       hasMetrics: false,
-      adminInfo: { role: 'owner' } as never,
+      adminInfo: { role: 'owner', canEdit: true } as never,
       currentUser: { email: 'o@example.com', name: 'Owner', picture: '' },
       hideToolbar: false,
       baseUrl: 'https://shareout.site',
       slug: 'demo',
       artifactId: 'art_1',
-      visualEditorEnabled: false,
+      title: 'Demo page',
       attachedSkills: [],
     })!);
-    expect(html).toContain('so-toolbar-btn is-disabled');
-    expect(html).toContain('Live Studio is not enabled for this workspace');
-    expect(html).not.toContain('href="https://shareout.site/a/demo/edit"');
+    expect(owner).toContain('href="https://shareout.site/home#a/demo"');
+    expect(owner).toContain('Open in ShareOut');
+    expect(owner).not.toContain('/a/demo/edit');
+    expect(owner).not.toContain('openStats');
+    expect(owner).not.toContain('openAdmin');
+    expect(owner).not.toContain('so-admin-overlay');
+    // Owners schedule deliveries to others; everyone else schedules it for themselves.
+    expect(owner).toContain('soOpenSchedule(false)');
+    const viewer = renderToolbar(followCtx(false));
+    expect(viewer).toContain('soOpenSchedule(true)');
+    expect(viewer).toContain('>Schedule<');
+    expect(viewer).not.toContain('Open in ShareOut');
   });
 
   it('wires comments post toasts and connection state messaging in the viewer client script', () => {
@@ -317,7 +342,7 @@ describe('sandbox-viewer modules', () => {
       baseUrl: 'https://shareout.site',
       slug: 'demo',
       artifactId: 'art_1',
-      visualEditorEnabled: true,
+      title: 'Demo page',
       attachedSkills: [],
     })!);
 
@@ -342,20 +367,22 @@ describe('sandbox-viewer modules', () => {
       baseUrl: 'https://shareout.site',
       slug: 'demo',
       artifactId: 'art_1',
-      visualEditorEnabled: true,
+      title: 'Demo page',
       attachedSkills: [],
     })!);
 
     expect(html).toContain('id="so-live-presence-btn"');
     expect(html).toContain("fetch('https://shareout.site/v1/artifacts/art_1/presence'");
     expect(html).toContain("safeCount + ' viewing now'");
+    // Hidden until someone besides you is here.
+    expect(html).toContain('livePresenceBtn.hidden = safeCount < 2;');
   });
 
   function guestCtx(commentsGuest: boolean, locale: 'en' | 'es' = 'en') {
     return buildToolbarContext({
       loggedIn: false, isFav: false, commentsEnabled: true, commentsIdentityMode: 'authenticated', commentsGuest,
       commentCount: 0, hasMetrics: false, adminInfo: null, currentUser: null, hideToolbar: false,
-      baseUrl: 'https://shareout.site', slug: 'demo', artifactId: 'art_1', visualEditorEnabled: true, attachedSkills: [], locale,
+      baseUrl: 'https://shareout.site', slug: 'demo', artifactId: 'art_1', title: 'Demo page', attachedSkills: [], locale,
     })!;
   }
 

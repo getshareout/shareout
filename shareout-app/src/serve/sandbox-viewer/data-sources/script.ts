@@ -67,11 +67,11 @@ export function renderDataSourcesScript(cfg: DataSourcesScriptConfig): string {
   var closeBtn = panel && panel.querySelector('.so-ds-close');
   if (!pill || !panel || !body) return;
 
-  // Sit next to the toolbar trigger when there is a toolbar; otherwise keep our own corner.
-  var toolbar = document.getElementById('shareout-admin-toolbar');
-  var trigger = document.getElementById('so-toolbar-trigger');
-  if (toolbar && trigger) {
-    toolbar.insertBefore(pill, trigger);
+  // Join the header's actions (before Share) when there is a header; otherwise keep our own corner.
+  var actions = document.getElementById('so-hd-actions');
+  if (actions) {
+    var share = document.getElementById('so-share-btn');
+    if (share && share.parentNode === actions) actions.insertBefore(pill, share); else actions.appendChild(pill);
     if (dock && dock.parentNode) dock.parentNode.removeChild(dock);
   }
 

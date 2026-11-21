@@ -6,7 +6,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { componentScripts } from '../../../src/design-system/components/index';
 import { renderToolbarScriptCore } from '../../../src/serve/sandbox-viewer/toolbar/script-core';
 import { renderToolbarScriptAuth } from '../../../src/serve/sandbox-viewer/toolbar/script-auth';
-import { renderToolbarScriptAdmin } from '../../../src/serve/sandbox-viewer/toolbar/script-admin';
 import { TOOLBAR_COPY } from '../../../src/serve/sandbox-viewer/toolbar/copy';
 
 const es = TOOLBAR_COPY.es;
@@ -65,16 +64,50 @@ describe('toolbar follow alerts', () => {
   });
 });
 
-describe('admin comments toggle', () => {
-  it('flips the label at once and flips it back if saving fails', async () => {
-    document.body.innerHTML = '<button id="so-cmt-toggle">On</button>';
-    fetchMock = vi.fn(async () => new Response('{}', { status: 500 }));
-    const js = renderToolbarScriptCore(es, 'es') + 'var cmtOverlayOn = true;' + renderToolbarScriptAdmin('', 's', 'a1', es);
-    new Function(`(function(){${js}})();`)();
-    w().toggleCommentsOverlay();
-    expect(document.getElementById('so-cmt-toggle')!.textContent).toBe('Off');
-    await flush();
-    expect(document.getElementById('so-cmt-toggle')!.textContent).toBe('On');
-    expect(toastText()).toContain(es.settingFail);
+describe('header title menu and comments button', () => {
+  function loadHeader(): void {
+    document.body.innerHTML = '<header><div id="wrap"><button id="so-hd-menu-btn" aria-expanded="false">T</button>'
+      + '<div id="so-hd-menu" hidden><button role="menuitem" id="item">Follow</button></div></div>'
+      + '<button id="so-cmt-btn">C</button><p id="outside">x</p></header><div id="so-comments-overlay"></div>';
+    new Function(`(function(){${renderToolbarScriptCore(es, 'es')}})();`)();
+    w().openComments = () => document.getElementById('so-comments-overlay')!.classList.add('open');
+    w().closeComments = () => document.getElementById('so-comments-overlay')!.classList.remove('open');
+  }
+
+  it('opens and closes the menu, and a click outside closes it', () => {
+    loadHeader();
+    const menu = document.getElementById('so-hd-menu')!;
+    const btn = document.getElementById('so-hd-menu-btn')!;
+    w().soHdMenu();
+    expect(menu.hidden).toBe(false);
+    expect(btn.getAttribute('aria-expanded')).toBe('true');
+    document.getElementById('item')!.click();
+    expect(menu.hidden).toBe(false);
+    document.getElementById('outside')!.click();
+    expect(menu.hidden).toBe(true);
+    expect(btn.getAttribute('aria-expanded')).toBe('false');
+  });
+
+  it('moves focus into the menu only when opened from the keyboard, and Esc closes it', () => {
+    loadHeader();
+    w().soHdMenu(undefined, { detail: 1 });
+    expect(document.activeElement?.id).not.toBe('item');
+    w().soHdMenu(false);
+    w().soHdMenu(undefined, { detail: 0 });
+    expect(document.activeElement?.id).toBe('item');
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    expect(document.getElementById('so-hd-menu')!.hidden).toBe(true);
+    expect(document.activeElement?.id).toBe('so-hd-menu-btn');
+  });
+
+  it('the Comments button opens the side panel and closes it when it is open', () => {
+    loadHeader();
+    const ov = document.getElementById('so-comments-overlay')!;
+    w().soHdComments();
+    expect(ov.classList.contains('open')).toBe(true);
+    expect(document.getElementById('so-cmt-btn')!.getAttribute('aria-expanded')).toBe('true');
+    w().soHdComments();
+    expect(ov.classList.contains('open')).toBe(false);
+    expect(document.getElementById('so-cmt-btn')!.getAttribute('aria-expanded')).toBe('false');
   });
 });

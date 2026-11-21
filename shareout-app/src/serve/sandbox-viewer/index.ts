@@ -43,7 +43,6 @@ import { renderToolbar } from './toolbar';
 import { renderDataSourcesBridge, renderDataSourcesPanel } from './data-sources';
 import { renderErrorBar } from './error-bar';
 import { getViewerConfig } from '../../data/viewer-config';
-import { isVisualEditorEnabled } from '../../editor/visual-editor-gate';
 import { localeForViewer, localeFromAcceptLanguage } from '../../i18n/locale';
 import { spaceGuestFor } from '../../sharees/space-guest';
 import { capabilitySatisfies } from '../../access/can-access';
@@ -56,7 +55,7 @@ import { servingOrigin } from '../../workspaces/domains/host-binding';
  * - Social / PWA meta tags in the streamed head
  * - Critical asset preloading and optional CSS inlining
  * - Injecting initial JSON/table data and a per-viewer session token
- * - Hosting the floating toolbar (favorites, comments, admin) outside the sandbox
+ * - Hosting the viewer header (favorite, schedule, comments, share) outside the sandbox
  */
 export async function serveSandboxedViewer(
   request: Request,
@@ -84,7 +83,7 @@ export async function serveSandboxedViewer(
 ): Promise<Response> {
   const baseUrl = servingOrigin(env);
   // The home Studio loads the artifact in an iframe with ?wsx=1; the Studio's right
-  // rail already provides share/comments/details, so suppress the in-artifact toolbar.
+  // rail already provides share/comments/details, so suppress the in-artifact header.
   const studioEmbed = new URL(request.url).searchParams.has('wsx');
 
   // The untrusted artifact loads cross-origin from its per-artifact content host
@@ -156,7 +155,7 @@ export async function serveSandboxedViewer(
       // No account, but a space-guest session reaching this artifact (checkAccess let it in).
       const spaceGuest = user ? null : await spaceGuestFor(request, env, 'artifact', artifactId, 'view');
 
-      const [initialJsonData, initialTableData, adminInfo, favInfo, commentsInfo, hasMetrics, viewerConfig, visualEditorEnabled, attachedSkills, profile] = await Promise.all([
+      const [initialJsonData, initialTableData, adminInfo, favInfo, commentsInfo, hasMetrics, viewerConfig, headerInfo, attachedSkills, profile] = await Promise.all([
         initialJsonPromise,
         initialTablePromise,
         detectAdminStatus(user, env, artifactId, ownerId),
@@ -165,7 +164,16 @@ export async function serveSandboxedViewer(
         // Only logged-in viewers can follow a metric, so skip the lookup for anonymous views.
         user ? hasMetricDefinitions(env, artifactId) : false,
         viewerConfigPromise,
-        isVisualEditorEnabled(env, workspaceId, user?.email),
+        // The header's name, owner and version — team context, so signed-in viewers only.
+        // created_by also tells an owner token apart from a co-author's (tokenRole below).
+        user
+          ? env.DB.prepare(
+            `SELECT v.version_no, v.created_by, a.name AS artifact_name, u.name AS owner_name
+               FROM versions v JOIN artifacts a ON a.id = v.artifact_id
+               LEFT JOIN users u ON u.id = a.owner_id
+              WHERE v.id = ?`,
+          ).bind(versionId).first<{ version_no: number | null; created_by: string | null; artifact_name: string | null; owner_name: string | null }>()
+          : null,
         fetchAttachedSkills(user, env, artifactId),
         // Folded into the batch so the viewer's profile no longer adds a
         // sequential D1 round-trip after this Promise.all resolves.
@@ -196,9 +204,7 @@ export async function serveSandboxedViewer(
 
       let tokenRole: AdminInfo['role'] | undefined;
       if (adminInfo?.role === 'owner' && ownerId) {
-        const author = await env.DB.prepare('SELECT created_by FROM versions WHERE id = ?')
-          .bind(versionId).first<{ created_by: string | null }>();
-        if (author?.created_by && author.created_by !== ownerId) tokenRole = 'editor';
+        if (headerInfo?.created_by && headerInfo.created_by !== ownerId) tokenRole = 'editor';
       }
 
       const {
@@ -240,9 +246,11 @@ export async function serveSandboxedViewer(
         baseUrl,
         slug,
         artifactId,
-        visualEditorEnabled,
         attachedSkills,
         locale,
+        title: headerInfo?.artifact_name || socialPreview?.title || slug,
+        ownerName: headerInfo?.owner_name ?? null,
+        versionNo: headerInfo?.version_no ?? null,
       });
       const toolbar = toolbarContext ? renderToolbar(toolbarContext) : '';
       // "Data" pill + Data sources panel for every viewer, toolbar or not. Hidden until
@@ -259,24 +267,17 @@ export async function serveSandboxedViewer(
         canReport: !!user,
         withVars: !toolbar && (studioEmbed || viewerConfig.hide_toolbar),
       });
-      const bodyClass = viewerConfig.hide_toolbar
-        ? ''
-        : viewerConfig.show_on_mobile
-          ? 'so-show-toolbar-mobile'
-          : 'so-hide-toolbar-mobile';
 
       // <head> and <body> were already opened (and the loading skeleton painted)
       // in the streamed early head, so this chunk continues inside <body>. The
       // deferred head bits (preload links, inlined CSS, init data + bridge
-      // scripts) are valid in body; the toolbar-visibility class is applied via a
-      // small script since <body> opened before viewerConfig was known. In cdn
+      // scripts) are valid in body; the page language is corrected via a small
+      // script since <html> opened before the workspace locale was known. In cdn
       // mode the iframe was already streamed above; in legacy mode it goes here
       // (after the preload links so they still warm the same-origin subresources).
-      const bodyClassScript = (bodyClass
-        ? `<script>document.body.className=${JSON.stringify(bodyClass)}</script>`
-        : '') + (locale !== earlyLang ? `<script>document.documentElement.lang=${JSON.stringify(locale)}</script>` : '');
+      const langScript = locale !== earlyLang ? `<script>document.documentElement.lang=${JSON.stringify(locale)}</script>` : '';
 
-      const restOfHtml = `${headLinks ? '  ' + headLinks + '\n' : ''}  ${inlinedStyleBlock}${initialDataScript}${mobileSdkScript}${bridgeScript}${bodyClassScript}${contentHost ? '' : '\n  ' + iframeHtml}${toolbar}${dataSources}${errorBar}
+      const restOfHtml = `${headLinks ? '  ' + headLinks + '\n' : ''}  ${inlinedStyleBlock}${initialDataScript}${mobileSdkScript}${bridgeScript}${langScript}${contentHost ? '' : '\n  ' + iframeHtml}${toolbar}${dataSources}${errorBar}
   ${renderLoadingHideScript()}
 </body>
 </html>`;
