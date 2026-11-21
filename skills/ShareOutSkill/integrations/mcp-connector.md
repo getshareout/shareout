@@ -91,7 +91,7 @@ your ShareOut account"). Allow, and the app is connected.
 | `read_connector` | App connector API (Humand): no `endpoint` → what it can read; `endpoint` + `query` / `path` → the data, `total`, `next_page`; GET endpoints only, answer capped (~50 KB) |
 | `get_help` | Short how-to and links |
 | `report_problem` | Opens a support ticket for the ShareOut team |
-| `send_feedback` | An idea (`kind: "feature_request"`), `feedback` or a `question` for the ShareOut team: `summary`, optional `details`, `artifact_id`, `language`. Lands in the team's queue under the person's account; 10 an hour per account, shared with the REST feedback categories |
+| `send_feedback` | An idea (`kind: "feature_request"`), `feedback` or a `question` for the ShareOut team: `summary`, optional `details`, `artifact_id`, `language`. Lands in the team's queue under the person's account; 10 an hour per account, shared with REST `feature_request` / `feedback` / token `question` tickets |
 | `search` / `fetch` | Read-only, ChatGPT deep-research shape. `search` covers all the person's workspaces unless `workspace_id` (id or slug) narrows it; `fetch` is by id |
 
 Rules the tools follow:

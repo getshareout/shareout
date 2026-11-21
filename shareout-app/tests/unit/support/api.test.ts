@@ -144,6 +144,17 @@ describe('create', () => {
     expect(limitMock).not.toHaveBeenCalled();
   });
 
+  it('caps questions from agents (token) but not questions people type in the app', async () => {
+    limitMock.mockResolvedValue({ allowed: false, limit: 10, remaining: 0, reset: Math.floor(Date.now() / 1000) + 600, retryAfter: 600 });
+    const agent = await routeSupportApi(ctx('POST', '/v1/support/tickets', { subject: 's', body: 'b', category: 'question' }, { authorization: 'Bearer so_x' }))!;
+    expect(agent!.status).toBe(429);
+    expect(alertMock).not.toHaveBeenCalled();
+    expect(limitMock).toHaveBeenCalledTimes(1);
+    const person = await routeSupportApi(ctx('POST', '/v1/support/tickets', { subject: 's', body: 'b', category: 'question' }))!;
+    expect(person!.status).toBe(201);
+    expect(limitMock).toHaveBeenCalledTimes(1);
+  });
+
   it('a retried idea with the same idempotencyKey returns the first ticket without spending the cap', async () => {
     const first = await createOne({ category: 'feature_request', idempotencyKey: 'idea-1' });
     expect(limitMock).toHaveBeenCalledTimes(1);

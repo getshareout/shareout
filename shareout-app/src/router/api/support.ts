@@ -130,14 +130,15 @@ export async function routeSupportApi(ctx: FetchContext): Promise<Response | nul
         const existing = await findByIdempotencyKey(ctx.env, auth.id, idempotencyKey);
         if (existing) return cors(jsonResponse(created(existing, true)));
       }
-      // Agents may send ideas and feedback on their own, and each one pings the operator:
-      // one hourly budget per account, shared with the MCP send_feedback tool. Problems stay uncapped.
-      if (FEEDBACK_CATEGORIES.includes(body.category as TicketCategory)) {
+      // Token caller → programmatic (skill); session caller → in-app UI.
+      const viaToken = !!request.headers.get('authorization');
+      // Agents may send ideas, feedback and questions on their own, and each one pings the operator:
+      // one hourly budget per account, shared with the MCP send_feedback tool. Problems, and
+      // questions people type in the app, stay uncapped.
+      if (FEEDBACK_CATEGORIES.includes(body.category as TicketCategory) || (viaToken && body.category === 'question')) {
         const rl = await checkSendFeedbackLimit(ctx.env, auth.id);
         if (!rl.allowed) return cors(rateLimitResponse(rl));
       }
-      // Token caller → programmatic (skill); session caller → in-app UI.
-      const viaToken = !!request.headers.get('authorization');
       const ticket = await createTicket(ctx.env, {
         workspaceId,
         requesterUserId: auth.id,
