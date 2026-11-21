@@ -157,7 +157,7 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
     rbodyEl.innerHTML = h;
     var root = rbodyEl.querySelector('.wsx__details');
     paintApprovals(art);
-    wireViewBar(art);
+    if (document.getElementById('wsxViewBar')) wireViewBar(art);
 
     // inline edits — click to type, Enter to save, blur to autosave
     var enterSaves = function (el) { el.addEventListener('keydown', function (e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); el.blur(); } }); };

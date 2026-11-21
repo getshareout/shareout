@@ -7,7 +7,7 @@ import { serveTypeViewer } from '../../src/serve/type-viewer';
 import type { ArtifactType, Env } from '../../src/types';
 import { renderToolbarScriptCore } from '../../src/serve/sandbox-viewer/toolbar/script-core';
 import { renderToolbarScriptComments } from '../../src/serve/sandbox-viewer/toolbar/script-comments';
-import { renderToolbarScriptAdmin } from '../../src/serve/sandbox-viewer/toolbar/script-admin';
+import { renderToolbarScriptAuth } from '../../src/serve/sandbox-viewer/toolbar/script-auth';
 
 // Real (unescaped) tags in the output, with <script> bodies removed.
 function tagsOf(html: string): string[] {
@@ -152,7 +152,7 @@ describe('sandbox-viewer toolbar escaping', () => {
   const scripts = [
     renderToolbarScriptCore(),
     renderToolbarScriptComments('https://shareout.test', 'art_1'),
-    renderToolbarScriptAdmin('https://shareout.test', 'slug', 'art_1'),
+    renderToolbarScriptAuth('https://shareout.test', 'art_1', 'me@example.com'),
   ].join('\n');
 
   it('client escapeHtml also escapes quotes', () => {

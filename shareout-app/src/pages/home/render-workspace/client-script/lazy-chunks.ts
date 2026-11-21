@@ -37,6 +37,7 @@ import { workspace_client_inspector_data_JS } from './inspector-data';
 import { workspace_client_edit_lite_JS } from './edit-lite';
 import { workspace_client_edit_lite_ai_JS } from './edit-lite-ai';
 import { workspace_client_guest_comments_lazy_JS } from './guest-comments';
+import { workspace_client_inspector_viewbar_JS } from './inspector-viewbar';
 import { workspace_client_home_views_fileImport_JS } from './home-views/file-import';
 import { workspace_client_home_views_driveSync_JS } from './home-views/drive-sync';
 import { workspace_client_home_views_sheetLinkSync_JS } from './home-views/sheet-link-sync';
@@ -74,6 +75,7 @@ export const LAZY_CHUNKS: Record<string, ChunkDef> = {
     soft: ['editKeydown'],
   },
   guest: { src: workspace_client_guest_comments_lazy_JS, exports: ['wireGuestFolder', 'wireGuestArt'] },
+  viewbar: { src: workspace_client_inspector_viewbar_JS, exports: ['wireViewBar'] },
   drives: { src: workspace_client_home_views_fileImport_JS, exports: ['openFileImport'] },
   drivesync: { src: workspace_client_home_views_autoDetailShared_JS + workspace_client_home_views_driveSync_JS, exports: ['openDriveSync'] },
   sheetlink: { src: workspace_client_home_views_autoDetailShared_JS + workspace_client_home_views_sheetLinkSync_JS, exports: ['openSheetLinkSync'] },

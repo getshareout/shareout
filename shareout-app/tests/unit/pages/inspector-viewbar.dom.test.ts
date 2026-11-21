@@ -3,7 +3,7 @@
 // Home → Details → More → ShareOut bar: the switch that hides the viewer header,
 // now that the viewer no longer has its own Settings panel.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { workspace_client_inspector_details_JS as detailsJs } from '../../../src/pages/home/render-workspace/client-script/inspector-details';
+import { workspace_client_inspector_viewbar_JS as viewbarJs } from '../../../src/pages/home/render-workspace/client-script/inspector-viewbar';
 
 type Opt = { apply: () => void; rollback: () => void; request: () => Promise<Response>; error: string };
 let fetchMock: ReturnType<typeof vi.fn>;
@@ -17,7 +17,7 @@ function load(): (art: { id: string }) => void {
     o.apply();
     return o.request().then((r) => { if (!r.ok) o.rollback(); });
   };
-  const factory = new Function('t', 'esc', 'isvg', 'optimistic', `${detailsJs}\n; return wireViewBar;`);
+  const factory = new Function('t', 'esc', 'isvg', 'optimistic', `${viewbarJs}\n; return wireViewBar;`);
   return factory((k: string) => k, (s: unknown) => String(s), () => '', optimistic);
 }
 
