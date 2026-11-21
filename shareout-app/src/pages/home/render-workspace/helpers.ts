@@ -24,10 +24,15 @@ export function viewSeg(id: string): string {
 }
 
 
-export function widget(id: string, titleKey: string, title: string, icon: keyof typeof ICON, wide = false, artifacts = false): string {
-  return `<section class="wsx-widget${wide ? ' wsx-widget--wide' : ''} is-empty-hidden" data-wid="${id}">
-    <div class="wsx-widget__head"><button class="wsx-widget__grip" type="button" data-i18n-aria="widget.drag" data-i18n-title="widget.drag" aria-label="Drag to reorder" title="Drag to reorder">${GRIP_SVG}</button>${svg(ICON[icon])}<span data-i18n="${titleKey}">${title}</span>${artifacts ? viewSeg(id) : ''}</div>
-    <div class="wsx-widget__body" id="${id}"><div class="wsx-empty" data-i18n="common.loading">Loading…</div></div>
+/**
+ * A Home card: drag grip, icon, title, optional head controls, body and resize corner
+ * (widget-layout.ts drives reorder/resize). `span` is its starting width on the Home grid:
+ * 1 = a third, 2 = two thirds, 3 = full width.
+ */
+export function briefCard(o: { wid: string; titleKey: string; title: string; icon: keyof typeof ICON; span: 1 | 2 | 3; head?: string; body: string }): string {
+  return `<section class="wsx-widget" data-wid="${o.wid}" data-span="${o.span}">
+    <div class="wsx-widget__head"><button class="wsx-widget__grip" type="button" data-i18n-aria="widget.drag" data-i18n-title="widget.drag" aria-label="Drag to reorder" title="Drag to reorder">${GRIP_SVG}</button>${svg(ICON[o.icon])}<h2 class="wsx-card__t" data-i18n="${o.titleKey}">${o.title}</h2>${o.head || ''}</div>
+    <div class="wsx-widget__body">${o.body}</div>
     <span class="wsx-widget__rz" aria-hidden="true"></span>
   </section>`;
 }

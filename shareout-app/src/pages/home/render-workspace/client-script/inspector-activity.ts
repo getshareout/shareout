@@ -16,42 +16,14 @@ export const workspace_client_inspector_activity_JS = `
     order.sort(function (a, b) { return b.ts - a.ts; });
     return order;
   }
-  // One "Recent" list: artifacts I opened + activity pulse (incl. runs), newest first.
-  var SOFT_KINDS = { viewed: 1, create: 1, view: 1, publish: 1 };
-  function recentLabel(k) {
-    if (k === 'viewed') return t('recent.t.viewed');
-    if (k === 'run') return t('recent.t.run');
-    if (k === 'create' || k === 'publish') return t('recent.t.new');
-    if (k === 'comment' || k === 'reply') return t('recent.t.comment');
-    return t('recent.t.update');
-  }
-  function recentRows() {
-    var rows = [], seen = {};
-    function ms(ts) { return ts < 1e12 ? ts * 1000 : ts; }
-    recentItems.forEach(function (it) { rows.push({ kind: 'viewed', id: it.id, slug: it.slug, name: it.name, ts: it.ts ? Date.parse(it.ts) : 0, sum: '', count: 1 }); });
-    pulseEvents.forEach(function (e) { rows.push({ kind: e.kind, id: e.artifact_id, slug: e.slug, name: e.artifact_name, ts: ms(e.ts), sum: e.summary, count: e.count || 1 }); });
-    rows.sort(function (a, b) { return b.ts - a.ts; });
-    return rows.filter(function (r) {
-      if (SOFT_KINDS[r.kind] && r.id && forYouIds[r.id]) return false;
-      var k = (SOFT_KINDS[r.kind] ? 'soft|' : r.kind + '|') + (r.id || r.sum);
-      if (seen[k]) return false; seen[k] = 1; return true;
-    }).slice(0, 10);
-  }
-  function recentRow(r) {
-    var title = r.name ? esc(r.name) : feedText(r.sum);
-    var detail = (!SOFT_KINDS[r.kind] && r.name && r.sum) ? '<span class="wsx-rc__sum">' + feedText(r.sum) + (r.count > 1 ? ' \\u00B7 ' + r.count + '\\u00D7' : '') + '</span>' : '';
-    var inner = '<span class="wsx-rc__main"><span class="wsx-rc__name">' + title + '</span>' + detail + '</span>'
-      + '<span class="wsx-rc__tag">' + esc(recentLabel(r.kind)) + '</span><span class="wsx-rc__time">' + (r.ts ? timeAgo(r.ts) : '') + '</span>';
-    return r.slug
-      ? '<a class="wsx-rc" data-kind="' + esc(r.kind) + '" data-name="' + esc(r.name || '') + '" data-id="' + esc(r.id || '') + '" href="/a/' + encodeURIComponent(r.slug) + '/">' + inner + '</a>'
-      : '<div class="wsx-rc" data-kind="' + esc(r.kind) + '">' + inner + '</div>';
-  }
+  // Home "In your workspace": the aggregated pulse (publishes, runs, data updates, new
+  // members), newest first. Waits for the feed so it never flashes its empty state.
   function renderActivity() {
-    var host = document.getElementById('wsxRecentW'); if (!host) return;
-    var rows = recentRows();
-    var wdg = host.closest('.wsx-widget'); if (wdg) wdg.classList.toggle('is-empty-hidden', !rows.length);
-    host.innerHTML = rows.map(recentRow).join('');
-    if (typeof syncHomeEmpty === 'function') syncHomeEmpty();
+    var host = document.getElementById('wsxPulse'); if (!host || !homeLoaded.feed) return;
+    var groups = groupFeed(pulseEvents).slice(0, 6);
+    host.innerHTML = groups.length
+      ? groups.map(function (g) { return evRow(g, false); }).join('')
+      : '<div class="wsx-empty wsx-empty--calm">' + esc(t('home.spaceEmpty')) + '</div>';
   }
   // Home "more" menu: customize, activity window, admin event visibility. Bound once.
   function wireActivityControls() {

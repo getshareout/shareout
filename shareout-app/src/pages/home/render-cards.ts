@@ -298,6 +298,24 @@ export function renderArtifactRow(a: ArtifactRow, hostname: string, env?: Env): 
   </a>`;
 }
 
+/**
+ * A small Home tile: preview thumbnail, name, and who · when (the client localizes the
+ * time from data-ts). Many fit where one full card did. `ts` = when it was last viewed
+ * (Recent) or else updated.
+ */
+export function renderArtifactMini(a: ArtifactRow, ts?: string | null): string {
+  const typeKey = TYPE_META[a.artifact_type] ? a.artifact_type : 'html';
+  const tm = TYPE_META[typeKey];
+  const v = encodeURIComponent(a.updated_at || a.created_at);
+  const isYou = a.user_role === 'owner';
+  const who = isYou ? 'You' : (a.owner_name || '');
+  const when = ts || a.updated_at || a.created_at;
+  return `<a class="wsx-mini" href="/a/${escapeHtml(a.slug)}/" data-id="${escapeHtml(a.id)}" data-slug="${escapeHtml(a.slug)}" data-name="${escapeHtml(a.name)}" data-type="${escapeHtml(a.artifact_type || 'html')}">
+    <span class="wsx-mini__th" style="--type-color:${tm.color}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${tm.svg}</svg><img src="/t/${escapeHtml(a.id)}_card.webp?v=${v}" alt="" loading="lazy" draggable="false" onerror="this.remove()"></span>
+    <span class="wsx-mini__main"><span class="wsx-mini__t">${escapeHtml(a.name)}</span><span class="wsx-mini__s">${who ? `<span${isYou ? ' data-i18n="cards.you"' : ''}>${escapeHtml(who)}</span> · ` : ''}<span data-ts="${escapeHtml(when)}"></span></span></span>
+  </a>`;
+}
+
 const FOLDER_SVG = '<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>';
 
 /** "2 folders · 14 artifacts": direct sub-folders, then artifacts across the whole subtree.

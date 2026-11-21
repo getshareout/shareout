@@ -100,7 +100,7 @@ describe('home shell assets', () => {
     }
   });
 
-  it('perf budget: the boot shell script stays under 578 KB (575.3 KB measured; 718 KB with both locales inlined)', async () => {
+  it('perf budget: the boot shell script stays under 589 KB (585.8 KB measured; 718 KB with both locales inlined)', async () => {
     const { js } = await homeShellUrls();
     const text = await (await serveHomeShellAsset(HOME_SHELL_JS, new URL(js, 'https://x.test').searchParams.get('v')))!.text();
     // Raised from 566 KB for sortable table headers (Artifacts server sort, Assets column
@@ -108,7 +108,9 @@ describe('home shell assets', () => {
     // `step` progress event in the create client (+0.2 KB). Raised for the share panel's
     // email-outcome toast: 572.5 KB measured, budget = that + ~0.5%. Raised for the Humand
     // connect form and the People & HR catalog group: 575.3 KB measured, budget = that + ~0.5%.
-    expect(new TextEncoder().encode(text).length).toBeLessThan(578_000);
+    // Raised for the compact Home (six cards: Your artifacts tabs, This week, What's new, All
+    // your artifacts replace three widgets): 585.8 KB measured, budget = that + ~0.5%.
+    expect(new TextEncoder().encode(text).length).toBeLessThan(589_000);
     for (const l of ['en', 'es'] as const) {
       const u = new URL(await homeI18nUrl(l), 'https://x.test');
       const copy = await (await serveHomeShellAsset(u.pathname, u.searchParams.get('v')))!.text();
@@ -125,8 +127,9 @@ describe('home shell assets', () => {
       // automatic forwarding (Gmail's confirmation step, one-tap allow, the Gmail/Outlook how-to:
       // esync.fwd*): es measured 137.9 KB, budget = that + ~0.5%. Raised for the WhatsApp
       // assistant (Admin → Settings switch, Connect WhatsApp, the AI report's channel breakdown):
-      // es measured 139.0 KB, budget = that + ~0.3%.
-      expect(new TextEncoder().encode(copy).length, l).toBeLessThan(139_400);
+      // es measured 139.0 KB, budget = that + ~0.3%. Raised for the compact Home's cards
+      // (home.*; six unused activity.* lines removed): es measured 139.9 KB, budget = that + ~0.5%.
+      expect(new TextEncoder().encode(copy).length, l).toBeLessThan(140_600);
     }
     for (const [name, c] of Object.entries(LAZY_CHUNKS)) expect(text.includes(c.src), `${name} is not in the boot shell`).toBe(false);
   });

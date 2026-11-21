@@ -315,7 +315,7 @@ Content-Type: application/json
 `admin` or `owner`. Failed job/crew runs surface in **Needs You** even when
 the `run` kind is ambient in Pulse.
 
-See [Your workspace (Home)](/everyone/your-workspace/#home--needs-you-for-you-recent).
+See [Your workspace (Home)](/everyone/your-workspace/#home).
 
 ## Session length policy
 

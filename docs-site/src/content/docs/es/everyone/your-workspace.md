@@ -18,25 +18,32 @@ de un workspace de equipo.
 
 Los rails y paneles son redimensionables; los anchos se recuerdan en tu navegador.
 
-## Inicio — Te necesita, Para vos, Reciente
+## Inicio
 
-**Inicio** es una página tranquila y fija. Una línea arriba resume qué pasó desde tu
-última visita (o te dice que estás al día). Debajo, hasta tres listas:
+**Inicio** entra en una sola pantalla con lo que importa. Arriba: un saludo, la fecha de hoy
+y cuántas cosas te esperan, y una caja para **pedirle algo a tu espacio o crear un
+artefacto** — escribís y Enter para mandárselo al asistente, o elegís **Tabla desde un
+Excel** o **Subir archivos**. El destello al principio de la caja abre el chat; si tiene un
+punto, hay una respuesta esperándote. Debajo, tarjetas:
 
-| Lista | Qué muestra |
+| Tarjeta | Qué muestra |
 | --- | --- |
-| **Te necesita** | Filas que requieren acción: comentarios o respuestas sin resolver (que no son tuyos), shares hacia vos, pedidos de acceso, alertas y vigías de métricas, tests fallidos, ejecuciones fallidas de jobs o tareas con IA, y más. **×** descarta una fila |
-| **Para vos** | Artefactos elegidos para vos |
-| **Reciente** | Los artefactos que abriste y la actividad reciente (publicaciones, comentarios, ejecuciones) en una sola lista, lo más nuevo primero |
+| **Tus artefactos** | Mosaicos chicos con vista previa: **Recientes** (lo que abriste), **Para vos**, **Favoritos** y **Compartidos conmigo**. **Ver todos** abre Artefactos |
+| **Te necesita** | Lo que te espera de las últimas dos semanas, cada uno con su botón (**Revisar**, **Responder**, **Abrir**): comentarios y respuestas, menciones, pedidos de acceso, alertas, ejecuciones fallidas y más. **×** descarta una fila; **Ver todos** abre la campana, donde quedan los más viejos |
+| **En tu espacio** | Lo que pasó últimamente: publicaciones, datos que se actualizaron solos, envíos que fallaron, gente nueva |
+| **Esta semana** | Las vistas de los artefactos que hiciste, por día y contra la semana anterior, cuántas personas los abrieron y el más visto. **Analítica** tiene el detalle |
+| **Novedades de ShareOut** | Los últimos cambios, cada uno con link a su entrada en [Novedades](/es/whats-new/) |
+| **Todos tus artefactos** | Debajo de la primera pantalla: tus artefactos en una tabla, lo más nuevo primero |
 
-Una lista vacía no se muestra — **Te necesita** aparece solo cuando algo te espera.
-Cuando las tres están vacías, Inicio muestra **Creá tu primer artefacto**.
+Cada tarjeta mantiene su lugar aunque esté vacía y lo dice en una línea. En el celular,
+**Te necesita** va primero y los mosaicos se deslizan de costado.
 
 El menú **Más** (**⋯**, arriba a la derecha de Inicio) tiene el resto:
 
-- **Personalizar** — arrastrá las listas para reordenarlas y cambiales el tamaño desde
-  la esquina; después, **Listo**. El layout se guarda en tu navegador.
-- **Hoy**, **7d**, **30d** — qué tan atrás llega la actividad de **Reciente**.
+- **Personalizar** — arrastrá las tarjetas para reordenarlas, cambiales el tamaño desde la
+  esquina (un tercio, dos tercios o el ancho completo) y pasá **Tus artefactos** de
+  mosaicos a tabla; después, **Listo**. El layout se guarda en tu navegador.
+- **Hoy**, **7d**, **30d** — qué tan atrás llega **En tu espacio**.
 - **Visibilidad de actividad** (owners y admins) — quién ve cada tipo de evento (ver
   [Admin del workspace → Visibilidad de actividad](/es/teams/admin/#visibilidad-de-actividad)).
 

@@ -65,20 +65,11 @@ export const WORKSPACE_CANVAS_STYLES = `/* ---- canvas ---- */
 /* The resting chat floats over the canvas bottom (18px + 60px); stop the artifact above it so its end stays readable. */
 .wsx:has(.wsx__composer[data-state="resting"]) .wsx__pane--art.is-active { padding-bottom: calc(90px + env(safe-area-inset-bottom, 0px)); }
 
-.wsx__narration { font: 600 var(--text-base) var(--font-body); color: var(--color-text); margin-bottom: var(--space-3); }
-.wsx__narration .muted { color: var(--color-text-tertiary); font-weight: 400; }
-.wsx__brief { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4); align-items: start; }
 .wsx-widget { position: relative; border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-bg-elevated); box-shadow: var(--shadow-sm); overflow: hidden; }
 .wsx-widget.is-dragging { opacity: 0.45; }
 .wsx-widget__head { display: flex; align-items: center; gap: 8px; padding: 13px 16px; border-bottom: 1px solid var(--color-border); font: 700 var(--text-sm) var(--font-body); }
 .wsx-widget__count { margin-left: auto; font: 600 var(--text-xs) var(--font-body); color: var(--color-text-tertiary); background: var(--color-surface); padding: 1px 8px; border-radius: 999px; }
 .wsx-widget__body { padding: 8px; max-height: 360px; overflow-y: auto; overscroll-behavior: contain; }
-/* Wide widgets (Recently viewed / For you / Activity) flow into the page scroll instead
-   of trapping the wheel in a 360px inner scroller that competes with the pane. */
-.wsx-widget--wide .wsx-widget__body { max-height: none; overflow: visible; }
-.wsx-widget--wide { grid-column: span 2; }
-.wsx-widget[data-span="1"] { grid-column: span 1; }
-.wsx-widget[data-span="2"] { grid-column: span 2; }
 .wsx-widget__grip { width: 22px; height: 26px; display: grid; place-items: center; border: 0; background: transparent; color: var(--color-text-tertiary); cursor: grab; opacity: 0; transition: opacity var(--duration-fast); margin: -4px 0 -4px -6px; flex: none; }
 .wsx-widget:hover .wsx-widget__grip { opacity: 1; }
 .wsx-widget__grip:active { cursor: grabbing; }
@@ -157,44 +148,7 @@ export const WORKSPACE_CANVAS_STYLES = `/* ---- canvas ---- */
 .wsx-clarify__q { font: 600 var(--text-sm) var(--font-body); margin-bottom: 8px; }
 .wsx-clarify__opts, .wsx-suggest { display: flex; flex-wrap: wrap; gap: 6px; }
 .wsx.is-create .wsx__thread { max-height: 52vh; }
-@media (max-width: 900px) { .wsx__brief { grid-template-columns: 1fr; } .wsx-widget, .wsx-widget--wide, .wsx-widget[data-span="2"], .wsx-widget[data-span="1"] { grid-column: auto; } }
 
-/* Home: fixed calm layout (Needs you / For you / Recent). Drag + resize + view toggle live behind "More > Customize". */
-.wsx__homehead { display: flex; align-items: flex-start; gap: var(--space-3); margin-bottom: var(--space-4); }
-.wsx__homehead .wsx__narration { flex: 1; min-width: 0; margin: 0; }
-.wsx__more { position: relative; flex: none; }
-.wsx__morebtn { display: inline-grid; place-items: center; width: 32px; height: 32px; border: 0; border-radius: var(--radius-md); background: transparent; color: var(--color-text-tertiary); cursor: pointer; transition: background var(--duration-fast), color var(--duration-fast); }
-.wsx__morebtn:hover, .wsx__morebtn[aria-expanded="true"] { background: var(--color-surface); color: var(--color-text); }
-.wsx__morebtn:focus-visible, .wsx__morem button:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 1px; }
-.wsx__morem { position: absolute; right: 0; top: 36px; z-index: 20; min-width: 200px; padding: 6px; display: flex; flex-direction: column; border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-bg-elevated); box-shadow: var(--shadow-md); }
-.wsx__morem[hidden], .wsx__morem button[hidden] { display: none; }
-.wsx__morem button { text-align: left; border: 0; background: transparent; color: var(--color-text); font: 500 var(--text-sm) var(--font-body); padding: 8px 10px; border-radius: var(--radius-md); cursor: pointer; }
-.wsx__morem button:hover { background: var(--color-surface); }
-.wsx__morem button.is-on { font-weight: 700; }
-.wsx__morem button.is-on::after { content: '\\2713'; float: right; color: var(--color-primary); }
-.wsx__morehd { padding: 10px 10px 4px; font: 700 var(--text-xs) var(--font-body); letter-spacing: .04em; text-transform: uppercase; color: var(--color-text-tertiary); }
-.wsx__brief { display: flex; flex-direction: column; align-items: stretch; gap: var(--space-6); }
-.wsx__brief .wsx-ev__main { display: flex; flex-direction: column; gap: 1px; }
-.wsx__brief .wsx-widget { border: 0; background: transparent; box-shadow: none; overflow: visible; }
-.wsx__brief .wsx-widget__head { padding: 0 2px var(--space-3); border-bottom: 0; font: 600 var(--text-sm) var(--font-body); color: var(--color-text-secondary); }
-.wsx__brief .wsx-widget__head > svg { display: none; }
-.wsx__brief .wsx-widget__body { padding: 0; }
-.wsx__brief .wsx-widget[data-wid="wsxNeedsYou"] { border: 1px solid var(--color-border); background: var(--color-bg-elevated); box-shadow: var(--shadow-sm); border-radius: var(--radius-lg); }
-.wsx__brief .wsx-widget[data-wid="wsxNeedsYou"] .wsx-widget__head { padding: 13px 16px 4px; color: var(--color-text); }
-.wsx__brief .wsx-widget[data-wid="wsxNeedsYou"] .wsx-widget__body { padding: 4px 8px 8px; max-height: 360px; overflow-y: auto; }
-.wsx__brief:not(.is-customizing) .wsx-widget__grip, .wsx__brief:not(.is-customizing) .wsx-widget__rz, .wsx__brief:not(.is-customizing) .wsx-viewseg { display: none; }
-.wsx__brief.is-customizing .wsx-widget { border: 1px dashed var(--color-border-strong); border-radius: var(--radius-lg); }
-.wsx__brief.is-customizing .wsx-widget__grip, .wsx__brief.is-customizing .wsx-widget__rz { opacity: 1; }
-.wsx__brief.is-customizing .wsx-widget__head { padding: 13px 16px; }
-.wsx-rc { display: flex; align-items: center; gap: var(--space-3); padding: 10px 2px; border-bottom: 1px solid var(--color-border); text-decoration: none; color: inherit; }
-.wsx-rc:last-child { border-bottom: 0; }
-a.wsx-rc:hover .wsx-rc__name { color: var(--color-primary); }
-.wsx-rc__main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
-.wsx-rc__name { font: 600 var(--text-sm) var(--font-body); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.wsx-rc__sum { font-size: var(--text-xs); color: var(--color-text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.wsx-rc__tag { flex: none; font: 600 var(--text-xs) var(--font-body); padding: 2px 9px; border-radius: 999px; background: var(--color-surface); color: var(--color-text-secondary); }
-.wsx-rc[data-kind="run"] .wsx-rc__tag { background: var(--color-success-light); color: var(--color-success); }
-.wsx-rc__time { flex: none; min-width: 28px; text-align: right; font-size: var(--text-xs); color: var(--color-text-tertiary); }
 .wsx-empty[hidden] { display: none; }
 
 /* list rows (schedules / alerts) */

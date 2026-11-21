@@ -24,7 +24,7 @@ import { getInternalWorkspaceRole } from '../../workspaces/roles';
 import { canManageTeamFolder, membersCanCreateFolders } from '../../folders';
 import { isFeatureEnabled } from '../../features/flags';
 import { CREATE_FEATURE } from '../create-gate';
-import { renderArtifactCard, renderArtifactRow, renderHomeEmptyState, renderRecentActivity, renderRecentComments, renderFolderCard, renderFolderRow } from './render-cards';
+import { renderArtifactCard, renderArtifactMini, renderArtifactRow, renderHomeEmptyState, renderRecentActivity, renderRecentComments, renderFolderCard, renderFolderRow } from './render-cards';
 import { buildResultLabel } from './utils';
 import { jsonWithApiErrors } from '../../http/api-error';
 import { getUserProfile, setUserProfile, addFollow, removeFollow, type Follow, type FollowKind } from '../../users/user-profile';
@@ -144,6 +144,7 @@ export async function handleHomeForYouApi(
   return Response.json({
     cardsHtml: artifacts.map((a) => renderArtifactCard(a, url.hostname, env)).join(''),
     rowsHtml: artifacts.map((a) => renderArtifactRow(a, url.hostname, env)).join(''),
+    miniHtml: artifacts.map((a) => renderArtifactMini(a)).join(''),
     count: artifacts.length,
     ids: artifacts.map((a) => a.id),
   });
@@ -164,6 +165,7 @@ export async function handleHomeRecentApi(
   return Response.json({
     cardsHtml: artifacts.map((a) => renderArtifactCard(a, url.hostname, env)).join(''),
     rowsHtml: artifacts.map((a) => renderArtifactRow(a, url.hostname, env)).join(''),
+    miniHtml: artifacts.map((a) => renderArtifactMini(a, (a as { viewed_at?: string }).viewed_at ?? null)).join(''),
     items: artifacts.map((a) => ({ id: a.id, slug: a.slug, name: a.name, ts: (a as { viewed_at?: string }).viewed_at ?? null })),
     count: artifacts.length,
   });
@@ -443,6 +445,8 @@ export async function handleHomeBrowserApi(
   return Response.json({
     cardsHtml: artifacts.map(a => renderArtifactCard(a, hostname, env)).join(''),
     rowsHtml: artifacts.map(a => renderArtifactRow(a, hostname, env)).join(''),
+    // Home's small tiles (Favorites / Shared with me tabs) ask for them; the lens does not.
+    ...(new URL(request.url).searchParams.get('mini') === '1' ? { miniHtml: artifacts.slice(0, 12).map(a => renderArtifactMini(a)).join('') } : {}),
     emptyHtml: artifacts.length === 0 ? renderHomeEmptyState(filters, createEnabled) : '',
     foldersHtml,
     folderRowsHtml: folders.map(renderFolderRow).join(''),

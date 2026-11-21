@@ -1,10 +1,10 @@
-/** Brief widget grid: drag-reorder + resize, persisted per workspace. */
+/** Home card grid: drag-reorder + resize (a third, two thirds, full width), persisted per workspace. */
 export const workspace_client_widget_layout_JS = `
   // ===== Brief layout: drag-reorder + resize widgets, persisted per workspace =====
   (function () {
     var brief = document.querySelector('.wsx__brief');
     if (!brief) return;
-    var LKEY = 'wsx_layout:' + (window.WSX_WS || '');
+    var LKEY = 'wsx_layout2:' + (window.WSX_WS || ''); // v2: the compact Home cards
     var saved = {};
     try { saved = JSON.parse(localStorage.getItem(LKEY) || '{}') || {}; } catch (e) {}
     saved.order = saved.order || [];
@@ -77,7 +77,7 @@ export const workspace_client_widget_layout_JS = `
       function mv(ev) {
         if (body) body.style.maxHeight = Math.max(120, startH + (ev.clientY - sy)) + 'px';
         var dx = ev.clientX - sx; var span = startSpan;
-        if (dx > 110) span = 2; else if (dx < -110) span = 1;
+        if (dx > 110) span = Math.min(3, startSpan + 1); else if (dx < -110) span = Math.max(1, startSpan - 1); // a third · two thirds · full
         w.setAttribute('data-span', String(span));
       }
       function up() {

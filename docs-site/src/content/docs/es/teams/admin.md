@@ -319,7 +319,7 @@ Content-Type: application/json
 `admin` u `owner`. Los runs fallidos de jobs/crew aparecen en **Needs You**
 aunque el tipo `run` sea ambient en Pulse.
 
-Ver [Tu workspace (Home)](/es/everyone/your-workspace/#inicio--te-necesita-para-vos-reciente).
+Ver [Tu workspace (Home)](/es/everyone/your-workspace/#inicio).
 
 ## Archivos de contexto (Guidance en Knowledge)
 

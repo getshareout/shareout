@@ -68,6 +68,8 @@ describe('workspace home boot requests', () => {
     expect(count('/v1/home/recent-searches')).toBe(0);
     expect(count('/v1/home/recent')).toBeLessThanOrEqual(1);
     expect(count('/v1/home/for-you')).toBeLessThanOrEqual(1);
+    // Home's This week card: one analytics read once the page is idle.
+    expect(count('/v1/home/analytics')).toBeLessThanOrEqual(1);
     const dupes = urls.filter((u, i) => u.startsWith('/v1/') && urls.indexOf(u) !== i);
     expect(dupes).toEqual([]);
     // Lazy lens chunks (admin, knowledge, catalog, edit, …) are not part of boot.
