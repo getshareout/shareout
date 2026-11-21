@@ -88,6 +88,15 @@ describe('header title menu and comments button', () => {
     expect(btn.getAttribute('aria-expanded')).toBe('false');
   });
 
+  it('a click inside the artifact frame (the window loses focus) closes the menu', () => {
+    loadHeader();
+    w().soHdMenu();
+    expect(document.getElementById('so-hd-menu')!.hidden).toBe(false);
+    window.dispatchEvent(new Event('blur'));
+    expect(document.getElementById('so-hd-menu')!.hidden).toBe(true);
+    expect(document.getElementById('so-hd-menu-btn')!.getAttribute('aria-expanded')).toBe('false');
+  });
+
   it('moves focus into the menu only when opened from the keyboard, and Esc closes it', () => {
     loadHeader();
     w().soHdMenu(undefined, { detail: 1 });
