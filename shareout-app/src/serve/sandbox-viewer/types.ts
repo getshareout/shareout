@@ -9,7 +9,7 @@ export interface ViewerUser {
   picture: string;
 }
 
-/** Inputs required to render the floating viewer toolbar and overlays. */
+/** Inputs required to render the viewer header and its side panels. */
 export interface ToolbarRenderContext {
   showToolbar: boolean;
   loggedIn: boolean;
@@ -27,11 +27,12 @@ export interface ToolbarRenderContext {
   slug: string;
   artifactId: string;
   loginRedirect: string;
-  userLabel: string;
-  userFirstName: string;
-  avatarInner: string;
-  /** False when Live Studio is off for the artifact's workspace (toolbar shows a greyed control). */
-  visualEditorEnabled: boolean;
+  /** The page's name, shown in the header. */
+  title: string;
+  /** Display name of the artifact's owner, for signed-in viewers; null hides it. */
+  ownerName: string | null;
+  /** Number of the version being viewed, for signed-in viewers; null hides it. */
+  versionNo: number | null;
   /** Skills attached to this artifact, shown read-only to any signed-in viewer. Empty for anonymous views. */
   attachedSkills: Array<{ name: string; slug: string }>;
   /** Language the toolbar speaks: the artifact's workspace locale, else the viewer's browser. */

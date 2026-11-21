@@ -211,7 +211,7 @@ de visitantes.
 | **Home** — tarjetas de artefactos | Badge Skills cuando el artefacto tiene adjuntos |
 | **Stats** → Skills adjuntos | Cualquier artefacto con skills; el picker attach/detach requiere workspace de equipo |
 | **Editor** — rail Details → Skills | Lista de solo lectura al editar |
-| **Viewer** — toolbar flotante → **Skills N** | Visitantes autenticados (colaboradores, miembros del workspace); abre un popover de solo lectura con link a cada skill. Los visitantes anónimos no lo ven. |
+| **Viewer** — header → menú del nombre → **Habilidades N** | Visitantes autenticados (colaboradores, miembros del workspace); abre un panel lateral de solo lectura con link a cada skill. Los visitantes anónimos no lo ven. |
 
 ```http
 GET  /v1/artifacts/{artifactId}/skills

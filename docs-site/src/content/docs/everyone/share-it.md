@@ -94,6 +94,17 @@ When the owner approves, you can edit it.
 If you already asked, ShareOut shows that your request was sent — there's no need to ask
 again. If nothing happens, message the owner directly.
 
+## What people see when they open it
+
+Your page fills the screen, with a slim bar on top:
+
+- **On the left:** the page's name, and for people signed in, who owns it and which version they're looking at. The arrow goes back to ShareOut.
+- **On the right:** a star to keep it in your favorites, **Schedule** to get it sent to you by email, Slack or Telegram, **Comments**, and **Share**.
+- **Comments** opens a panel that floats on the right. The page stays visible, so you can keep reading while you write.
+- Click the page's name for the rest: **Follow a number**, the page's **Skills**, and, if it's yours, **Open in ShareOut**, where you edit it, see its stats and change its settings.
+
+Someone without an account sees only the name and, if comments are on, **Comments**. Want the page with nothing from ShareOut around it? In ShareOut, open the page, then **Details → More → ShareOut bar**, and turn it off.
+
 ## It looks good when you share it
 
 Paste your link into a text, WhatsApp, or Slack and it shows a **nice preview** — a title, a description, and a picture — instead of a bare web address. ShareOut makes that preview for you automatically, so your page looks polished the moment you send it. Want a specific picture or wording? Just ask.

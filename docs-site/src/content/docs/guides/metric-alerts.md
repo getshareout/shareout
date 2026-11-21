@@ -71,8 +71,8 @@ day) stops a metric that stays past its threshold from alerting on every check.
 - **Managers** (artifact owner/editor, or a workspace owner/admin) define metrics
   and send alerts anywhere — team Slack channels, webhooks, any email.
 - **Viewers** can subscribe to themselves only — a Slack DM or an email to their
-  own address. On a published page they can do this from the **Follow metric**
-  button in the toolbar.
+  own address. On a published page they can do this from **Follow a number**
+  in the menu under the page's name.
 - On an artifact with a **row-level access policy**, only the owner and editors
   can follow its metrics. A metric counts every row, so anyone the policy limits
   to some rows doesn't get **Follow metric**, can't create or run alerts there,

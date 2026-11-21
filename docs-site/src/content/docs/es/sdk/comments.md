@@ -233,9 +233,11 @@ GET /v1/data/{artifactId}/comments?assignee=alice@example.com
 
 **Herramientas de crew IA:** `action_item_create`, `action_item_list`.
 
-## Toolbar del viewer (UI integrada)
+## Header del viewer (UI integrada)
 
-Con comentarios habilitados en un artefacto, los viewers logueados ven una toolbar flotante:
+Con comentarios habilitados en un artefacto, el header del viewer tiene un botón
+**Comentarios**. Abre un panel que flota a la derecha, debajo del header, y deja el
+artefacto usable. El panel tiene:
 
 | Función | Notas |
 | --- | --- |

@@ -7,7 +7,7 @@ Your page can do things **on its own** — no one sitting there pressing buttons
 
 ## From the page itself
 
-When you're viewing a page you're allowed to manage, the toolbar has a **schedule** button.
+When you're viewing a page signed in, the bar at the top has a **Schedule** button.
 Pick email, Slack, or Telegram, choose how often, and ShareOut creates the job for you —
 no API calls needed. Owners and editors can schedule delivery to other people; viewers
 can subscribe to get the page sent to their own inbox on a recurring schedule.

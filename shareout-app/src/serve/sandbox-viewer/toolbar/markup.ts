@@ -4,10 +4,30 @@ import { TOOLBAR_COPY } from './copy';
 import { GUEST_COPY } from './copy-guest';
 import { renderGuestPanel } from './script-guest';
 
-/** HTML for toolbar buttons, overlays, and comment panel shells. */
+const icon = (paths: string, size = 16) =>
+  `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths}</svg>`;
+const ICON = {
+  back: '<path d="M19 12H5"/><path d="m12 19-7-7 7-7"/>',
+  chevron: '<path d="m6 9 6 6 6-6"/>',
+  star: '<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>',
+  calendar: '<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>',
+  comment: '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>',
+  share: '<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>',
+  metric: '<path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/>',
+  book: '<path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>',
+  external: '<path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>',
+  close: '<path d="M18 6L6 18M6 6l12 12"/>',
+};
+
+/**
+ * The viewer header: a slim bar above the artifact with the page's name, who owns it
+ * and its version on the left, and the few things a viewer does on the right
+ * (favorite, schedule, comments, share). Rarely used actions sit in the title's menu.
+ * Owner tools (edit, stats, settings) live in ShareOut's home, linked from that menu.
+ * Also renders the comments and skills side panels the header opens.
+ */
 export function renderToolbarMarkup(ctx: ToolbarRenderContext): string {
   const {
-    currentUser,
     adminInfo,
     loggedIn,
     isFav,
@@ -20,197 +40,71 @@ export function renderToolbarMarkup(ctx: ToolbarRenderContext): string {
     slug,
     artifactId,
     loginRedirect,
-    userLabel,
-    userFirstName,
-    avatarInner,
-    visualEditorEnabled,
     attachedSkills,
+    title,
+    ownerName,
+    versionNo,
     locale,
   } = ctx;
   const c = TOOLBAR_COPY[locale];
   const canPost = loggedIn || commentsIdentityMode !== 'authenticated' || commentsGuest;
 
-  const editorBtn = adminInfo ? (visualEditorEnabled ? `
-      <a href="${baseUrl}/a/${slug}/edit" class="so-toolbar-btn" title="${c.openStudio}">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-        </svg>
-        ${c.editor}
-      </a>` : `
-      <span class="so-toolbar-btn is-disabled" title="${c.studioOff}" aria-disabled="true">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-        </svg>
-        ${c.editor}
-      </span>`) : '';
-
   const skills = attachedSkills || [];
   const showSkills = loggedIn && skills.length > 0;
-  const skillsBtn = showSkills ? `
-      <button class="so-toolbar-btn" id="so-skills-btn" onclick="soToggleSkills()" title="${c.skillsTitle}" aria-haspopup="true" aria-expanded="false">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
-        </svg>
-        ${c.skills} <span class="so-skills-count">${skills.length}</span>
-      </button>` : '';
-  const skillsOverlay = showSkills ? `
-  <div id="so-skills-overlay">
-    <div class="backdrop" onclick="soCloseSkills()"></div>
-    <div id="so-skills-panel">
-      <div class="so-stats-header">
-        <h3 class="so-stats-title">${c.attachedSkills}</h3>
-        <button class="so-stats-close" onclick="soCloseSkills()" aria-label="${c.close}">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
-        </button>
-      </div>
-      <div class="so-skills-body">
-        <p class="so-skills-intro">${c.skillsIntro}</p>
-        <div class="so-skills-list">
-          ${skills.map(s => `<a class="so-skill-chip" href="${baseUrl}/a/${escapeHtml(s.slug)}/" target="_blank" rel="noopener">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
-            <span>${escapeHtml(s.name)}</span>
-          </a>`).join('')}
-        </div>
-      </div>
-    </div>
-  </div>` : '';
 
-  return `${loggedIn ? `
-  <div id="so-back-zone" aria-hidden="true"></div>
-  <a href="/home" id="so-back-home" title="${c.backAll}" aria-label="${c.backAll}">
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
-    <span class="so-back-label">${c.allArtifacts}</span>
-  </a>` : ''}
-  <div id="shareout-admin-toolbar"${loggedIn ? '' : ' class="so-solo so-open"'}>
-    <div id="so-toolbar-items">${currentUser ? `
-      <button class="so-toolbar-btn so-avatar-btn"${adminInfo ? ' onclick="openAdmin()"' : ''} title="${escapeHtml(userLabel)}">
-        <span class="so-avatar">${avatarInner}</span>
-        <span>${escapeHtml(userFirstName)}</span>
-      </button>` : ''}${loggedIn ? `
-      <a href="/home" class="so-toolbar-btn" title="${c.backAllYours}">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
-        ${c.allArtifacts}
-      </a>` : ''}${loggedIn ? `
-      <button class="so-toolbar-btn so-fav-btn${isFav ? ' active' : ''}" id="so-fav-btn" onclick="toggleFav()" title="${isFav ? c.favRemove : c.favAdd}" aria-pressed="${isFav ? 'true' : 'false'}">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="${isFav ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linejoin="round">
-          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
-        </svg>
-        <span id="so-fav-label">${isFav ? c.favorited : c.favorite}</span>
-      </button>
-      <button class="so-toolbar-btn" id="so-share-btn" onclick='openShare(${JSON.stringify(artifactId)},${JSON.stringify(slug)},${JSON.stringify(slug)},${adminInfo?.canEdit ? 'true' : 'false'})' title="${c.shareTitle}">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
-        </svg>
-        ${c.share}
-      </button>
-      <button class="so-toolbar-btn so-live-presence-btn" id="so-live-presence-btn" title="${c.liveViewers}">
+  const menuItems = [
+    loggedIn && hasMetrics ? `
+        <button type="button" class="so-hd__item" role="menuitem" onclick="soHdMenu(false);soOpenFollow()" title="${c.followTitle}">${icon(ICON.metric)}<span>${c.followMetric}</span></button>` : '',
+    showSkills ? `
+        <button type="button" class="so-hd__item" role="menuitem" id="so-skills-btn" onclick="soHdMenu(false);soToggleSkills()" title="${c.skillsTitle}" aria-haspopup="dialog" aria-expanded="false">${icon(ICON.book)}<span>${c.skills}</span><span class="so-skills-count">${skills.length}</span></button>` : '',
+    adminInfo ? `${loggedIn && (hasMetrics || showSkills) ? '\n        <div class="so-hd__sep" role="separator"></div>' : ''}
+        <a class="so-hd__item" role="menuitem" href="${baseUrl}/home#a/${encodeURIComponent(slug)}" title="${c.openInShareOutTitle}">${icon(ICON.external)}<span>${c.openInShareOut}</span></a>` : '',
+  ].join('');
+  const hasMenu = menuItems.trim() !== '';
+
+  const name = `<span class="so-hd__name">${escapeHtml(title)}</span>`;
+  const titleEl = hasMenu
+    ? `<button type="button" class="so-hd__title" id="so-hd-menu-btn" onclick="soHdMenu(undefined, event)" aria-haspopup="menu" aria-expanded="false" aria-controls="so-hd-menu" title="${c.moreOptions}">${name}${icon(ICON.chevron, 14)}</button>`
+    : `<span class="so-hd__title">${name}</span>`;
+  const meta = [ownerName ? escapeHtml(ownerName) : '', versionNo ? `<span title="${c.versionTitle}${versionNo}">v${versionNo}</span>` : '']
+    .filter(Boolean).join('<span class="so-hd__dot" aria-hidden="true">·</span>');
+
+  const commentsBtn = commentsEnabled ? (canPost ? `
+      <button type="button" class="so-hd__btn" id="so-cmt-btn" onclick="soHdComments()" title="${c.comments}" aria-label="${c.comments}">${icon(ICON.comment)}<span class="so-hd__label">${c.comments}</span>${commentCount > 0 ? `<span class="so-cmt-count" id="so-cmt-count">${commentCount}</span>` : ''}</button>` : `
+      <a class="so-hd__btn" href="${baseUrl}/auth/login?redirect=${encodeURIComponent(loginRedirect)}" title="${c.loginToComment}">${icon(ICON.comment)}<span class="so-hd__label">${c.loginToComment}</span></a>`) : '';
+
+  return `
+  <header id="so-header" class="so-hd${loggedIn ? '' : ' so-hd--guest'}">
+    <div class="so-hd__left">${loggedIn ? `
+      <a href="${baseUrl}/home" class="so-hd__btn so-hd__btn--icon" title="${c.back}" aria-label="${c.back}">${icon(ICON.back)}</a>` : `
+      <img src="${baseUrl}/brand/logo-mark.png" alt="ShareOut" width="20" height="20" class="so-hd__mark">`}
+      <div class="so-hd__titlewrap">
+        ${titleEl}${meta ? `
+        <span class="so-hd__meta">${meta}</span>` : ''}${hasMenu ? `
+        <div class="so-hd__menu" id="so-hd-menu" role="menu" aria-label="${c.moreOptions}" hidden>${menuItems}
+        </div>` : ''}
+      </div>
+    </div>
+    <div class="so-hd__right" id="so-hd-actions">${loggedIn ? `
+      <span class="so-live-presence-btn" id="so-live-presence-btn" title="${c.liveViewers}" hidden>
         <span class="so-live-presence-dot" aria-hidden="true"></span>
-        <span id="so-live-presence-label">0 ${c.viewingNow}</span>
         <span class="so-live-presence-avatars" id="so-live-presence-avatars" aria-hidden="true"></span>
-      </button>` : ''}${skillsBtn}${loggedIn && !adminInfo ? `
-      <button class="so-toolbar-btn" onclick="soOpenSchedule(true)" title="${c.notifyTitle}">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>
-        </svg>
-        ${c.notifyMe}
-      </button>` : ''}${loggedIn && hasMetrics ? `
-      <button class="so-toolbar-btn" onclick="soOpenFollow()" title="${c.followTitle}">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/>
-        </svg>
-        ${c.followMetric}
-      </button>` : ''}${commentsEnabled ? (canPost ? `
-      <button class="so-toolbar-btn" id="so-cmt-btn" onclick="openComments()" title="${c.comments}">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-        </svg>
-        ${c.comments}${commentCount > 0 ? ` <span class="so-cmt-count" id="so-cmt-count">${commentCount}</span>` : ''}
-      </button>` : `
-      <a href="${baseUrl}/auth/login?redirect=${encodeURIComponent(loginRedirect)}" class="so-toolbar-btn" title="${c.loginToComment}">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-        </svg>
-        ${c.loginToComment}
-      </a>`) : ''}${adminInfo ? `${editorBtn}
-      <button class="so-toolbar-btn" onclick="openStats()">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/>
-        </svg>
-        ${c.stats}
-      </button>
-      <button class="so-toolbar-btn" onclick="openAdmin()">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-        </svg>
-        ${c.settings}
-      </button>
-      <button class="so-toolbar-btn" onclick="soOpenSchedule(false)" title="${c.scheduleTitle}">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>
-        </svg>
-        ${c.schedule}
-      </button>` : ''}
-    </div>
-    <button id="so-toolbar-trigger" onclick="soToggleToolbar()" aria-label="${c.toggleToolbar}" aria-expanded="false">
-      ${commentCount > 0 ? `<span id="so-trig-badge">${commentCount}</span>` : '<span id="so-trig-badge" style="display:none"></span>'}
-      <span class="so-trig-icon">
-        <img src="${baseUrl}/brand/logo-mark.png" alt="ShareOut" width="24" height="24" class="so-trig-logo">
+        <span class="so-hd__label" id="so-live-presence-label"></span>
       </span>
-    </button>
-  </div>${adminInfo ? `
-  <div id="so-stats-overlay">
-    <div class="backdrop" onclick="closeStats()"></div>
-    <div id="so-stats-panel">
-      <div class="so-stats-header">
-        <h3 class="so-stats-title">${c.analytics}</h3>
-        <button class="so-stats-close" onclick="closeStats()">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M18 6L6 18M6 6l12 12"/>
-          </svg>
-        </button>
-      </div>
-      <div class="so-stats-content" id="so-stats-content">
-        <div class="so-stats-loading">${c.loadingStats}</div>
-      </div>
-      <a href="${baseUrl}/a/${slug}/admin" class="so-admin-link">${c.fullDashboard}</a>
+      <button type="button" class="so-hd__btn so-hd__btn--icon so-fav-btn${isFav ? ' active' : ''}" id="so-fav-btn" onclick="toggleFav()" title="${isFav ? c.favRemove : c.favAdd}" aria-pressed="${isFav ? 'true' : 'false'}">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="${isFav ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true">${ICON.star}</svg>
+        <span class="so-hd__sr" id="so-fav-label">${isFav ? c.favorited : c.favorite}</span>
+      </button>
+      <button type="button" class="so-hd__btn" onclick="soOpenSchedule(${adminInfo ? 'false' : 'true'})" title="${adminInfo ? c.scheduleTitle : c.notifyTitle}" aria-label="${c.schedule}">${icon(ICON.calendar)}<span class="so-hd__label">${c.schedule}</span></button>` : ''}${commentsBtn}${loggedIn ? `
+      <button type="button" class="so-hd__btn so-hd__btn--primary" id="so-share-btn" onclick='openShare(${JSON.stringify(artifactId)},${JSON.stringify(slug)},${JSON.stringify(slug)},${adminInfo?.canEdit ? 'true' : 'false'})' title="${c.shareTitle}" aria-label="${c.share}">${icon(ICON.share)}<span class="so-hd__label">${c.share}</span></button>` : ''}
     </div>
-  </div>
-  <div id="so-admin-overlay">
-    <div class="backdrop" onclick="closeAdmin()"></div>
-    <div id="so-admin-panel">
-      <div class="so-stats-header">
-        <h3 class="so-stats-title">${c.settings}</h3>
-        <button class="so-stats-close" onclick="closeAdmin()">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M18 6L6 18M6 6l12 12"/>
-          </svg>
-        </button>
-      </div>${currentUser ? `
-      <div class="so-admin-user">
-        <span class="so-avatar so-avatar-lg">${avatarInner}</span>
-        <div class="so-admin-user-meta">
-          <span class="so-admin-user-name">${escapeHtml(userLabel)}</span>
-          ${currentUser.name ? `<span class="so-admin-user-email">${escapeHtml(currentUser.email)}</span>` : ''}
-        </div>
-      </div>` : ''}
-      <div class="so-stats-content" id="so-admin-content">
-        <div class="so-stats-loading">${c.loadingDots}</div>
-      </div>
-    </div>
-  </div>` : ''}${canPost && commentsEnabled ? `
+  </header>${canPost && commentsEnabled ? `
   <div id="so-pins-layer"></div>
   <div id="so-comments-overlay" data-identity-mode="${commentsIdentityMode}" data-logged-in="${loggedIn ? '1' : '0'}" data-guest="${!loggedIn && commentsGuest ? '1' : '0'}">
-    <div class="backdrop" onclick="closeComments()"></div>
-    <div id="so-comments-panel">
-      <div class="so-stats-header">
-        <h3 class="so-stats-title">${c.comments}<span class="so-cmt-presence" id="so-cmt-presence"></span></h3>
-        <button class="so-stats-close" onclick="closeComments()" aria-label="${c.closeComments}">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M18 6L6 18M6 6l12 12"/>
-          </svg>
-        </button>
+    <div id="so-comments-panel" class="so-side" role="dialog" aria-modal="false" aria-labelledby="so-cmt-title">
+      <div class="so-side__head">
+        <h3 class="so-side__title" id="so-cmt-title">${c.comments}<span class="so-cmt-presence" id="so-cmt-presence"></span></h3>
+        <button class="so-side__close" onclick="closeComments()" aria-label="${c.closeComments}">${icon(ICON.close, 18)}</button>
       </div>
       <div class="so-cmt-tabs">
         <button class="so-cmt-tab active" id="so-cmt-tab-open" onclick="setCommentFilter('open')">${c.open}</button>
@@ -235,5 +129,19 @@ export function renderToolbarMarkup(ctx: ToolbarRenderContext): string {
         <div class="so-cmt-replying" id="so-cmt-replying" style="margin-top:8px"></div>
       </div>
     </div>
-  </div>` : ''}${skillsOverlay}`;
+  </div>` : ''}${showSkills ? `
+  <div id="so-skills-overlay">
+    <div id="so-skills-panel" class="so-side" role="dialog" aria-modal="false" aria-labelledby="so-skills-title">
+      <div class="so-side__head">
+        <h3 class="so-side__title" id="so-skills-title">${c.attachedSkills}</h3>
+        <button class="so-side__close" onclick="soCloseSkills()" aria-label="${c.close}">${icon(ICON.close, 18)}</button>
+      </div>
+      <div class="so-skills-body">
+        <p class="so-skills-intro">${c.skillsIntro}</p>
+        <div class="so-skills-list">
+          ${skills.map(s => `<a class="so-skill-chip" href="${baseUrl}/a/${escapeHtml(s.slug)}/" target="_blank" rel="noopener">${icon(ICON.book, 13)}<span>${escapeHtml(s.name)}</span></a>`).join('')}
+        </div>
+      </div>
+    </div>
+  </div>` : ''}`;
 }

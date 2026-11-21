@@ -492,21 +492,21 @@ All `allow_anon_*` flags default to `false`. See [modules/_shared/publishing.md]
 
 Transitioning **into** `public` may run an automated content-safety check. If it isn't cleared instantly, PATCH returns `202` with `code: "MODERATION_HELD"`, a `reason`, and the artifact stays `private` — but it is re-checked automatically within the hour and goes public by itself once it clears (no re-publish needed).
 
-## Viewer toolbar (ShareOut chrome)
+## Viewer header (ShareOut chrome)
 
-Logged-in viewers see a floating ShareOut toolbar on `/a/{slug}/` (favorite, edit link, schedule delivery, notify-me, **Skills** when attachments exist, etc.). The **schedule** button opens a modal to create recurring delivery via **email**, **Slack**, or **Telegram** — no API calls needed. When an artifact has attached skills (Teams workspace), signed-in viewers see a **Skills N** button that opens a read-only popover linking to each skill — skills do not load into visitor chat. Owners and editors can schedule to other recipients; viewers with access can subscribe to delivery **to themselves** only (their own inbox, Slack DM, or linked Telegram chat). Jobs created from the toolbar use the same `POST /v1/jobs` actions documented in [jobs.md](jobs.md). Owners can tune the toolbar from its admin menu or by writing the reserved JSON key `_viewer_config`:
+`/a/{slug}/` shows the page under a slim ShareOut header. Signed-in viewers see the page's name, its owner and version, a favorite star, **Schedule**, **Comments** (a side panel floating on the right) and **Share**; the name opens a menu with **Follow a number**, **Skills N** when the artifact has attached skills (a read-only panel linking to each skill — skills do not load into visitor chat) and, for owners and editors, **Open in ShareOut** (`/home#a/{slug}`), where editing, stats and settings live. Visitors without an account see the name and **Comments** when comments are on. The header shows on phones too, with icon-only buttons.
+
+**Schedule** opens a modal to create recurring delivery via **email**, **Slack**, or **Telegram** — no API calls needed. Owners and editors can schedule to other recipients; anyone else signed in subscribes **to themselves** only (their own inbox, Slack DM, or linked Telegram chat). Jobs created from the header use the same `POST /v1/jobs` actions documented in [jobs.md](jobs.md). Owners hide the header from ShareOut (**Details → More → ShareOut bar**) or by writing the reserved JSON key `_viewer_config`:
 
 ```json
 {
-  "hide_toolbar": false,
-  "show_on_mobile": false
+  "hide_toolbar": false
 }
 ```
 
 | Field | Default | Effect |
 |-------|---------|--------|
-| `hide_toolbar` | `false` | When `true`, the toolbar is not rendered at all |
-| `show_on_mobile` | `false` | When `false`, toolbar is hidden on small screens (avoids overlapping artifact FABs); set `true` to show it on phones |
+| `hide_toolbar` | `false` | When `true`, the header is not rendered at all |
 
 ```http
 PUT /v1/data/{artifactId}/json/_viewer_config

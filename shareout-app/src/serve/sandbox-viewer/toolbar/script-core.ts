@@ -23,31 +23,37 @@ export function renderToolbarScriptCore(c: ToolbarCopy = TOOLBAR_COPY.en, locale
       if (seconds < 60) return '${js(c.justNow)}';
 ${ago}
     }
-    window.soToggleToolbar = function() {
-      var tb = document.getElementById('shareout-admin-toolbar');
-      var trig = document.getElementById('so-toolbar-trigger');
-      if (!tb) return;
-      var isOpen = tb.classList.contains('so-open');
-      var items = tb.querySelectorAll('.so-toolbar-btn');
-      if (trig) {
-        trig.classList.remove('so-spin');
-        void trig.offsetWidth;
-        trig.classList.add('so-spin');
-      }
-      if (!isOpen) {
-        var n = items.length;
-        for (var i = 0; i < n; i++) {
-          items[i].style.transitionDelay = ((n - 1 - i) * 45) + 'ms';
-        }
-        tb.classList.add('so-open');
-        if (trig) trig.setAttribute('aria-expanded', 'true');
-      } else {
-        for (var j = 0; j < items.length; j++) {
-          items[j].style.transitionDelay = '';
-        }
-        tb.classList.remove('so-open');
-        if (trig) trig.setAttribute('aria-expanded', 'false');
-      }
+    // Title menu: opens under the title, closes on a pick, a click outside or Esc.
+    window.soHdMenu = function(open, ev) {
+      var menu = document.getElementById('so-hd-menu');
+      var btn = document.getElementById('so-hd-menu-btn');
+      if (!menu || !btn) return;
+      var show = typeof open === 'boolean' ? open : menu.hidden;
+      menu.hidden = !show;
+      btn.setAttribute('aria-expanded', show ? 'true' : 'false');
+      // Opened from the keyboard (a click with no pointer): move focus into the menu.
+      if (show && ev && ev.detail === 0) { var first = menu.querySelector('[role="menuitem"]'); if (first) first.focus(); }
+    };
+    document.addEventListener('click', function(e) {
+      var menu = document.getElementById('so-hd-menu');
+      if (!menu || menu.hidden) return;
+      var wrap = menu.parentNode;
+      if (wrap && !wrap.contains(e.target)) soHdMenu(false);
+    });
+    document.addEventListener('keydown', function(e) {
+      var menu = document.getElementById('so-hd-menu');
+      if (e.key !== 'Escape' || !menu || menu.hidden) return;
+      soHdMenu(false);
+      var btn = document.getElementById('so-hd-menu-btn');
+      if (btn) btn.focus();
+    });
+    // The Comments button opens the side panel, and closes it when it is already open.
+    window.soHdComments = function() {
+      var ov = document.getElementById('so-comments-overlay');
+      if (ov && ov.classList.contains('open')) { if (window.closeComments) closeComments(); }
+      else if (window.openComments) openComments();
+      var btn = document.getElementById('so-cmt-btn');
+      if (btn && ov) btn.setAttribute('aria-expanded', ov.classList.contains('open') ? 'true' : 'false');
     };
     window.soToggleSkills = function() {
       var ov = document.getElementById('so-skills-overlay');

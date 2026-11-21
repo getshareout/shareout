@@ -94,6 +94,17 @@ permiso de edición**. Cuando el dueño aprueba, ya podés editarlo.
 Si ya pediste acceso, ShareOut te muestra que la solicitud se envió: no hace falta pedir
 de nuevo. Si no pasa nada, escribile al dueño directamente.
 
+## Qué ve la gente cuando lo abre
+
+Tu artefacto ocupa toda la pantalla, con una barra fina arriba:
+
+- **A la izquierda:** el nombre del artefacto y, para quien entró con su cuenta, de quién es y qué versión está viendo. La flecha vuelve a ShareOut.
+- **A la derecha:** una estrella para guardarlo en favoritos, **Programar** para que te llegue por mail, Slack o Telegram, **Comentarios** y **Compartir**.
+- **Comentarios** abre un panel que flota a la derecha. El artefacto sigue a la vista, así podés seguir leyendo mientras escribís.
+- Tocá el nombre del artefacto para el resto: **Seguir un número**, las **Habilidades** del artefacto y, si es tuyo, **Abrir en ShareOut**, donde lo editás, mirás sus estadísticas y cambiás su configuración.
+
+Alguien sin cuenta ve solo el nombre y, si los comentarios están prendidos, **Comentarios**. ¿Querés el artefacto sin nada de ShareOut alrededor? En ShareOut, abrilo y andá a **Detalles → Más → Barra de ShareOut**, y apagala.
+
 ## Se ve bien cuando lo compartís
 
 Pegá tu link en un mensaje, WhatsApp o Slack y muestra una **vista previa linda** — un título, una descripción y una imagen — en vez de una dirección pelada. ShareOut arma esa vista previa solo, así tu artefacto queda pro apenas lo mandás. ¿Querés una imagen o un texto puntual? Solo pedilo.

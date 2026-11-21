@@ -1,36 +1,16 @@
 /**
- * Viewer toolbar styles — Mobile toolbar layout and overlay sizing
+ * Viewer header styles — phone layout: icon-only buttons, full-width panels
  * @module serve/sandbox-viewer/toolbar/styles/responsive
  */
 
-/** CSS rules for: Mobile toolbar layout and overlay sizing */
+/** CSS rules for: the phone layout of the header, its panels and modals */
 export const responsiveStyles = `    @media (max-width: 640px) {
-      /* Toolbar overlaps artifact FABs on mobile — hidden unless the artifact opts in. */
-      body.so-hide-toolbar-mobile #shareout-admin-toolbar,
-      body.so-hide-toolbar-mobile #so-back-zone,
-      body.so-hide-toolbar-mobile #so-back-home {
-        display: none !important;
-      }
-      #shareout-admin-toolbar {
-        flex-direction: column;
-        align-items: flex-end;
-        bottom: 16px;
-        right: 16px;
-      }
-      #so-toolbar-items {
-        flex-direction: column;
-        align-items: flex-end;
-        max-height: calc(100vh - 96px);
-        overflow-y: auto;
-        -webkit-overflow-scrolling: touch;
-      }
-      .so-toolbar-btn {
-        max-width: calc(100vw - 32px);
-        transform: translateY(10px) scale(0.88);
-      }
-      .so-toolbar-btn span { white-space: nowrap; }
-      #so-stats-overlay, #so-admin-overlay { padding: 16px; }
-      #so-stats-panel, #so-admin-panel { width: 100%; max-width: calc(100vw - 32px); }
+      #so-header { gap: var(--space-1); padding: 0 var(--space-1); }
+      .so-hd__label, .so-hd__meta, #so-header .so-ds-pill span { display: none; }
+      .so-hd__btn, #so-header .so-ds-pill { width: 36px; padding: 0; }
+      .so-hd__btn .so-cmt-count { position: absolute; top: 0; right: -2px; min-width: 16px; height: 16px; font-size: 10px; }
+      .so-hd__menu { max-width: calc(100vw - 2 * var(--space-2)); }
+      .so-side { left: var(--space-2); width: auto; }
       .so-sched-dest-grid, .so-sched-row { grid-template-columns: 1fr; }
     }
 `;

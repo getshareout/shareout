@@ -243,7 +243,6 @@ After publish, owners can track engagement — no tier requirement:
 | --- | --- |
 | Home → **Analytics** sidebar | Account roll-up: views, uniques, trend, top artifacts, countries, referrers, load-time p75 |
 | Home artifact detail | Per-artifact views and uniques |
-| Viewer toolbar (signed-in owner) | Quick stats popover |
 
 API: `GET /v1/home/analytics?range=` and `GET /v1/artifacts/{id}/analytics`. See [api/artifacts.md](../../api/artifacts.md#analytics).
 

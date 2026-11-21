@@ -70,7 +70,7 @@ interface CommentsConfig {
   identityMode: 'anonymous' | 'named' | 'authenticated';  // default 'anonymous'
   allowReplies: boolean;                     // default true
   maxDepth: number;                          // 1–10, default 3
-  overlayEnabled?: boolean;                  // signed-in viewer toolbar; default true
+  overlayEnabled?: boolean;                  // Comments button in the viewer header; default true
 }
 ```
 
@@ -302,10 +302,11 @@ GET /v1/data/{artifactId}/comments?assignee=alice@example.com
 
 **AI crew tools:** `comment_create`, `action_item_create`, `action_item_list`.
 
-## Viewer toolbar (built-in UI)
+## Viewer header (built-in UI)
 
-When comments are enabled, the sandbox viewer injects a comments overlay according to
-`identityMode`:
+When comments are enabled, the viewer's header has a **Comments** button. It opens a side
+panel that floats on the right, under the header, and leaves the page usable. Who gets it
+follows `identityMode`:
 
 | `identityMode` | Who sees the panel |
 | --- | --- |

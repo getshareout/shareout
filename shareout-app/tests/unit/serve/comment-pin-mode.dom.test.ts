@@ -34,7 +34,7 @@ describe('viewer: pinned comment placement', () => {
     const ctx = buildToolbarContext({
       loggedIn: true, isFav: false, commentsEnabled: true, commentCount: 0, hasMetrics: false,
       adminInfo: null, currentUser: { id: 'u1', email: 'viewer@example.com', name: 'Viewer', picture: null },
-      hideToolbar: false, baseUrl: '', slug: 'demo', artifactId: 'art_1', visualEditorEnabled: false,
+      hideToolbar: false, baseUrl: '', slug: 'demo', artifactId: 'art_1', title: 'Demo page',
       attachedSkills: [], locale: 'es',
     })!;
     document.body.innerHTML = '<iframe></iframe>' + renderToolbarMarkup(ctx);

@@ -209,7 +209,7 @@ visitor chat.
 | **Home** artifact cards | Skills badge when the artifact has attachments |
 | **Stats** modal → Attached skills | Any artifact with skills; attach/detach picker requires a team workspace |
 | **Editor** Details rail → Skills | Read-only list while editing |
-| **Viewer** floating toolbar → **Skills N** | Signed-in viewers (collaborators, workspace members); opens a read-only popover linking to each skill artifact. Anonymous visitors do not see it. |
+| **Viewer** header → page-name menu → **Skills N** | Signed-in viewers (collaborators, workspace members); opens a read-only side panel linking to each skill artifact. Anonymous visitors do not see it. |
 
 ```http
 GET  /v1/artifacts/{artifactId}/skills

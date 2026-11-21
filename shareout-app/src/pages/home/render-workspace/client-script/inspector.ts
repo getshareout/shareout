@@ -149,6 +149,7 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
       + sec('approvals', t('review.approvals'), t('review.approvalsHelp'), '<div id="wsxApprove"></div>')
       + (editable ? sec('analytics', t('inspector.analytics'), t('inspector.analyticsHelp'), '<div id="wsxDetStats" class="wsx-det__stats"></div>') : '')
       + (editable ? sec('tests', t('inspector.tests'), t('inspector.testsHelp'), '<div id="wsxTests"></div>') : '')
+      + (editable && withData ? sec('viewbar', t('inspector.viewBar'), t('inspector.viewBarHelp'), '<label class="wsx-admin__check"><input type="checkbox" role="switch" id="wsxViewBar" disabled> ' + esc(t('inspector.viewBarLabel')) + '</label>') : '')
       + sec('knowledge', t('inspector.knowledgeFrom'), t('inspector.knowledgeFromHelp'), '<div id="wsxKnFrom"></div>')
       + (withData ? moreRow('data', t('inspector.data')) : '')
       + moreRow('history', t('inspector.versions'))
@@ -156,6 +157,7 @@ export const workspace_client_inspector_JS = `  // ===== right rail = the workin
     rbodyEl.innerHTML = h;
     var root = rbodyEl.querySelector('.wsx__details');
     paintApprovals(art);
+    if (document.getElementById('wsxViewBar')) wireViewBar(art);
 
     // inline edits — click to type, Enter to save, blur to autosave
     var enterSaves = function (el) { el.addEventListener('keydown', function (e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); el.blur(); } }); };
