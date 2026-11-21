@@ -40,6 +40,12 @@ ${ago}
       var wrap = menu.parentNode;
       if (wrap && !wrap.contains(e.target)) soHdMenu(false);
     });
+    // A click inside the artifact never reaches this document (it is in the frame), but it
+    // takes focus away from this window: close the menu then too.
+    window.addEventListener('blur', function() {
+      var menu = document.getElementById('so-hd-menu');
+      if (menu && !menu.hidden) soHdMenu(false);
+    });
     document.addEventListener('keydown', function(e) {
       var menu = document.getElementById('so-hd-menu');
       if (e.key !== 'Escape' || !menu || menu.hidden) return;
