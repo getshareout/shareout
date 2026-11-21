@@ -6,7 +6,9 @@ export type TicketChannel = 'ui' | 'skill' | 'slack' | 'telegram' | 'whatsapp' |
 export type TicketStatus = 'open' | 'pending' | 'resolved' | 'closed';
 export type TicketPriority = 'low' | 'normal' | 'high' | 'urgent';
 export type MessageAuthor = 'customer' | 'staff' | 'ai';
-export const TICKET_CATEGORIES = ['bug', 'question', 'access', 'billing', 'other'] as const;
+export const TICKET_CATEGORIES = ['bug', 'question', 'access', 'billing', 'feature_request', 'feedback', 'other'] as const;
+/** Not a problem: an idea or an opinion for the team. Kept apart from bugs in alerts and replies. */
+export const FEEDBACK_CATEGORIES: readonly TicketCategory[] = ['feature_request', 'feedback'];
 export const TICKET_SEVERITIES = ['low', 'normal', 'high', 'blocker'] as const;
 export const TICKET_CLIENTS = ['ui', 'claude', 'chatgpt', 'mcp', 'api', 'slack', 'telegram', 'email', 'chat_agent'] as const;
 export type TicketCategory = (typeof TICKET_CATEGORIES)[number];

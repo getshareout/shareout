@@ -4,8 +4,8 @@
 export interface WhatsNewItem { date: string; en: string; es: string; anchor: string }
 
 export const WHATS_NEW: WhatsNewItem[] = [
+  {"date":"2026-11-21","en":"Send the ShareOut team an idea or feedback from your AI","es":"Mandale al equipo de ShareOut una idea o un comentario desde tu IA","anchor":"2026-11-21-send-the-shareout-team-an-idea-or-feedback-from-your-ai"},
   {"date":"2026-11-21","en":"View counts add up again","es":"Las vistas vuelven a sumarse","anchor":"2026-11-21-view-counts-add-up-again"},
   {"date":"2026-11-21","en":"Home fits what matters on one screen","es":"Inicio entra en una pantalla con lo que importa","anchor":"2026-11-21-home-fits-what-matters-on-one-screen"},
   {"date":"2026-11-21","en":"Opening a page shows a clean bar on top instead of a menu full of buttons","es":"Al abrir un artefacto ves una barra prolija arriba en vez de un menú lleno de botones","anchor":"2026-11-21-opening-a-page-shows-a-clean-bar-on-top-instead-of-a-menu-of"},
-  {"date":"2026-11-21","en":"Messages opens right away","es":"Mensajes abre al instante","anchor":"2026-11-21-messages-opens-right-away"},
 ];

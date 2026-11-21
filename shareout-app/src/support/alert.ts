@@ -2,6 +2,12 @@ import type { Env } from '../types';
 import { sendMessage as sendTelegram } from '../telegram/client';
 import type { Ticket } from './store';
 
+const TITLES: Record<string, string> = {
+  feature_request: '💡 New feature request',
+  feedback: '💬 New feedback',
+  question: '❓ New question',
+};
+
 /**
  * Ping the instance operator on Telegram the moment a ticket opens, so a customer's
  * blocker reaches a human in minutes instead of waiting for someone to open the queue.
@@ -9,10 +15,11 @@ import type { Ticket } from './store';
  */
 export async function alertOperator(env: Env, ticket: Ticket, body: string): Promise<boolean> {
   const excerpt = body.length > 1500 ? `${body.slice(0, 1500)}…` : body;
-  return alertOps(env, `🆘 New support ticket ${ticket.id}`, [
+  return alertOps(env, `${TITLES[ticket.category ?? ''] ?? '🆘 New support ticket'} ${ticket.id}`, [
     `Subject: ${ticket.subject}`,
     `From: ${ticket.requester_email ?? ticket.requester_user_id ?? 'unknown'}`,
     `Workspace: ${ticket.workspace_id ?? '—'} · via ${ticket.client ?? ticket.channel}`,
+    ticket.category ? `Category: ${ticket.category}` : '',
     ticket.severity ? `Severity: ${ticket.severity}` : '',
   ], excerpt);
 }

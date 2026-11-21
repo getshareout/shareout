@@ -108,6 +108,7 @@ There is no public hosted default — resolve origin or deploy first.
 | Receive email / forward mail to an artifact / trigger on inbound mail | [integrations/inbound-email.md](integrations/inbound-email.md) | [api/jobs.md](api/jobs.md) |
 | Email templates | [sdk/email.md](sdk/email.md#templates) | [api/templates.md](api/templates.md) |
 | Raise a support ticket / bug report (agent or app) | [api/support.md](api/support.md) | [api/overview.md](api/overview.md) |
+| Send an idea, feedback or a question to the ShareOut team (agent or app) | [SKILL.md](SKILL.md#feedback-ideas-and-questions--tell-the-shareout-team) | [api/support.md](api/support.md#feedback-ideas-and-questions) |
 | REST API reference | [api/overview.md](api/overview.md) | [api/artifacts.md](api/artifacts.md) |
 | Publish CSV/Markdown/JSON | [api/artifact-types.md](api/artifact-types.md) | [SKILL.md](SKILL.md) |
 | Link preview when sharing (Slack, WhatsApp) | [modules/_shared/publishing.md](modules/_shared/publishing.md#link-previews-slack-whatsapp-imessage) | [api/artifacts.md](api/artifacts.md#put-v1artifactsidthumbnail) |

@@ -1,7 +1,7 @@
 {
   "name": "shareout-skill",
-  "version": "2.69.0",
-  "updated_at": "2026-11-18T23:00:00Z",
+  "version": "2.70.0",
+  "updated_at": "2026-11-21T18:00:00Z",
   "skill_endpoint": "/v1/skill",
   "parts": {
     "deploy/SKILL.md": {

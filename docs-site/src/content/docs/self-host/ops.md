@@ -127,8 +127,14 @@ Telegram, Slack, `support@` email — lands in one queue at `/admin?view=support
 answer and set its status. The reply reaches the requester on the channel they used, by
 email for in-app and API requests, and in their notification bell.
 
+Ideas, feedback and questions land in the same queue: people send them from Help, and AI
+apps and agents send them through the API (`category: "feature_request"`, `"feedback"` or
+`"question"`) or the connector's `send_feedback` tool. Pick **feature request (idea)** or
+**feedback** in the category filter to see only those, or ask for them over REST with
+`&category=feature_request`.
+
 With `SUPPORT_ALERT_TELEGRAM_CHAT_ID` and `TELEGRAM_BOT_TOKEN` set, every new ticket also
-pings your Telegram chat (the same chat gets the [AI and build alerts](/self-host/ai/#alerts)).
+pings your Telegram chat (ideas and feedback are labelled as such) (the same chat gets the [AI and build alerts](/self-host/ai/#alerts)).
 
 An agent can work the same queue with a personal API token created by an instance admin:
 

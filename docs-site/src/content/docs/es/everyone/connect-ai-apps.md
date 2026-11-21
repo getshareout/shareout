@@ -60,6 +60,10 @@ La IA te dice el link y quién puede ver el artefacto. Los artefactos van a tu e
 
 Contáselo a la IA. Puede mandarle un reporte al equipo de ShareOut por vos, y te respondemos por mail.
 
+## Ideas y comentarios
+
+¿Querés que ShareOut haga algo nuevo, o contarnos qué te sirvió? Decíselo a la IA: "Mandale a ShareOut la idea: exportar un artefacto a PDF." Le llega directo al equipo de ShareOut, y la IA te avisa que lo mandó. La IA también puede mandarnos una nota por su cuenta cuando ShareOut le complicó algo, sin tus datos personales ni los de tu empresa.
+
 ## Desconectar
 
 Sacá el conector de ShareOut en la configuración de Claude o ChatGPT. Deja de funcionar en menos de una hora.

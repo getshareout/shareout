@@ -39,4 +39,11 @@ describe('supportBody', () => {
     expect(html).toContain('bug · blocker');
     expect(html).not.toMatch(/telegram/i);
   });
+
+  it('filters down to ideas and feedback that agents send', () => {
+    const html = supportBody([ticket({ category: 'feature_request', client: 'mcp', channel: 'skill' })]);
+    expect(html).toContain('<option value="feature_request">feature request (idea)</option>');
+    expect(html).toContain('<option value="feedback">feedback</option>');
+    expect(html).toContain('data-category="feature_request"');
+  });
 });

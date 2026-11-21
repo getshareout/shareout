@@ -45,6 +45,12 @@ example the page you asked it to publish) goes to `https://shareout.site` under 
 account, with the same permissions you have in ShareOut. The tools are listed in
 [ShareOutSkill/integrations/mcp-connector.md](ShareOutSkill/integrations/mcp-connector.md).
 
+The skill also asks Claude to send the ShareOut team a short note when ShareOut gets in its
+way or you have an idea or feedback for the team: one ticket through the same connector
+(`send_feedback`) or REST API, under your account, about ShareOut only and without personal
+or customer data. Claude may send it without asking first, and tells you when it does. Ask it
+not to and it won't.
+
 The skill is documentation, and following it can send data to two other places, only when
 you ask for it:
 

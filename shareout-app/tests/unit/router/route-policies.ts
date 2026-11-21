@@ -161,6 +161,7 @@ export const MCP_TOOL_POLICIES: Record<string, McpToolPolicy> = {
   list_workspaces: 'self',
   get_help: 'self',
   report_problem: 'self',
+  send_feedback: 'self',
   search: 'self',
   list_artifacts: 'workspace',
   publish_artifact: 'workspace',

@@ -48,6 +48,15 @@ describe('triageTicket', () => {
     expect(triage).toMatchObject({ category: 'question', priority: 'normal', draft: 'Hi' });
   });
 
+  it('keeps only categories the queue can filter on', async () => {
+    streamTurnMock.mockReturnValue(deltas('{"category":"feature_request","priority":"low","draft":"Thanks"}'));
+    const idea = await createTicket(e, { channel: 'skill', subject: 'Dark mode', body: 'please' });
+    expect((await triageTicket(e, idea.id))!.category).toBe('feature_request');
+    streamTurnMock.mockReturnValue(deltas('{"category":"account","priority":"low","draft":"Hi"}'));
+    const other = await createTicket(e, { channel: 'skill', subject: 'Login', body: 'x' });
+    expect((await triageTicket(e, other.id))!.category).toBe('other');
+  });
+
   it('returns null on provider error without writing', async () => {
     streamTurnMock.mockReturnValue((async function* () { yield { type: 'error' as const, error: 'down' }; })());
     const t = await createTicket(e, { workspaceId: 'wsp_1', channel: 'ui', subject: 'Q', body: 'x' });

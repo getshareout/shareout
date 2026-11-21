@@ -7,7 +7,7 @@ import { getInternalWorkspaceRole } from '../../workspaces/roles';
 import {
   createTicket, getTicket, getThread, appendMessage, setStatus, assign,
   listForWorkspace, listAll, listForRequester, findByIdempotencyKey,
-  TICKET_CATEGORIES, TICKET_SEVERITIES, TICKET_CLIENTS,
+  TICKET_CATEGORIES, TICKET_SEVERITIES, TICKET_CLIENTS, FEEDBACK_CATEGORIES,
   type Ticket, type TicketStatus, type TicketCategory, type TicketSeverity, type TicketClient,
 } from '../../support/store';
 import { triageTicket } from '../../support/triage';
@@ -81,8 +81,11 @@ function created(ticket: Ticket, deduped: boolean) {
     success: true,
     deduped,
     ticket,
-    message: `Your report is in the support queue as ${ticket.id}. The team replies on the ticket thread`
-      + ' (Help & support in the app) and by email — nothing else to do now.',
+    message: FEEDBACK_CATEGORIES.includes(ticket.category as TicketCategory)
+      ? `Thanks — the ShareOut team got it as ${ticket.id} and reads every one. If they have a question`
+        + ' they answer on the ticket thread (Help & support in the app) and by email.'
+      : `Your report is in the support queue as ${ticket.id}. The team replies on the ticket thread`
+        + ' (Help & support in the app) and by email — nothing else to do now.',
     check_replies: { method: 'GET', path: check, hint: 'Staff messages appear in `thread` with author "staff"; status turns "pending" once answered.' },
   };
 }

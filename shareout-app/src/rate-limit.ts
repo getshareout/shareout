@@ -54,6 +54,8 @@ const RATE_LIMITS = {
   guestCommentIp: { limit: 30, windowSeconds: 3600 },
   guestCommentToken: { limit: 20, windowSeconds: 3600 },
   reportProblem: { limit: 5, windowSeconds: 3600 },
+  // Ideas, feedback and questions for the team from an assistant: room for a few, not a loop.
+  sendFeedback: { limit: 10, windowSeconds: 3600 },
   accessRequest: { limit: 30, windowSeconds: 3600 },
   adminBridgeAsk: { limit: 30, windowSeconds: 3600 },
   // "Ask an admin" from a refused action; per-reason dedupe sits in the handler.
@@ -271,6 +273,10 @@ export async function checkArtifactGateLimit(env: Env, request: Request, artifac
 
 export async function checkReportProblemLimit(env: Env, userId: string): Promise<RateLimitResult> {
   return checkKVRateLimit(env.RATE_LIMIT_KV, userId, 'reportProblem');
+}
+
+export async function checkSendFeedbackLimit(env: Env, userId: string): Promise<RateLimitResult> {
+  return checkKVRateLimit(env.RATE_LIMIT_KV, userId, 'sendFeedback');
 }
 
 export async function checkAccessRequestLimit(env: Env, userId: string): Promise<RateLimitResult> {

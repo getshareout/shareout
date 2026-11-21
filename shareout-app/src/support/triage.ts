@@ -1,14 +1,14 @@
 import type { Env } from '../types';
 import { getCrewProvider, type NeutralTurn } from '../crew/provider';
 import { SHAREOUT_SKILL_PRIMER } from '../chat-agent/skill-primer';
-import { getTicket, threadAsChatHistory, setTriage, type Triage, type TicketPriority } from './store';
+import { getTicket, threadAsChatHistory, setTriage, TICKET_CATEGORIES, type Triage, type TicketPriority } from './store';
 
 const PRIORITIES: TicketPriority[] = ['low', 'normal', 'high', 'urgent'];
 
 const TRIAGE_SYSTEM = [
   'You are a support triage assistant for ShareOut. A user has opened a support ticket.',
   'Read the conversation and return ONLY a JSON object — no prose, no code fences — with exactly these keys:',
-  '  "category": one of "bug" | "question" | "billing" | "feature_request" | "account" | "other"',
+  `  "category": one of ${TICKET_CATEGORIES.map((c) => `"${c}"`).join(' | ')}`,
   '  "priority": one of "low" | "normal" | "high" | "urgent"',
   '  "draft": a warm, concise reply to the customer (plain text, no markdown headings).',
   'The draft is a SUGGESTION for a human agent to review and edit — it is never sent automatically.',
@@ -25,7 +25,8 @@ function parseTriage(raw: string): Triage {
   if (start === -1 || end === -1 || end <= start) throw new Error('triage: no JSON object in model output');
   const obj = JSON.parse(raw.slice(start, end + 1)) as Partial<Triage>;
   const priority = PRIORITIES.includes(obj.priority as TicketPriority) ? (obj.priority as TicketPriority) : 'normal';
-  const category = typeof obj.category === 'string' && obj.category ? obj.category : 'other';
+  // Only a category the queue can filter on; anything else lands in "other".
+  const category = (TICKET_CATEGORIES as readonly string[]).includes(obj.category as string) ? (obj.category as string) : 'other';
   const draft = typeof obj.draft === 'string' ? obj.draft : '';
   return { category, priority, draft };
 }

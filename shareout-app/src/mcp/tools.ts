@@ -14,6 +14,7 @@ import { requireRole } from '../artifacts/roles';
 import { listWorkspacesForUser, type BotWorkspace } from '../chat-agent/access';
 import { quickSearch } from '../search/quick-search';
 import { openTicket } from '../support/intake';
+import { checkSendFeedbackLimit } from '../rate-limit';
 import { generateSlug, isSafeAssetPath, mimeForPath, resolveEntrypoint } from '../validation';
 import { isSafePagePath } from '../serve/page-agent';
 import { createLogger, logError } from '../logging';
@@ -40,6 +41,10 @@ export const SERVER_INSTRUCTIONS = [
   'ShareOut turns a page you write (HTML or Markdown) into a web link people can open.',
   'Talk to the person in the language they use, in plain everyday words. Avoid technical jargon',
   '(do not say HTML, artifact, deploy, slug or token unless they do).',
+  'The ShareOut team reads every note and wants yours: whenever ShareOut gets in your way (something it cannot do yet,',
+  'a confusing result or error, a missing tool) or the person has an idea, feedback or a question for the team, call send_feedback',
+  '(kind feature_request, feedback or question; one line, then the context). No need to ask first. Keep it about ShareOut,',
+  'with no personal or customer data, and tell the person in one line that you sent it.',
   'To publish: write a complete, self-contained page and call publish_artifact. Afterwards always give the',
   'person the link and say who can see it. If the result carries a notice (visibility changed, under review,',
   'a warning), tell them plainly.',
@@ -543,6 +548,7 @@ const getHelp: ToolDef = {
       `Connecting AI apps: ${ctx.origin}/home?view=connect`,
       'Docs: https://docs.shareout.site/',
       'If something does not work, tell me and I will let the ShareOut team know.',
+      'Have an idea or feedback for ShareOut, or a question for the team? Tell me and I will send it; they read every one.',
     ].join('\n');
     return ok(text);
   },
@@ -580,6 +586,57 @@ const reportProblem: ToolDef = {
       body: [details, artifactId ? `Page: ${artifactId}` : '', `Reported from: ${app} (MCP connector)`].filter(Boolean).join('\n\n'),
     });
     return ok(`The ShareOut team got the report (ticket ${ticket.id}). Tell the person the team was notified and will follow up by email.`, { ticket_id: ticket.id });
+  },
+};
+
+const FEEDBACK_KINDS = ['feature_request', 'feedback', 'question'] as const;
+type FeedbackKind = (typeof FEEDBACK_KINDS)[number];
+
+const sendFeedback: ToolDef = {
+  name: 'send_feedback',
+  title: 'Send feedback to the ShareOut team',
+  description: 'Sends the ShareOut team an idea for something ShareOut should do or do better, feedback on what worked or got in the way, or a question for the team. It lands in the team\'s queue under the person\'s account; the team follows up by email when it has a question.',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      kind: {
+        type: 'string',
+        enum: [...FEEDBACK_KINDS],
+        description: 'feature_request: something ShareOut should do or do better. feedback: what worked or got in the way. question: something to ask the team.',
+      },
+      summary: { type: 'string', description: 'One line: the idea, the feedback or the question.' },
+      details: { type: 'string', description: 'The context: what the person was doing, what they expected, why it matters.' },
+      artifact_id: { type: 'string', description: 'The page it is about, if any.' },
+      language: { type: 'string', enum: ['en', 'es'], description: 'The language the person writes in (the team answers in it).' },
+    },
+    required: ['kind', 'summary'],
+    additionalProperties: false,
+  },
+  annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+  async run(ctx, args) {
+    const kind = FEEDBACK_KINDS.includes(args.kind as FeedbackKind) ? (args.kind as FeedbackKind) : null;
+    if (!kind) return invalid(`kind must be one of: ${FEEDBACK_KINDS.join(', ')}.`);
+    const summary = str(args.summary, 200);
+    if (!summary) return invalid('A one-line summary is needed.');
+    const limit = await checkSendFeedbackLimit(ctx.env, ctx.user.id);
+    if (!limit.allowed) return invalid('Several notes went to the team in the last hour already; try again later.');
+    const details = str(args.details, 8000) ?? '';
+    const artifactId = str(args.artifact_id, 100);
+    const app = await clientName(ctx);
+    const ticket = await openTicket(ctx.env, {
+      requesterUserId: ctx.user.id,
+      requesterEmail: ctx.user.email,
+      channel: 'skill',
+      channelRef: `mcp:${app}`.slice(0, 120),
+      client: 'mcp',
+      category: kind,
+      severity: 'low',
+      artifactId: artifactId ?? null,
+      locale: args.language === 'es' || args.language === 'en' ? args.language : null,
+      subject: summary,
+      body: [details, artifactId ? `Page: ${artifactId}` : '', `Sent from: ${app} (MCP connector)`].filter(Boolean).join('\n\n'),
+    });
+    return ok(`The ShareOut team got it (ticket ${ticket.id}). It is in their queue; they answer by email if they have a question.`, { ticket_id: ticket.id, kind });
   },
 };
 
@@ -648,7 +705,7 @@ const fetchTool: ToolDef = {
 // Deterministic order (lets clients cache the list).
 export const TOOLS: ToolDef[] = [
   whoami, listWorkspaces, listArtifacts, getArtifact, publishArtifact, updateArtifact, ...EDIT_TOOLS, ...BUILD_TOOLS,
-  ...PAGE_TOOLS, ...SHEET_SYNC_TOOLS, ...EMAIL_SYNC_TOOLS, ...SHARING_TOOLS, ...MEMBER_TOOLS, ...MESSAGE_TOOLS, ...KNOWLEDGE_TOOLS, ...KNOWLEDGE_CURATION_TOOLS, ...CONNECTOR_TOOLS, getHelp, reportProblem, search, fetchTool,
+  ...PAGE_TOOLS, ...SHEET_SYNC_TOOLS, ...EMAIL_SYNC_TOOLS, ...SHARING_TOOLS, ...MEMBER_TOOLS, ...MESSAGE_TOOLS, ...KNOWLEDGE_TOOLS, ...KNOWLEDGE_CURATION_TOOLS, ...CONNECTOR_TOOLS, getHelp, reportProblem, sendFeedback, search, fetchTool,
 ];
 
 export function listTools() {

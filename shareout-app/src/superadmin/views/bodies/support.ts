@@ -8,6 +8,8 @@ import { escapeHtml } from '../../../html/utils';
 import { TICKET_CATEGORIES, type Ticket } from '../../../support/store';
 import { stat, fmtEpoch } from '../components';
 
+const CATEGORY_LABELS: Record<string, string> = { feature_request: 'feature request (idea)', feedback: 'feedback' };
+
 function select(id: string, all: string, values: [string, string][]): string {
   const opts = values.map(([v, label]) => `<option value="${escapeHtml(v)}">${escapeHtml(label)}</option>`).join('');
   return `<select id="${id}" class="so-c-select"><option value="">${escapeHtml(all)}</option>${opts}</select>`;
@@ -28,7 +30,7 @@ export function supportBody(tickets: Ticket[]): string {
   const workspaces = [...new Set(tickets.map((t) => t.workspace_id).filter((w): w is string => !!w))];
   const filters = `<div class="sa-card" style="display:flex;gap:8px;flex-wrap:wrap">
     ${select('sa-sup-status', 'All statuses', ['open', 'pending', 'resolved', 'closed'].map((s) => [s, s]))}
-    ${select('sa-sup-category', 'All categories', TICKET_CATEGORIES.map((c) => [c, c]))}
+    ${select('sa-sup-category', 'All categories', TICKET_CATEGORIES.map((c) => [c, CATEGORY_LABELS[c] ?? c]))}
     ${select('sa-sup-ws', 'All workspaces', [['none', 'No workspace'], ...workspaces.map((w): [string, string] => [w, w])])}
   </div>`;
 

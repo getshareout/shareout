@@ -120,8 +120,14 @@ artefacto, request id, navegador), el hilo y una respuesta redactada por IA; des
 respondé y cambiá su estado. La respuesta le llega a quien pidió por el canal que usó, por
 email para los pedidos desde la app y la API, y en su campana de notificaciones.
 
+Las ideas, los comentarios y las preguntas caen en la misma cola: la gente los manda desde
+Ayuda, y las apps de IA y los agentes por la API (`category: "feature_request"`, `"feedback"`
+o `"question"`) o con la herramienta `send_feedback` del conector. Elegí **feature request
+(idea)** o **feedback** en el filtro de categoría para ver solo esos, o pedilos por REST con
+`&category=feature_request`.
+
 Con `SUPPORT_ALERT_TELEGRAM_CHAT_ID` y `TELEGRAM_BOT_TOKEN` configurados, cada ticket nuevo
-también avisa en tu chat de Telegram (el mismo chat recibe las
+también avisa en tu chat de Telegram (las ideas y los comentarios llegan marcados como tales) (el mismo chat recibe las
 [alertas de IA y de builds](/es/self-host/ai/#alertas)).
 
 Un agente puede trabajar la misma cola con un token personal de API creado por un admin de

@@ -104,6 +104,21 @@ describe('create', () => {
     expect((await getTicket(e, plain.ticket.id))!.client).toBe('api');
   });
 
+  it('takes an idea or feedback from an agent and thanks instead of promising a fix', async () => {
+    for (const category of ['feature_request', 'feedback'] as const) {
+      const res = await routeSupportApi(ctx('POST', '/v1/support/tickets', {
+        subject: 'Let me export a page to PDF', body: 'Asked twice this week.', category, client: 'claude',
+      }, { authorization: 'Bearer so_x' }))!;
+      expect(res!.status).toBe(201);
+      const j = await res!.json() as { ticket: { id: string }; message: string };
+      expect(j.message).toMatch(/^Thanks/);
+      expect(j.message).toContain(j.ticket.id);
+      expect(await getTicket(e, j.ticket.id)).toMatchObject({ category, channel: 'skill', client: 'claude' });
+    }
+    const bug = await routeSupportApi(ctx('POST', '/v1/support/tickets', { subject: 's', body: 'b', category: 'bug' }))!;
+    expect(((await bug!.json()) as { message: string }).message).toMatch(/^Your report is in the support queue/);
+  });
+
   it('rejects an unknown category/severity/client', async () => {
     const res = await routeSupportApi(ctx('POST', '/v1/support/tickets', { subject: 's', body: 'b', severity: 'urgent' }))!;
     expect(res!.status).toBe(400);
