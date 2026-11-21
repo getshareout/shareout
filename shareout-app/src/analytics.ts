@@ -503,12 +503,19 @@ interface AggCursor {
 export async function aggregateDailyStats(env: Env): Promise<number> {
   let cursor = await loadAggCursor(env);
   if (!cursor) {
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    const dateStr = utcDateString(yesterday);
-    // Already rolled up by a prior tick — nothing to do.
-    if (await isDayAggregated(env, dateStr)) return 0;
-    cursor = { date: dateStr, lastArtifactId: '' };
+    // A day marked done with nothing counted goes first: its raw events are the next
+    // ones cleanupOldEvents deletes.
+    const uncounted = await findUncountedDay(env);
+    if (uncounted) {
+      cursor = { date: uncounted, lastArtifactId: '' };
+    } else {
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      const dateStr = utcDateString(yesterday);
+      // Already rolled up by a prior tick — nothing to do.
+      if (await isDayAggregated(env, dateStr)) return 0;
+      cursor = { date: dateStr, lastArtifactId: '' };
+    }
   }
 
   // analytics_events.created_at is ISO text: bound the day with ISO strings. Unix seconds
@@ -677,6 +684,25 @@ async function isDayAggregated(env: Env, dateStr: string): Promise<boolean> {
     `SELECT 1 AS present FROM analytics_agg_state WHERE date = ?`
   ).bind(dateStr).first<{ present: number }>();
   return !!row;
+}
+
+// A recent past day watermarked in analytics_agg_state with raw events but no analytics_daily
+// row — what the rollup left while it bound unix seconds against the ISO created_at (it
+// matched no rows and still marked the day done). Oldest first; only the last week, since
+// cleanupOldEvents removes a watermarked day's raw events after two days. Indexed lookups on
+// a handful of rows, so it is cheap on every idle tick.
+async function findUncountedDay(env: Env): Promise<string | null> {
+  const now = Date.now();
+  const row = await env.DB.prepare(`
+    SELECT s.date AS date FROM analytics_agg_state s
+    WHERE s.date >= ?1 AND s.date < ?2
+      AND NOT EXISTS (SELECT 1 FROM analytics_daily d WHERE d.date = s.date)
+      AND EXISTS (SELECT 1 FROM analytics_events e
+                  WHERE e.created_at >= s.date || 'T00:00:00.000Z'
+                    AND e.created_at < date(s.date, '+1 day') || 'T00:00:00.000Z')
+    ORDER BY s.date LIMIT 1
+  `).bind(utcDateString(new Date(now - 7 * 86400_000)), utcDateString(new Date(now))).first<{ date: string }>();
+  return row?.date || null;
 }
 
 // After a day completes, point the cursor at the next still-past, not-yet-aggregated

@@ -2,7 +2,7 @@
 // analytics_events.created_at is ISO text; binding unix seconds there compares as text
 // ('2026-…' >= '1795…' is always true, '2026-…' < '1795…' never), so the rollup counted
 // nothing and "today" counted every raw event. The mocked tests in analytics.test.ts
-// could not see that.
+// could not see that. Days it marked done with nothing counted are picked up on their own.
 import { beforeAll, describe, expect, it } from 'vitest';
 import { applyMigrations, e } from './helpers/migrated-db';
 import { aggregateDailyStats, getAccountAnalytics, getAnalytics } from '../../src/analytics';
@@ -78,18 +78,26 @@ describe('view rollup on real D1', () => {
     await e.DB.prepare("DELETE FROM analytics_events WHERE id = 'ev_new'").run();
   });
 
-  it('re-summarises a day that was marked done with nothing counted', async () => {
-    // What the broken rollup left behind: the day marked done, no daily row.
-    await e.DB.prepare("INSERT INTO analytics_agg_state (date, completed_at) VALUES (?, '2026-01-01T00:00:00.000Z')").bind(TWO_AGO).run();
+  it('an idle tick with everything counted does nothing', async () => {
+    expect(await aggregateDailyStats(e)).toBe(0);
+    expect(await e.DB.prepare('SELECT 1 FROM analytics_agg_cursor').first()).toBeNull();
+  });
+
+  it('counts, on its own, a day the broken rollup marked done with nothing counted', async () => {
+    // What the broken rollup left behind: the day marked done, its raw events still there,
+    // no daily row. A marked day with no events at all is left alone.
+    const EMPTY = day(3);
+    await e.DB.batch([
+      e.DB.prepare("INSERT INTO analytics_agg_state (date, completed_at) VALUES (?, '2026-01-01T00:00:00.000Z')").bind(TWO_AGO),
+      e.DB.prepare("INSERT INTO analytics_agg_state (date, completed_at) VALUES (?, '2026-01-01T00:00:00.000Z')").bind(EMPTY),
+    ]);
     expect(await daily(TWO_AGO)).toBeNull();
-    // The repair: unmark the day and point the rollup cursor at it.
-    await e.DB.prepare('DELETE FROM analytics_agg_state WHERE date IN (?)').bind(TWO_AGO).run();
-    await e.DB.prepare(`INSERT INTO analytics_agg_cursor (id, date, last_artifact_id, updated_at) VALUES (1, ?, '', strftime('%Y-%m-%dT%H:%M:%fZ','now'))
-                        ON CONFLICT(id) DO UPDATE SET date = excluded.date, last_artifact_id = excluded.last_artifact_id, updated_at = excluded.updated_at`)
-      .bind(TWO_AGO).run();
+    expect(await aggregateDailyStats(e)).toBe(1); // picked up by the next tick, no manual step
     await drain();
     expect(await daily(TWO_AGO)).toEqual({ views: 1, uniques: 1 });
     expect(await daily(YESTERDAY)).toEqual({ views: 3, uniques: 2 });
     expect(await e.DB.prepare('SELECT 1 FROM analytics_agg_state WHERE date = ?').bind(TWO_AGO).first()).not.toBeNull();
+    expect(await aggregateDailyStats(e)).toBe(0);
+    expect((await getAccountAnalytics(e, [user.id], 7, WS)).totals.views).toBe(6);
   });
 });
