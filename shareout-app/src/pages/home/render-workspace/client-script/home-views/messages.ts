@@ -3,7 +3,8 @@ import { MESSAGES_PAGE_COPY } from './messages-copy';
 /** Messages lens: one-to-one conversations between internal members of the workspace
  *  (/v1/workspaces/{ws}/messages). Lazily loaded (lazy-chunks.ts); shares the shell scope.
  *  The list and the open conversation sit side by side; under 720px the list comes first and a
- *  conversation opens over it with a back button. Polls every 20 s while the view is on screen. */
+ *  conversation opens over it with a back button. Polls every 20 s while the view is on screen.
+ *  The first paint uses the conversations the boot request brought (messages-badge.ts). */
 export const workspace_client_home_views_messages_JS = `  var MSG_COPY = ${JSON.stringify(MESSAGES_PAGE_COPY).replace(/</g, '\\u003c')};
   // Messages strings first (in the page's current language), then the shell's copy.
   function mt(k) { var de = document.documentElement, l = de && de.lang === 'es' ? 'es' : 'en'; return MSG_COPY[l][k] || MSG_COPY.en[k] || t(k); }
@@ -320,11 +321,14 @@ export const workspace_client_home_views_messages_JS = `  var MSG_COPY = ${JSON.
     var root = msgEl('wsxMsgMount'); if (!root) return;
     if (!root.hasAttribute('data-wired')) { root.setAttribute('data-wired', '1'); msgWire(root); }
     var lang = document.documentElement.lang === 'es' ? 'es' : 'en';
+    // The boot request already brought the conversations: paint them now, refresh behind.
+    if (!msgThreads && msgBootThreads) msgThreads = msgBootThreads.slice();
     if (!msgEl('wsxMsgConv') || root.getAttribute('data-lang') !== lang) {
       root.setAttribute('data-lang', lang);
       msgPaintShell(); msgPaintList(); msgShowConv();
     }
-    msgLoadList(false);
+    // With a list on screen a failed refresh keeps it; with none, it says so.
+    msgLoadList(!!msgThreads);
     msgStartPoll();
   }
 `;

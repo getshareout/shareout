@@ -196,6 +196,19 @@ describe('getSessionUser', () => {
       .resolves.toEqual({ id: 'usr_1', email: 'user@example.com' });
     expect(kvMiss.put).toHaveBeenCalledWith('userdisabled:usr_1', '0', { expirationTtl: 60 });
   });
+
+  it('does not wait on a slow KV read or the cache fill (a KV miss can take 10 s)', async () => {
+    const token = await createSessionToken('usr_1', 'user@example.com', baseEnv);
+    const request = new Request('https://shareout.example.com/', { headers: { Cookie: `shareout_session=${token}` } });
+    const never = () => new Promise<never>(() => {});
+    const kvStuck = { get: vi.fn(never), put: vi.fn(never), delete: vi.fn() };
+    const db = makeDbMock({ first: (sql) => (sql.includes('disabled FROM users') ? { disabled: 0 } : null) });
+    const started = Date.now();
+    await expect(getSessionUser(request, { ...baseEnv, SLUGS: kvStuck, DB: db } as unknown as Env))
+      .resolves.toEqual({ id: 'usr_1', email: 'user@example.com' });
+    expect(Date.now() - started).toBeLessThan(2000);
+    expect(kvStuck.put).toHaveBeenCalledWith('userdisabled:usr_1', '0', { expirationTtl: 60 });
+  });
 });
 
 describe('upsertUserByEmail', () => {
